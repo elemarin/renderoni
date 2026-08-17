@@ -6,12 +6,15 @@
  * zero VRAM leaks and zero WASM double-frees.
  */
 
+import * as THREE from 'three';
+
 export type ResourceOwnership = 'owned' | 'borrowed' | 'shared' | 'transferred';
 
 export interface DisposableThreeObject {
   geometry?: { dispose: () => void };
   material?: { dispose: () => void } | Array<{ dispose: () => void }>;
   dispose?: () => void;
+  [key: string]: unknown;
 }
 
 export interface RapierWorldAdapter {
@@ -23,7 +26,7 @@ export interface RapierWorldAdapter {
 
 export interface EntityResourceRecord {
   entityId: string;
-  threeObjects: Array<{ object: DisposableThreeObject; ownership: ResourceOwnership }>;
+  threeObjects: Array<{ object: DisposableThreeObject | THREE.Object3D; ownership: ResourceOwnership }>;
   rapierHandles: {
     bodyHandles: number[];
     colliderHandles: number[];
@@ -53,7 +56,7 @@ export class ResourceOwnershipTracker {
 
   addThreeObject(
     entityId: string,
-    object: DisposableThreeObject,
+    object: DisposableThreeObject | THREE.Object3D,
     ownership: ResourceOwnership = 'owned'
   ): void {
     const record = this.registerEntity(entityId);
@@ -82,7 +85,7 @@ export class ResourceOwnershipTracker {
     // Clean up Three.js objects
     for (const item of record.threeObjects) {
       if (item.ownership === 'owned' || item.ownership === 'transferred') {
-        const obj = item.object;
+        const obj = item.object as any;
         if (obj.geometry?.dispose) {
           obj.geometry.dispose();
         }

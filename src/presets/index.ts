@@ -1,10 +1,6 @@
-export interface PresetDefinition<TOptions = unknown> {
-  name: string;
-  version: number;
-  schema?: unknown;
-  create: (ctx: unknown, options: TOptions) => unknown;
-}
-
-export function definePreset<TOptions>(def: PresetDefinition<TOptions>): PresetDefinition<TOptions> {
-  return def;
-}
+export * from './define-preset.js';
+export * from './body.js';
+export * from './sensor.js';
+export * from './light.js';
+export * from './kcc-player.js';
+export * from './dynamic-player.js';

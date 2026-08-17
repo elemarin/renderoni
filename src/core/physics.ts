@@ -54,6 +54,10 @@ export class PhysicsEngine {
     }
   }
 
+  get hasWorld(): boolean {
+    return this._world !== null;
+  }
+
   get world(): RAPIER.World {
     if (!this._world) {
       throw new Error('PhysicsEngine not initialized. Call await physics.init() first.');
