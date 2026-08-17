@@ -1,0 +1,105 @@
+{
+  "name": "renderoni",
+  "version": "0.1.0",
+  "description": "Deterministic by design. Al dente by default. A batteries-included, agent-native 3D simulation and gameplay framework for Three.js and Rapier.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./presets": {
+      "types": "./dist/presets/index.d.ts",
+      "import": "./dist/presets/index.js"
+    },
+    "./animation": {
+      "types": "./dist/animation/index.d.ts",
+      "import": "./dist/animation/index.js"
+    },
+    "./audio": {
+      "types": "./dist/audio/index.d.ts",
+      "import": "./dist/audio/index.js"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js"
+    },
+    "./vfx": {
+      "types": "./dist/vfx/index.d.ts",
+      "import": "./dist/vfx/index.js"
+    },
+    "./network": {
+      "types": "./dist/network/index.d.ts",
+      "import": "./dist/network/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js"
+    },
+    "./testing/matchers": {
+      "types": "./dist/testing/matchers.d.ts",
+      "import": "./dist/testing/matchers.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "threejs",
+    "rapier",
+    "physics",
+    "game-engine",
+    "simulation",
+    "deterministic",
+    "mcp",
+    "agent-native",
+    "webgl",
+    "webgpu"
+  ],
+  "author": "Esteban Leandro Marín",
+  "license": "MIT",
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.14",
+    "xxhash-wasm": "^1.1.0"
+  },
+  "peerDependencies": {
+    "@dimforge/rapier3d-compat": ">=0.13.0",
+    "three": ">=0.160.0"
+  },
+  "peerDependenciesMeta": {
+    "@dimforge/rapier3d-compat": {
+      "optional": true
+    },
+    "three": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@dimforge/rapier3d-compat": "^0.14.0",
+    "@types/node": "^22.10.2",
+    "@types/three": "^0.170.0",
+    "three": "^0.170.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
