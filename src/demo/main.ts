@@ -2,16 +2,17 @@
  * Renderoni Interactive Web Playground & Live Agent Inspector
  */
 
+import { QuickstartGame } from './quickstart-game.js';
 import { FlightGame } from './flight-game.js';
 import { VoxelGame } from './voxel-game.js';
 import { PsxGame } from './psx-game.js';
 import { ObservationEngine } from '../core/observations.js';
 
-type GameMode = 'flight' | 'voxel' | 'psx';
+type GameMode = 'quickstart' | 'flight' | 'voxel' | 'psx';
 
 class PlaygroundApp {
-  private activeMode: GameMode = 'flight';
-  private currentGame: FlightGame | VoxelGame | PsxGame | null = null;
+  private activeMode: GameMode = 'quickstart';
+  private currentGame: QuickstartGame | FlightGame | VoxelGame | PsxGame | null = null;
   private canvas: HTMLCanvasElement;
   private isInspectorOpen = true;
 
@@ -26,7 +27,7 @@ class PlaygroundApp {
   constructor() {
     this.canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     this.initDOM();
-    this.switchGame('flight');
+    this.switchGame('quickstart');
     this.startHUDUpdateLoop();
   }
 
@@ -117,7 +118,11 @@ class PlaygroundApp {
     this.updateQuickActions(mode);
 
     // Mount Game
-    if (mode === 'flight') {
+    if (mode === 'quickstart') {
+      this.currentGame = new QuickstartGame(this.canvas);
+      await this.currentGame.init();
+      this.mountQuickstartHUD();
+    } else if (mode === 'flight') {
       this.currentGame = new FlightGame(this.canvas);
       await this.currentGame.init();
       this.mountFlightHUD();
@@ -138,7 +143,11 @@ class PlaygroundApp {
     const container = document.getElementById('quick-actions');
     if (!container) return;
 
-    if (mode === 'flight') {
+    if (mode === 'quickstart') {
+      container.innerHTML = `
+        <button class="chip-btn" data-action="quickstart.respawnCoin">🪙 Respawn Coin</button>
+      `;
+    } else if (mode === 'flight') {
       container.innerHTML = `
         <button class="chip-btn" data-action="flight.throttle" data-payload="1.0">⚡ Max Throttle (Z)</button>
         <button class="chip-btn" data-action="flight.throttle" data-payload="0.0">🛑 Cut Throttle (X)</button>
@@ -158,6 +167,30 @@ class PlaygroundApp {
         <button class="chip-btn" data-action="quest.unlockDoor">🚪 Unlock Gate</button>
       `;
     }
+  }
+
+  private mountQuickstartHUD(): void {
+    this.hudContainer.innerHTML = `
+      <div class="hud-card">
+        <div class="hud-title">🪙 README Quickstart Demo</div>
+        <div class="instructions-text">
+          <strong>WASD / Arrow Keys</strong>: Move Hero Player &bull; <strong>Space</strong>: Jump<br/>
+          Walk to the <strong>Golden Coin</strong> at (5, 1.4, 0) to trigger the sensor, play audio, spawn VFX particles, and destroy the coin!
+        </div>
+        <div class="telemetry-grid">
+          <div class="metric"><span class="label">Hero Position:</span> <span id="qs-pos" class="val">0.0, 1.5, 0.0</span></div>
+          <div class="metric"><span class="label">Coins Collected:</span> <span id="qs-coins" class="val tag">0</span></div>
+        </div>
+        <div class="controls-row">
+          <button id="btn-respawn-coin" class="btn btn-primary">🪙 Respawn Coin</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('btn-respawn-coin')?.addEventListener('click', (e) => {
+      (this.currentGame as QuickstartGame)?.respawnCoin();
+      (e.currentTarget as HTMLElement)?.blur();
+    });
   }
 
   private mountFlightHUD(): void {
@@ -291,7 +324,13 @@ class PlaygroundApp {
   private startHUDUpdateLoop(): void {
     const updateHUD = () => {
       if (this.currentGame) {
-        if (this.activeMode === 'flight') {
+        if (this.activeMode === 'quickstart') {
+          const t = (this.currentGame as QuickstartGame).getTelemetry();
+          const posEl = document.getElementById('qs-pos');
+          const coinsEl = document.getElementById('qs-coins');
+          if (posEl) posEl.textContent = `${t.playerPos[0]}, ${t.playerPos[1]}, ${t.playerPos[2]}`;
+          if (coinsEl) coinsEl.textContent = `${t.coinsCollected}`;
+        } else if (this.activeMode === 'flight') {
           const t = (this.currentGame as FlightGame).getTelemetry();
           const spdEl = document.getElementById('flight-speed');
           const altEl = document.getElementById('flight-alt');

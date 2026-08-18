@@ -13,7 +13,8 @@
     <!-- Top Navigation / Archetype Selector -->
     <nav class="top-nav">
       <div class="brand-badge">🍝 Renderoni</div>
-      <button class="tab-btn active" data-mode="flight">✈️ Flight Simulator</button>
+      <button class="tab-btn active" data-mode="quickstart">🪙 Quickstart Demo</button>
+      <button class="tab-btn" data-mode="flight">✈️ Flight Simulator</button>
       <button class="tab-btn" data-mode="voxel">🧱 Vast Voxel Sandbox</button>
       <button class="tab-btn" data-mode="psx">🔦 PSX 3rd-Person</button>
     </nav>
@@ -37,13 +38,10 @@
       <div id="inspector-body">
         <div id="inspector-content" class="inspector-terminal"># Initializing Renderoni Engine...</div>
         <div class="quick-actions-row" id="quick-actions">
-          <button class="chip-btn" data-action="flight.throttle" data-payload="1.0">⚡ 100% Throttle</button>
-          <button class="chip-btn" data-action="flight.toggleGear">🛞 Gear (G)</button>
-          <button class="chip-btn" data-action="flight.toggleCamera">🎥 View (C)</button>
-          <button class="chip-btn" data-action="flight.reset">🔄 Reset (R)</button>
+          <button class="chip-btn" data-action="quickstart.respawnCoin">🪙 Respawn Coin</button>
         </div>
         <div class="action-bar">
-          <input id="action-input" type="text" placeholder="Dispatch action (e.g. flight.throttle or JSON)" />
+          <input id="action-input" type="text" placeholder="Dispatch action (e.g. hero.move or JSON)" />
           <button id="btn-dispatch-action">Act</button>
         </div>
       </div>
