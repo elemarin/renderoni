@@ -117,6 +117,7 @@ function resolvePath(game: RenderoniEngine, path: string): unknown {
   if (parts[0] === 'entities') {
     if (!game.entities.has(parts[1])) return undefined;
     const ent = game.entities.get(parts[1]);
+    if (!ent) return undefined;
     if (parts[2] === 'position') {
       if (parts[3] === 'x') return ent.position[0];
       if (parts[3] === 'y') return ent.position[1];

@@ -59,8 +59,8 @@ export const sensor = definePreset({
     colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
     colliderDesc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
 
-    // Fixed sensor body
-    const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(pos[0], pos[1], pos[2]);
+    // Kinematic sensor body ensures collision pairs with dynamic, kinematic, and KCC players
+    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(pos[0], pos[1], pos[2]);
     const body = ctx.native.world.createRigidBody(bodyDesc);
     const collider = ctx.native.world.createCollider(colliderDesc, body);
 

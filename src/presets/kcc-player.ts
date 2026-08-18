@@ -56,6 +56,7 @@ export const kccPlayer = definePreset({
 
     const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
     colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    colliderDesc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
     const collider = ctx.native.world.createCollider(colliderDesc, body);
 
     // 3. Create Rapier Kinematic Character Controller
