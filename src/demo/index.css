@@ -371,11 +371,35 @@ html, body {
   font-size: 0.73rem;
   line-height: 1.45;
   color: #a5b4fc;
-  max-height: 180px;
+  max-height: 160px;
   overflow-y: auto;
   white-space: pre-wrap;
   word-break: break-all;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+.quick-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.chip-btn {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-btn:hover {
+  background: rgba(59, 130, 246, 0.3);
+  color: #ffffff;
 }
 
 .action-bar {

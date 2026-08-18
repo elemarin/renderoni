@@ -38,11 +38,18 @@ class PlaygroundApp {
     this.inspectorBytes = document.getElementById('inspector-bytes')!;
     this.actionInput = document.getElementById('action-input') as HTMLInputElement;
 
+    // Canvas click blurs any input and grabs focus
+    this.canvas.addEventListener('click', () => {
+      (document.activeElement as HTMLElement)?.blur();
+      this.canvas.focus();
+    });
+
     // Tab buttons
     document.querySelectorAll('.tab-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const targetMode = (e.currentTarget as HTMLElement).dataset.mode as GameMode;
         if (targetMode && targetMode !== this.activeMode) {
+          (document.activeElement as HTMLElement)?.blur();
           this.switchGame(targetMode);
         }
       });
@@ -55,6 +62,17 @@ class PlaygroundApp {
       body.style.display = this.isInspectorOpen ? 'block' : 'none';
     });
 
+    // Quick Action Chips in Agent Inspector
+    document.addEventListener('click', (e) => {
+      const chip = (e.target as HTMLElement).closest('.chip-btn') as HTMLElement;
+      if (chip && chip.dataset.action && this.currentGame) {
+        const actName = chip.dataset.action;
+        const payload = chip.dataset.payload ? parseFloat(chip.dataset.payload) : undefined;
+        this.currentGame.engine.act({ name: actName, payload });
+        (document.activeElement as HTMLElement)?.blur();
+      }
+    });
+
     // Action Dispatcher
     document.getElementById('btn-dispatch-action')?.addEventListener('click', () => {
       this.dispatchCustomAction();
@@ -63,21 +81,6 @@ class PlaygroundApp {
     this.actionInput?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         this.dispatchCustomAction();
-      }
-    });
-
-    // Global Key shortcuts
-    window.addEventListener('keydown', (e) => {
-      if (document.activeElement === this.actionInput) return;
-
-      if (this.activeMode === 'flight') {
-        if (e.code === 'KeyR' || e.key.toLowerCase() === 'r') {
-          (this.currentGame as FlightGame)?.resetPlane();
-        } else if (e.code === 'KeyG' || e.key.toLowerCase() === 'g') {
-          (this.currentGame as FlightGame)?.toggleLandingGear();
-        } else if (e.code === 'KeyC' || e.key.toLowerCase() === 'c') {
-          (this.currentGame as FlightGame)?.toggleCameraView();
-        }
       }
     });
 
@@ -110,6 +113,9 @@ class PlaygroundApp {
       btn.classList.toggle('active', (btn as HTMLElement).dataset.mode === mode);
     });
 
+    // Update Quick Action Chips for current archetype
+    this.updateQuickActions(mode);
+
     // Mount Game
     if (mode === 'flight') {
       this.currentGame = new FlightGame(this.canvas);
@@ -128,14 +134,39 @@ class PlaygroundApp {
     this.handleResize();
   }
 
+  private updateQuickActions(mode: GameMode): void {
+    const container = document.getElementById('quick-actions');
+    if (!container) return;
+
+    if (mode === 'flight') {
+      container.innerHTML = `
+        <button class="chip-btn" data-action="flight.throttle" data-payload="1.0">⚡ 100% Throttle</button>
+        <button class="chip-btn" data-action="flight.toggleGear">🛞 Gear (G)</button>
+        <button class="chip-btn" data-action="flight.toggleCamera">🎥 View (C)</button>
+        <button class="chip-btn" data-action="flight.reset">🔄 Reset (R)</button>
+      `;
+    } else if (mode === 'voxel') {
+      container.innerHTML = `
+        <button class="chip-btn" data-action="voxel.place" data-payload="lantern">💡 Place Lantern</button>
+        <button class="chip-btn" data-action="voxel.place" data-payload="stone">🧱 Place Stone</button>
+        <button class="chip-btn" data-action="voxel.break">💥 Break Block</button>
+      `;
+    } else if (mode === 'psx') {
+      container.innerHTML = `
+        <button class="chip-btn" data-action="quest.pickupKey">🗝️ Pickup Key</button>
+        <button class="chip-btn" data-action="quest.unlockDoor">🚪 Unlock Gate</button>
+      `;
+    }
+  }
+
   private mountFlightHUD(): void {
     this.hudContainer.innerHTML = `
       <div class="hud-card flight-card">
         <div class="hud-title">✈️ Aeroplane Flight Simulator</div>
         <div class="instructions-text">
-          <strong>Shift / Ctrl</strong>: Throttle up / down (100% to takeoff)<br/>
-          <strong>W / S</strong>: Pitch &bull; <strong>A / D</strong>: Roll &bull; <strong>Q / E</strong>: Yaw<br/>
-          <strong>G</strong>: Toggle Landing Gear &bull; <strong>C</strong>: Cockpit / Outside View &bull; <strong>R</strong>: Reset Runway
+          <strong>W / S</strong>: Pitch Nose Down / Up (Pull S to climb)<br/>
+          <strong>A / D</strong>: Roll / Bank &bull; <strong>Q / E</strong>: Yaw<br/>
+          <strong>G</strong>: Retract Landing Gear &bull; <strong>C</strong>: Cockpit / Outside View &bull; <strong>R</strong>: Reset
         </div>
         <div class="telemetry-grid">
           <div class="metric"><span class="label">Airspeed:</span> <span id="flight-speed" class="val">0 km/h</span></div>
@@ -150,8 +181,8 @@ class PlaygroundApp {
         </div>
         <div class="throttle-row">
           <label for="flight-throttle">Throttle:</label>
-          <input id="flight-throttle" type="range" min="0" max="100" value="0" />
-          <span id="flight-throttle-val" class="val">0%</span>
+          <input id="flight-throttle" type="range" min="0" max="100" value="100" />
+          <span id="flight-throttle-val" class="val">100%</span>
         </div>
       </div>
     `;
@@ -162,18 +193,22 @@ class PlaygroundApp {
       (this.currentGame as FlightGame)?.setThrottle(val);
       const label = document.getElementById('flight-throttle-val');
       if (label) label.textContent = `${Math.round(val * 100)}%`;
+      (document.activeElement as HTMLElement)?.blur();
     });
 
-    document.getElementById('btn-toggle-view')?.addEventListener('click', () => {
+    document.getElementById('btn-toggle-view')?.addEventListener('click', (e) => {
       (this.currentGame as FlightGame)?.toggleCameraView();
+      (e.currentTarget as HTMLElement)?.blur();
     });
 
-    document.getElementById('btn-toggle-gear')?.addEventListener('click', () => {
+    document.getElementById('btn-toggle-gear')?.addEventListener('click', (e) => {
       (this.currentGame as FlightGame)?.toggleLandingGear();
+      (e.currentTarget as HTMLElement)?.blur();
     });
 
-    document.getElementById('btn-reset-plane')?.addEventListener('click', () => {
+    document.getElementById('btn-reset-plane')?.addEventListener('click', (e) => {
       (this.currentGame as FlightGame)?.resetPlane();
+      (e.currentTarget as HTMLElement)?.blur();
     });
   }
 
@@ -237,6 +272,7 @@ class PlaygroundApp {
       this.currentGame.engine.act({ name: raw });
       this.actionInput.value = '';
     }
+    this.actionInput.blur();
   }
 
   private startHUDUpdateLoop(): void {

@@ -8,7 +8,7 @@
   </head>
   <body>
     <!-- 3D WebGL Canvas -->
-    <canvas id="render-canvas"></canvas>
+    <canvas id="render-canvas" tabindex="0"></canvas>
 
     <!-- Top Navigation / Archetype Selector -->
     <nav class="top-nav">
@@ -36,6 +36,12 @@
       </div>
       <div id="inspector-body">
         <div id="inspector-content" class="inspector-terminal"># Initializing Renderoni Engine...</div>
+        <div class="quick-actions-row" id="quick-actions">
+          <button class="chip-btn" data-action="flight.throttle" data-payload="1.0">⚡ 100% Throttle</button>
+          <button class="chip-btn" data-action="flight.toggleGear">🛞 Gear (G)</button>
+          <button class="chip-btn" data-action="flight.toggleCamera">🎥 View (C)</button>
+          <button class="chip-btn" data-action="flight.reset">🔄 Reset (R)</button>
+        </div>
         <div class="action-bar">
           <input id="action-input" type="text" placeholder="Dispatch action (e.g. flight.throttle or JSON)" />
           <button id="btn-dispatch-action">Act</button>
