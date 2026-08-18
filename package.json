@@ -5,6 +5,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "renderoni": "./bin/renderoni.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -53,9 +56,21 @@
   },
   "files": [
     "dist",
+    "bin",
     "README.md",
     "LICENSE"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elemarin/renderoni.git"
+  },
+  "homepage": "https://github.com/elemarin/renderoni#readme",
+  "bugs": {
+    "url": "https://github.com/elemarin/renderoni/issues"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsup",
