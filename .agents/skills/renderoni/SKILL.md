@@ -11,17 +11,47 @@ This skill provides comprehensive architectural guidelines, Three.js optimizatio
 ---
 
 ## 📑 Table of Contents
-1. [Core Architectural Principles & Determinism](#1-core-architectural-principles--determinism)
-2. [Three.js Performance & Optimization Mastery](#2-threejs-performance--optimization-mastery)
-3. [Rapier Physics & Character Controller Best Practices](#3-rapier-physics--character-controller-best-practices)
-4. [Game Architecture & Declarative Presets](#4-game-architecture--declarative-presets)
-5. [Camera, Input & Audio Systems](#5-camera-input--audio-systems)
-6. [VFX, Particles & Juice](#6-vfx-particles--juice)
-7. [Headless Testing & Agent Verification](#7-headless-testing--agent-verification)
+1. [The Renderoni Philosophy: Ecosystem Force Multiplier](#1-the-renderoni-philosophy-ecosystem-force-multiplier)
+2. [Core Architectural Principles & Determinism](#2-core-architectural-principles--determinism)
+3. [Leveraging Existing Three.js & Rapier Ecosystems (Zero Lock-In)](#3-leveraging-existing-threejs--rapier-ecosystems-zero-lock-in)
+4. [Three.js Performance & Optimization Mastery](#4-threejs-performance--optimization-mastery)
+5. [Rapier Physics & Character Controller Best Practices](#5-rapier-physics--character-controller-best-practices)
+6. [Game Architecture & Declarative Presets](#6-game-architecture--declarative-presets)
+7. [Camera, Input & Audio Systems](#7-camera-input--audio-systems)
+8. [VFX, Particles & Juice](#8-vfx-particles--juice)
+9. [Headless Testing & Agent Verification](#9-headless-testing--agent-verification)
 
 ---
 
-## 1. Core Architectural Principles & Determinism
+## 1. The Renderoni Philosophy: Ecosystem Force Multiplier
+
+Renderoni is **not** a proprietary walled garden or a new DSL. It is designed to be the glue and force-multiplier for the two industry standards of 3D web development: **Three.js** and **Rapier WebAssembly Physics**.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 YOUR GAMEPLAY & CREATIVITY                  │
+│       GLTF Models • Custom Shaders • Game Rules • Content   │
+├─────────────────────────────────────────────────────────────┤
+│                         RENDERONI                           │
+│  Fixed Timestep Loop • Dual-Buffer Transform Interpolation │
+│  Character Controllers • Spatial Audio • Particle Pools     │
+│  State Hashing • Headless CI Testing • Built-in MCP Tools   │
+├──────────────────────────────┬──────────────────────────────┤
+│           Three.js           │          Rapier WASM         │
+│  (Shaders, WebGL/WebGPU, PBR)│  (Fast Multi-threaded Physics)│
+└──────────────────────────────┴──────────────────────────────┘
+```
+
+### What Developers Get Out of the Box:
+- **No Hand-Rolled Game Loops**: Automatic fixed-timestep accumulator with zero visual jitter on 60Hz, 120Hz, or 144Hz monitors via dual-buffer transform interpolation.
+- **No Physics Boilerplate**: Out-of-the-box Kinematic Character Controllers (climbing slopes, sliding against walls, jumping, step height).
+- **Direct Native Escape Hatches**: Direct access to `THREE.Scene`, `THREE.WebGLRenderer`, and `RAPIER.World` whenever needed.
+- **$<10\text{ms}$ Headless CI**: Game logic and physics run headlessly in Node.js without browser automation or mock DOMs.
+- **Agent-Native MCP**: Built-in Model Context Protocol server enabling AI agents (Claude, Antigravity, Cursor) to inspect scenes and test gameplay deterministically.
+
+---
+
+## 2. Core Architectural Principles & Determinism
 
 Renderoni is built around a **strict 4-layer separation of concerns**:
 - **L0 (Deterministic Kernel)**: Integer clock (`clock.ts`), seeded PRNG (`prng.ts`), dual-buffer transform pipeline (`transform-buffer.ts`), XXH3 state hashing (`hashing.ts`), and resource ownership tracking (`ownership.ts`).
@@ -41,7 +71,44 @@ Renderoni is built around a **strict 4-layer separation of concerns**:
 
 ---
 
-## 2. Three.js Performance & Optimization Mastery
+## 3. Leveraging Existing Three.js & Rapier Ecosystems (Zero Lock-In)
+
+Developers can bring any Three.js loader, shader, or Rapier feature directly into Renderoni:
+
+### A. Loading 3D Models with `GLTFLoader`
+```ts
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { definePreset } from 'renderoni/presets';
+import RAPIER from '@dimforge/rapier3d-compat';
+
+export const animatedCharacter = definePreset<{ gltfUrl: string }>('animated_character', async (options, ctx) => {
+  const loader = new GLTFLoader();
+  const gltf = await loader.loadAsync(options.gltfUrl);
+  
+  // Create Rapier Collider matching model bounds
+  const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, 1, 0);
+  const body = ctx.native.world.createRigidBody(bodyDesc);
+  const collider = ctx.native.world.createCollider(RAPIER.ColliderDesc.capsule(0.6, 0.4), body);
+
+  return ctx.entity({
+    tags: ['character', 'player'],
+    native: {
+      three: { object: gltf.scene },
+      rapier: { body, colliderHandles: [collider.handle] },
+    },
+  });
+});
+```
+
+### B. Custom Shaders & Post-Processing
+Attach custom Three.js `ShaderMaterial`, post-processing passes (Bloom, SSAO, Film Grain), or render passes directly to `game.native.renderer` and `game.native.scene`.
+
+### C. Advanced Rapier Joints & Vehicles
+Use `ctx.native.world.createImpulseJoint()` to create rope bridges, ragdolls, revolute hinges, and suspension constraints without any restrictions.
+
+---
+
+## 4. Three.js Performance & Optimization Mastery
 
 High frame rates ($60\text{--}120\text{ fps}$) in WebGL/WebGPU require minimizing CPU overhead and optimizing GPU memory bandwidth.
 
@@ -124,7 +191,7 @@ function disposeHierarchy(node: THREE.Object3D): void {
 
 ---
 
-## 3. Rapier Physics & Character Controller Best Practices
+## 5. Rapier Physics & Character Controller Best Practices
 
 ### 🏃 A. Kinematic Character Controller (KCC) vs Dynamic Rigidbody
 - **Player & Humanoid NPCs**: Use `kccPlayer` / Rapier Character Controller. Dynamic rigid bodies feel "floaty", stick to walls, and tip over on slopes. KCC provides crisp, responsive platformer controls, slope sliding, and step climbing.
@@ -148,7 +215,7 @@ colliderDesc.setCollisionGroups(playerFilter);
 
 ---
 
-## 4. Game Architecture & Declarative Presets
+## 6. Game Architecture & Declarative Presets
 
 Renderoni encourages the **Preset Pattern** using `definePreset`:
 
@@ -165,7 +232,6 @@ export interface TurretOptions {
 
 export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
   const pos = options.position ?? [0, 0, 0];
-  const fireIntervalTicks = Math.round(60 / (options.fireRateHz ?? 2));
 
   // Visual
   const group = new THREE.Group();
@@ -180,8 +246,6 @@ export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
   const body = ctx.native.world.createRigidBody(bodyDesc);
   const collider = ctx.native.world.createCollider(RAPIER.ColliderDesc.cylinder(0.5, 1.2), body);
 
-  let lastFireTick = 0;
-
   return ctx.entity({
     tags: ['enemy', 'turret'],
     state: { health: 100 },
@@ -193,10 +257,6 @@ export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
       shoot: () => {
         ctx.events.emit('bullet.spawn', { origin: group.position, direction: [0, 0, -1] });
       },
-      update: () => {
-        // Automatic periodic firing based on deterministic ticks
-        // ctx.prng used for seeded spread
-      },
     },
   });
 });
@@ -204,7 +264,7 @@ export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
 
 ---
 
-## 5. Camera, Input & Audio Systems
+## 7. Camera, Input & Audio Systems
 
 ### 🎥 Camera Modes:
 - **Smooth 3rd-Person Chase**: Use spherical coordinates (`theta`, `phi`, `radius`) lerped smoothly towards the player's position + offset.
@@ -217,7 +277,7 @@ export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
 
 ---
 
-## 6. VFX, Particles & Juice
+## 8. VFX, Particles & Juice
 
 - **Particle Pools**: Maintain a pre-allocated pool of $100\text{--}500$ particle objects. Never create/destroy meshes during particle emission; activate and reset existing particles from the pool.
 - **Visual Feedback ("Juice")**:
@@ -227,7 +287,7 @@ export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
 
 ---
 
-## 7. Headless Testing & Agent Verification
+## 9. Headless Testing & Agent Verification
 
 Renderoni tests run in pure Node.js in $<10\text{ms}$ with Vitest:
 
