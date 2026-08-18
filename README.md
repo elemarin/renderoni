@@ -1,108 +1,121 @@
 # 🍝 Renderoni
 
-> **Deterministic by design. Al dente by default.**  
-> A batteries-included, agent-native 3D simulation and gameplay framework for Three.js and Rapier.
+> **3D web games, served al dente.**  
+> A batteries-included, agent-native 3D engine for Three.js and Rapier.  
+> *Deterministic WebAssembly physics, declarative presets, and built-in Model Context Protocol (MCP) for AI pair programming.*
 
 [![CI](https://github.com/elemarin/renderoni/actions/workflows/ci.yml/badge.svg)](https://github.com/elemarin/renderoni/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
+[![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
 ---
 
-## 🌟 What is Renderoni?
+## ⚡ The Problem & The Solution
 
-Three.js is the standard for web graphics; Rapier is the standard for fast WebAssembly physics. Connecting them into a production-grade, testable, and reproducible 3D application requires massive repetitive boilerplate: managing fixed timestep loops, transform synchronization, visual interpolation, asset lifecycles, character controllers, skeletal animations, spatial audio, UI projections, and network replication.
+Building 3D games with **Three.js** and **Rapier WebAssembly** usually means writing thousands of lines of boilerplate: fixed timestep loops, transform interpolation, character controllers, spatial audio, particle systems, and UI projections.
 
-For autonomous AI coding agents and automated CI test runners, this architecture is historically opaque: Three.js and Rapier scenes are mutable, non-deterministic black boxes that require costly vision snapshots and fragile browser automation.
+At the same time, **AI coding agents** (Claude, Gemini, Cursor) struggle with 3D engines because game loops are non-deterministic black boxes that require expensive vision screenshots.
 
-**Renderoni solves this with a unified, dual-nature architecture:**
-1. **For Human Developers:** A batteries-included, ergonomic 3D game framework. A single call to `createRenderoni()` spins up physics, rendering, camera management, asset loading, animation state machines, spatial audio, UI projections, and particle effects with typed presets and zero boilerplate.
-2. **For AI Agents & CI Suites:** A headless-first, deterministic simulation and verification kernel. It provides token-efficient semantic observations (<500B Markdown summaries), JIT-validated semantic actions, fixed-point state hashing, keyframed replays, and a built-in Model Context Protocol (MCP) server for instant agent pairing.
+**Renderoni gives you both:**
+- **For Humans:** A declarative, batteries-included 3D engine. A single `createRenderoni()` call spins up physics, rendering, camera controls, spatial audio, animation state machines, and particle systems with typed presets.
+- **For AI Agents & Headless CI:** A deterministic simulation kernel with a built-in **Model Context Protocol (MCP)** server. Agents inspect scenes via lightweight semantic Markdown (<500 bytes / ~120 tokens), dispatch typed actions, and verify game state headlessly in Node.js in under 10ms.
 
 ---
 
-## 📦 Installation & Subpath Exports
+## 🎮 Live Demos
+
+Run the local Vite playground with `npm run dev`:
+
+```bash
+npm run dev
+# ➜ Open http://localhost:5173/
+```
+
+| Demo | What It Does | Controls |
+| :--- | :--- | :--- |
+| **✈️ Flight Simulator** | Aerodynamic flight physics with lift, drag, runway takeoff & landing, retractable landing gear, and ring course. | `W`/`S` (Pitch), `A`/`D` (Yaw), `Q`/`E` (Roll), `Shift`/`Ctrl` (Throttle), `Z`/`X` (Max/Cut), `G` (Gear), `C` (Cockpit/Chase View), `R` (Reset) |
+| **🧱 Vast Voxel Sandbox** | Multi-biome procedural world (~2,000+ blocks) with ocean water, sandy beaches, rolling hills, snowy peaks, and trees. | `WASD` (Walk & Auto-step), `Shift` (Sprint), `Space` (Jump), `1`-`6` (Hotbar), `Left/Right Click` (Break/Place) |
+| **🔦 PSX 3rd-Person Horror** | Retro PSX survival horror with 3rd-person chase camera, gothic manor corridor, flashlight, key puzzle, and animated iron gate. | `WASD` (Walk Detective), Mouse (Orbit Camera), `E` (Pickup Key & Unlock Gate) |
+
+---
+
+## 📦 Installation
 
 ```bash
 npm install renderoni three @dimforge/rapier3d-compat
 ```
 
-Renderoni ships as a single package with tree-shakable subpath exports:
+Tree-shakable subpath exports:
 
 ```ts
 import { createRenderoni } from 'renderoni';
 import { body, kccPlayer, sensor, light } from 'renderoni/presets';
-import { animation } from 'renderoni/animation';
 import { audio } from 'renderoni/audio';
-import { ui } from 'renderoni/ui';
+import { animation } from 'renderoni/animation';
 import { vfx } from 'renderoni/vfx';
-import { network } from 'renderoni/network';
+import { ui } from 'renderoni/ui';
 import { createMCPServer } from 'renderoni/mcp';
-import '@renderoni/testing/matchers';
+import 'renderoni/testing/matchers';
 ```
 
 ---
 
-## 🚀 Playable Quickstart
+## 🚀 Quickstart
 
 ```ts
 import { createRenderoni } from 'renderoni';
 import { body, kccPlayer, sensor, light } from 'renderoni/presets';
 import { audio } from 'renderoni/audio';
-import { animation } from 'renderoni/animation';
 import { vfx } from 'renderoni/vfx';
-import { ui } from 'renderoni/ui';
 
-// 1. Initialize complete batteries-included game
+// 1. Initialize engine (runs headlessly in CI or interactively in browser)
 const game = await createRenderoni({
-  mode: 'interactive', // 'interactive' or 'headless'
+  mode: 'interactive', // or 'headless'
   seed: 42,
   subsystems: [
     audio({ volume: 0.8 }),
-    animation(),
-    vfx({ bloom: true }),
-    ui(),
+    vfx({ particles: true }),
   ],
 });
 
 // 2. Add Environment & Lighting
-game.add(light({ type: 'directional', position: [5, 10, 5], castShadow: true }));
+game.add(light({ type: 'directional', position: [20, 40, 20] }));
 game.add(body({ shape: 'box', type: 'fixed', size: [100, 1, 100], position: [0, 0, 0] }));
 
-// 3. Add Interactive Collectible
+// 3. Add Collectible Item
 const coin = game.add(sensor({
-  id: 'coin',
+  id: 'golden_coin',
   shape: 'sphere',
-  radius: 0.5,
-  position: [5, 1, 0],
+  radius: 0.6,
+  position: [4, 1.2, 0],
 }));
 
-// 4. Add Animated Kinematic Player
-const hero = game.add(kccPlayer({
+// 4. Add Player Character
+const player = game.add(kccPlayer({
   id: 'hero',
   position: [0, 1.5, 0],
-  moveSpeed: 6.0,
-  jumpSpeed: 8.5,
+  moveSpeed: 6.5,
 }));
 
-// 5. Gameplay Logic via Events
+// 5. Handle Gameplay Events
 game.events.on('sensor.enter', ({ sensor, target }) => {
-  if (sensor.id === 'coin' && target.id === 'hero') {
-    game.audio.play('coin');
-    game.vfx.spawnParticles({ count: 20, position: [5, 1, 0] });
+  if (sensor.id === 'golden_coin' && target.id === 'hero') {
+    game.audio.play('coin_pickup');
+    game.vfx.spawnParticles({ count: 16, position: [4, 1.2, 0] });
     coin.destroy();
   }
 });
 
-// 6. Step Simulation or Start Interactive Presentation Loop
-game.step(60); // In headless CI / tests
+// 6. Step headlessly (CI) or start render loop (Browser)
+game.step(60); // 60 deterministic fixed ticks in ~1ms
 ```
 
 ---
 
 ## 🤖 AI Agent Integration (MCP Server)
 
-Renderoni includes a built-in **Model Context Protocol (MCP)** server over `stdio` and `SSE`:
+Connect Claude Desktop, Antigravity, Cursor, or any MCP client directly to your simulation:
 
 ```json
 {
@@ -115,16 +128,18 @@ Renderoni includes a built-in **Model Context Protocol (MCP)** server over `stdi
 }
 ```
 
-### Supported MCP Tools:
-- **`describe`**: Returns active entities, component schemas, and simulation metadata.
-- **`observe`**: Returns token-efficient **Tier 0 Markdown summaries (<500 bytes / ~120 tokens)** or Tier 1 delta observations.
+### Built-in MCP Tools:
+- **`describe`**: Returns active entities, colliders, tags, and engine schemas.
+- **`observe`**: Returns ultra-dense **Tier 0 Markdown summaries (<500B / ~120 tokens)** with positions, velocities, and game state.
 - **`act`**: Injects deterministic semantic gameplay actions (`game.act({ name, payload })`).
-- **`step`**: Advances the simulation by $N$ fixed ticks and returns updated state hashes.
+- **`step`**: Advances the simulation by $N$ fixed ticks and returns state hashes.
 - **`check`**: Evaluates machine AST assertions.
 
 ---
 
-## 🧪 Testing with Vitest
+## 🧪 Headless Testing with Vitest
+
+Run complete game integration tests headlessly in Node.js in under 10ms with custom Vitest matchers:
 
 ```ts
 import { expect, test } from 'vitest';
@@ -132,7 +147,7 @@ import { createRenderoni } from 'renderoni';
 import { kccPlayer, sensor } from 'renderoni/presets';
 import 'renderoni/testing/matchers';
 
-test('hero collects coin after moving right', async () => {
+test('player collects coin and verifies state hash', async () => {
   const game = await createRenderoni({ mode: 'headless', seed: 42 });
   const hero = game.add(kccPlayer({ id: 'hero', position: [0, 1, 0] }));
   const coin = game.add(sensor({ id: 'coin', position: [3, 1, 0] }));
@@ -141,7 +156,7 @@ test('hero collects coin after moving right', async () => {
   game.step(60);
 
   expect(game).toHaveTick(60);
-  expect(hero.position[0]).toBeGreaterThan(1.0);
+  expect(hero.position[0]).toBeGreaterThan(1.5);
   expect(game).toHavePassedDiagnostics();
 });
 ```
@@ -151,24 +166,24 @@ test('hero collects coin after moving right', async () => {
 ## 🏛️ Architecture
 
 ```
-+---------------------------------------------------------------------------------------+
-|                                     L3 APPLICATION                                    |
-|             Game Rules, Assets, Content Data, Custom Shaders, UI Layouts              |
-+---------------------------------------------------------------------------------------+
-|                                  L2 TOOLING & AGENTS                                  |
-|         Built-in MCP Server (stdio/SSE), Vitest Matchers, Replay CLI, Debug UI         |
-+---------------------------------------------------------------------------------------+
-|                                L1 BATTERIES & SUBSYSTEMS                              |
-|   Animation State Machine | Spatial Audio | UI Screen Anchors | VFX Emitters | Net    |
-|   Presets: body, sensor, light, kccPlayer, dynamicPlayer | Asset Manifest Manager     |
-+---------------------------------------------------------------------------------------+
-|                                  L0 DETERMINISTIC KERNEL                              |
-|   Integer Tick Clock | Seeded PRNG Streams | Dual-Buffer Transform Pipeline           |
-|   Quantized Fixed-Point Canopy (Q20.12) | XXH3 Hasher | Resource Ownership Matrix     |
-+---------------------------------------------------------------------------------------+
-|                                    NATIVE ENGINES                                     |
-|               Three.js (WebGL/WebGPU)      |      @dimforge/rapier3d-compat (WASM)    |
-+---------------------------------------------------------------------------------------+
+┌────────────────────────────────────────────────────────────────────────┐
+│                              L3 APPLICATION                            │
+│           Game Rules, Custom Assets, Levels, Shaders, UI Layouts       │
+├────────────────────────────────────────────────────────────────────────┤
+│                           L2 TOOLING & AGENTS                          │
+│     Built-in MCP Server (stdio/SSE), Vitest Matchers, Live Inspector   │
+├────────────────────────────────────────────────────────────────────────┤
+│                         L1 BATTERIES & SUBSYSTEMS                      │
+│   Spatial Audio • Skeletal Animation • UI Projections • VFX Emitters   │
+│   Declarative Presets: body, sensor, light, kccPlayer, dynamicPlayer   │
+├────────────────────────────────────────────────────────────────────────┤
+│                          L0 DETERMINISTIC KERNEL                       │
+│   Integer Tick Clock • Seeded PRNG • Dual-Buffer Transform Pipeline    │
+│   Quantized State Hashing (XXH3) • Resource Ownership Tracking         │
+├────────────────────────────────────────────────────────────────────────┤
+│                             NATIVE ENGINES                             │
+│       Three.js (WebGL / WebGPU)   │   @dimforge/rapier3d-compat (WASM) │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---

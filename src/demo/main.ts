@@ -163,7 +163,7 @@ class PlaygroundApp {
   private mountFlightHUD(): void {
     this.hudContainer.innerHTML = `
       <div class="hud-card flight-card">
-        <div class="hud-title">✈️ Aeroplane Flight Simulator (KSP Controls)</div>
+        <div class="hud-title">✈️ Aeroplane Flight Simulator</div>
         <div class="instructions-text">
           <strong>Shift / Ctrl</strong>: Throttle Up / Down &bull; <strong>Z</strong>: Max Throttle &bull; <strong>X</strong>: Cut Throttle<br/>
           <strong>W / S</strong>: Pitch Nose Down / Up &bull; <strong>A / D</strong>: Yaw / Turn Left / Right<br/>
