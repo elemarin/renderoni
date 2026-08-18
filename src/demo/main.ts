@@ -27,7 +27,7 @@ class PlaygroundApp {
     this.canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     this.initDOM();
     this.switchGame('ksp');
-    this.startRenderLoop();
+    this.startHUDUpdateLoop();
   }
 
   private initDOM(): void {
@@ -38,7 +38,7 @@ class PlaygroundApp {
     this.inspectorBytes = document.getElementById('inspector-bytes')!;
     this.actionInput = document.getElementById('action-input') as HTMLInputElement;
 
-    // Tabs
+    // Tab buttons
     document.querySelectorAll('.tab-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const targetMode = (e.currentTarget as HTMLElement).dataset.mode as GameMode;
@@ -66,7 +66,22 @@ class PlaygroundApp {
       }
     });
 
-    // Resize
+    // Global Key shortcuts
+    window.addEventListener('keydown', (e) => {
+      // Don't capture keys if typing in the action input bar
+      if (document.activeElement === this.actionInput) return;
+
+      if (this.activeMode === 'ksp') {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          (this.currentGame as KspGame)?.launch();
+        } else if (e.code === 'KeyX' || e.key.toLowerCase() === 'x') {
+          (this.currentGame as KspGame)?.stage();
+        }
+      }
+    });
+
+    // Window Resize
     window.addEventListener('resize', () => this.handleResize());
     this.handleResize();
   }
@@ -147,16 +162,8 @@ class PlaygroundApp {
     throttleInput?.addEventListener('input', (e) => {
       const val = parseFloat((e.target as HTMLInputElement).value) / 100;
       (this.currentGame as KspGame)?.setThrottle(val);
-      document.getElementById('ksp-throttle-val')!.textContent = `${Math.round(val * 100)}%`;
-    });
-
-    window.addEventListener('keydown', (e) => {
-      if (this.activeMode !== 'ksp') return;
-      if (e.code === 'Space') {
-        (this.currentGame as KspGame)?.launch();
-      } else if (e.code === 'KeyX') {
-        (this.currentGame as KspGame)?.stage();
-      }
+      const label = document.getElementById('ksp-throttle-val');
+      if (label) label.textContent = `${Math.round(val * 100)}%`;
     });
   }
 
@@ -184,7 +191,7 @@ class PlaygroundApp {
         <div class="hud-title">🔦 PSX Retro Horror (Archetype C)</div>
         <div class="instructions-text">
           Click screen to <strong>Lock Pointer</strong> &bull; <strong>WASD</strong>: Walk<br/>
-          Walk to the table to grab the <strong>Rusty Key</strong>, then unlock the <strong>Sealed Iron Gate</strong>.
+          Walk to the table to grab the <strong>Rusty Key</strong>, then approach the <strong>Iron Gate</strong> at the end of the hall.
         </div>
         <div class="quest-box">
           <div class="label">Active Quest:</div>
@@ -212,16 +219,10 @@ class PlaygroundApp {
     }
   }
 
-  private startRenderLoop(): void {
-    let lastTime = performance.now();
-
-    const frame = (time: number) => {
-      const dt = (time - lastTime) / 1000;
-      lastTime = time;
-
+  private startHUDUpdateLoop(): void {
+    const updateHUD = () => {
       if (this.currentGame) {
         if (this.activeMode === 'ksp') {
-          (this.currentGame as KspGame).update(dt);
           const t = (this.currentGame as KspGame).getTelemetry();
           const altEl = document.getElementById('ksp-alt');
           const velEl = document.getElementById('ksp-vel');
@@ -234,14 +235,12 @@ class PlaygroundApp {
             statusEl.textContent = t.isStaged ? 'Stage 2 In Flight' : t.isLaunched ? 'Ascending' : 'On Pad';
           }
         } else if (this.activeMode === 'voxel') {
-          (this.currentGame as VoxelGame).update();
           const t = (this.currentGame as VoxelGame).getTelemetry();
           const posEl = document.getElementById('vox-pos');
           const blocksEl = document.getElementById('vox-blocks');
           if (posEl) posEl.textContent = `${t.playerPos[0]}, ${t.playerPos[1]}, ${t.playerPos[2]}`;
           if (blocksEl) blocksEl.textContent = `${t.blockCount}`;
         } else if (this.activeMode === 'psx') {
-          (this.currentGame as PsxGame).update();
           const t = (this.currentGame as PsxGame).getTelemetry();
           const questEl = document.getElementById('psx-quest');
           if (questEl) questEl.textContent = t.questStatus;
@@ -257,10 +256,10 @@ class PlaygroundApp {
         }
       }
 
-      requestAnimationFrame(frame);
+      requestAnimationFrame(updateHUD);
     };
 
-    requestAnimationFrame(frame);
+    requestAnimationFrame(updateHUD);
   }
 }
 

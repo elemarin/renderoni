@@ -356,7 +356,7 @@ export class RenderoniEngine {
   /**
    * Steps the fixed simulation by N ticks deterministically.
    */
-  step(ticksToRun: number = 1): void {
+  step(ticksToRun: number = 1, advanceClock: boolean = true): void {
     for (let i = 0; i < ticksToRun; i++) {
       // 1. Drain & execute pending actions
       this.actions.drain(this);
@@ -440,7 +440,9 @@ export class RenderoniEngine {
 
       // 7. Commit transform pipeline tick and advance Simulation Clock
       this.transformPipeline.commitTick();
-      this.clock.stepTicks(1);
+      if (advanceClock) {
+        this.clock.stepTicks(1);
+      }
     }
   }
 
@@ -476,7 +478,7 @@ export class RenderoniEngine {
   /**
    * Starts interactive presentation render loop.
    */
-  start(): void {
+  start(onUpdate?: (dt: number) => void): void {
     if (this.isRunning) return;
     this.isRunning = true;
 
@@ -490,7 +492,11 @@ export class RenderoniEngine {
 
       const numTicks = this.clock.advancePresentation(dt);
       if (numTicks > 0) {
-        this.step(numTicks);
+        this.step(numTicks, false);
+      }
+
+      if (onUpdate) {
+        onUpdate(dt);
       }
 
       // Render presentation interpolation

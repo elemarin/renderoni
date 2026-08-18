@@ -42,7 +42,7 @@ export class VoxelGame {
     this.engine = new RenderoniEngine({
       mode: 'interactive',
       canvas: this.canvas,
-      gravity: [0, -18.0, 0],
+      gravity: [0, -22.0, 0],
     });
   }
 
@@ -60,15 +60,16 @@ export class VoxelGame {
     // 2. Generate Initial Procedural Voxel Chunks
     this.generateTerrain();
 
-    // 3. First-Person Player Body (Kinematic / Dynamic with smooth damping)
+    // 3. First-Person Player Body
     this.playerBody = this.engine.native.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(0, 5.0, 0)
+        .setTranslation(0, 6.0, 0)
         .lockRotations()
-        .setAdditionalMass(2.0)
+        .setAdditionalMass(3.0)
+        .setCanSleep(false)
     );
     const playerCollider = this.engine.native.world.createCollider(
-      RAPIER.ColliderDesc.capsule(0.8, 0.4),
+      RAPIER.ColliderDesc.capsule(0.7, 0.35).setFriction(0.0),
       this.playerBody
     );
 
@@ -102,7 +103,8 @@ export class VoxelGame {
       handle: () => this.placeAdjacentBlock(),
     });
 
-    this.engine.start();
+    // Start presentation loop with update hook
+    this.engine.start(() => this.update());
   }
 
   private generateTerrain(): void {
@@ -175,16 +177,21 @@ export class VoxelGame {
   }
 
   private setupControls(): void {
-    window.addEventListener('keydown', (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       this.keys[e.code] = true;
+      this.keys[e.key.toLowerCase()] = true;
       if (e.code === 'Space') {
         this.jump();
       }
-    });
+    };
 
-    window.addEventListener('keyup', (e) => {
+    const onKeyUp = (e: KeyboardEvent) => {
       this.keys[e.code] = false;
-    });
+      this.keys[e.key.toLowerCase()] = false;
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
 
     this.canvas.addEventListener('click', () => {
       if (!this.isLocked) {
@@ -220,10 +227,10 @@ export class VoxelGame {
     let forward = 0;
     let strafe = 0;
 
-    if (this.keys['KeyW'] || this.keys['ArrowUp']) forward += 1;
-    if (this.keys['KeyS'] || this.keys['ArrowDown']) forward -= 1;
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) strafe -= 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) strafe += 1;
+    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) forward += 1;
+    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) forward -= 1;
+    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
+    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
 
     const speed = 7.5;
     const moveX = (Math.sin(this.yaw) * forward + Math.cos(this.yaw) * strafe) * speed;
@@ -232,10 +239,10 @@ export class VoxelGame {
     const currentVel = this.playerBody.linvel();
     this.playerBody.setLinvel(new RAPIER.Vector3(moveX, currentVel.y, moveZ), true);
 
-    // Auto-stepping up 1-block steps: check forward ray at knee level
+    // Auto-stepping up 1-block steps: check forward obstacle
     if (forward !== 0 || strafe !== 0) {
       const pPos = this.playerBody.translation();
-      const kneeOrigin: [number, number, number] = [pPos.x, pPos.y - 0.4, pPos.z];
+      const kneeOrigin: [number, number, number] = [pPos.x, pPos.y - 0.3, pPos.z];
       const dir: [number, number, number] = [moveX, 0, moveZ];
       const len = Math.hypot(dir[0], dir[2]);
 
@@ -247,8 +254,7 @@ export class VoxelGame {
           0.85
         );
         if (stepHit.hit && stepHit.entityId?.startsWith('block_')) {
-          // Smooth step impulse
-          this.playerBody.setLinvel(new RAPIER.Vector3(moveX, 5.0, moveZ), true);
+          this.playerBody.setLinvel(new RAPIER.Vector3(moveX, 6.0, moveZ), true);
         }
       }
     }
@@ -257,8 +263,8 @@ export class VoxelGame {
   jump(): void {
     if (!this.playerBody) return;
     const vel = this.playerBody.linvel();
-    if (Math.abs(vel.y) < 0.2) {
-      this.playerBody.setLinvel(new RAPIER.Vector3(vel.x, 7.2, vel.z), true);
+    if (Math.abs(vel.y) < 0.4) {
+      this.playerBody.setLinvel(new RAPIER.Vector3(vel.x, 8.5, vel.z), true);
     }
   }
 

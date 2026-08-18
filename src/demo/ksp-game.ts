@@ -24,6 +24,8 @@ export class KspGame {
   private canvas: HTMLCanvasElement;
   private booster!: EntityInstance;
   private capsule!: EntityInstance;
+  private boosterBody!: RAPIER.RigidBody;
+  private capsuleBody!: RAPIER.RigidBody;
   private decouplerJoint: RAPIER.ImpulseJoint | null = null;
   private isLaunched = false;
   private isStaged = false;
@@ -33,9 +35,9 @@ export class KspGame {
   // Visuals
   private particles: THREE.Points | null = null;
   private particleGeo: THREE.BufferGeometry | null = null;
-  private particlePositions: Float32Array = new Float32Array(600 * 3);
-  private particleLifetimes: Float32Array = new Float32Array(600);
-  private particleCount = 600;
+  private particlePositions: Float32Array = new Float32Array(800 * 3);
+  private particleLifetimes: Float32Array = new Float32Array(800);
+  private particleCount = 800;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -51,19 +53,19 @@ export class KspGame {
 
     const scene = this.engine.native.scene;
     scene.background = new THREE.Color(0x050814);
-    scene.fog = new THREE.FogExp2(0x050814, 0.003);
+    scene.fog = new THREE.FogExp2(0x050814, 0.002);
 
     // 1. Lighting
     this.engine.add(light({ type: 'directional', intensity: 2.2, position: [20, 40, 20] }));
-    this.engine.add(light({ type: 'ambient', intensity: 0.4, color: 0x8899bb }));
+    this.engine.add(light({ type: 'ambient', intensity: 0.5, color: 0x8899bb }));
 
     // 2. Stars Dome
     const starGeo = new THREE.BufferGeometry();
     const starPos = [];
     for (let i = 0; i < 2000; i++) {
-      const x = (Math.random() - 0.5) * 800;
-      const y = Math.random() * 500;
-      const z = (Math.random() - 0.5) * 800;
+      const x = (Math.random() - 0.5) * 1000;
+      const y = Math.random() * 800;
+      const z = (Math.random() - 0.5) * 1000;
       starPos.push(x, y, z);
     }
     starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
@@ -79,7 +81,7 @@ export class KspGame {
     scene.add(padMesh);
 
     const groundMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(600, 600),
+      new THREE.PlaneGeometry(800, 800),
       new THREE.MeshStandardMaterial({ color: 0x111622, roughness: 0.9 })
     );
     groundMesh.rotation.x = -Math.PI / 2;
@@ -92,7 +94,7 @@ export class KspGame {
         id: 'ground',
         shape: 'box',
         type: 'fixed',
-        size: [600, 2, 600],
+        size: [800, 2, 800],
         position: [0, 0, 0],
       })
     );
@@ -129,22 +131,21 @@ export class KspGame {
         new THREE.MeshStandardMaterial({ color: 0xb53c25 })
       );
       fin.position.set(0, -3.2, 1.2);
-      fin.rotation.y = (i * Math.PI) / 2;
       const pivot = new THREE.Group();
       pivot.rotation.y = (i * Math.PI) / 2;
       pivot.add(fin);
       boosterGroup.add(pivot);
     }
 
-    const boosterBody = this.engine.native.world.createRigidBody(
+    this.boosterBody = this.engine.native.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(0, 6.0, 0)
+        .setTranslation(0, 6.2, 0)
         .setAdditionalMass(5.0)
         .setCanSleep(false)
     );
     const boosterCollider = this.engine.native.world.createCollider(
       RAPIER.ColliderDesc.cylinder(4.0, 1.0),
-      boosterBody
+      this.boosterBody
     );
 
     this.booster = this.engine.add({
@@ -152,7 +153,7 @@ export class KspGame {
       tags: ['rocket', 'booster'],
       native: {
         three: { object: boosterGroup },
-        rapier: { body: boosterBody, colliders: [boosterCollider] },
+        rapier: { body: this.boosterBody, colliders: [boosterCollider] },
       },
     });
 
@@ -172,15 +173,15 @@ export class KspGame {
     heatShield.position.y = -1.6;
     capsuleGroup.add(heatShield);
 
-    const capsuleBody = this.engine.native.world.createRigidBody(
+    this.capsuleBody = this.engine.native.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(0, 11.6, 0)
+        .setTranslation(0, 11.8, 0)
         .setAdditionalMass(1.5)
         .setCanSleep(false)
     );
     const capsuleCollider = this.engine.native.world.createCollider(
       RAPIER.ColliderDesc.cone(1.6, 1.0),
-      capsuleBody
+      this.capsuleBody
     );
 
     this.capsule = this.engine.add({
@@ -188,7 +189,7 @@ export class KspGame {
       tags: ['rocket', 'capsule'],
       native: {
         three: { object: capsuleGroup },
-        rapier: { body: capsuleBody, colliders: [capsuleCollider] },
+        rapier: { body: this.capsuleBody, colliders: [capsuleCollider] },
       },
     });
 
@@ -201,28 +202,42 @@ export class KspGame {
     );
     this.decouplerJoint = this.engine.native.world.createImpulseJoint(
       jointParams,
-      boosterBody,
-      capsuleBody,
+      this.boosterBody,
+      this.capsuleBody,
       true
     );
 
     // 7. Particle System (Exhaust Plume)
     this.initParticles(scene);
 
-    // 8. Physics System Update: Apply Upward Thrust
+    // 8. Physics System Update: Clamp Rocket on pad until launch, then apply Upward Thrust
     this.engine.systems.add({
       phase: 'prePhysics',
       update: () => {
-        if (!this.isLaunched) return;
+        if (!this.isLaunched) {
+          // Clamp to launchpad
+          this.boosterBody.setTranslation({ x: 0, y: 6.2, z: 0 }, true);
+          this.boosterBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+          this.boosterBody.setLinvel(new RAPIER.Vector3(0, 0, 0), true);
+          this.boosterBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
+
+          if (this.decouplerJoint) {
+            this.capsuleBody.setTranslation({ x: 0, y: 11.8, z: 0 }, true);
+            this.capsuleBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+            this.capsuleBody.setLinvel(new RAPIER.Vector3(0, 0, 0), true);
+            this.capsuleBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
+          }
+          return;
+        }
 
         if (!this.isStaged) {
-          // Booster main thrust: mass (6.5) * gravity (9.81) * 3.2 TWR
-          const thrust = 205.0 * this.throttle;
-          boosterBody.applyImpulse(new RAPIER.Vector3(0, thrust * 0.0166, 0), true);
+          // Booster main thrust: mass (6.5) * (gravity + 32 m/s² accel)
+          const thrust = 280.0 * this.throttle;
+          this.boosterBody.applyImpulse(new RAPIER.Vector3(0, thrust * 0.0166, 0), true);
         } else {
           // Upper stage vacuum engine
-          const thrust = 45.0 * this.throttle;
-          capsuleBody.applyImpulse(new RAPIER.Vector3(0, thrust * 0.0166, 0), true);
+          const thrust = 65.0 * this.throttle;
+          this.capsuleBody.applyImpulse(new RAPIER.Vector3(0, thrust * 0.0166, 0), true);
         }
       },
     });
@@ -243,8 +258,8 @@ export class KspGame {
       handle: (val: number) => this.setThrottle(val),
     });
 
-    // Start engine presentation loop
-    this.engine.start();
+    // Start engine presentation loop with camera & particle update callback
+    this.engine.start((dt) => this.update(dt));
   }
 
   private initParticles(scene: THREE.Scene): void {
@@ -259,9 +274,9 @@ export class KspGame {
 
     const particleMat = new THREE.PointsMaterial({
       color: 0xffaa33,
-      size: 1.8,
+      size: 2.2,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.85,
       blending: THREE.AdditiveBlending,
     });
 
@@ -276,20 +291,20 @@ export class KspGame {
     const nozzleY = !this.isStaged ? bPos[1] - 4.2 : bPos[1] - 1.6;
 
     for (let i = 0; i < this.particleCount; i++) {
-      if (this.isLaunched && Math.random() < 0.35 * this.throttle) {
+      if (this.isLaunched && Math.random() < 0.45 * this.throttle) {
         if (this.particleLifetimes[i] <= 0) {
           this.particleLifetimes[i] = 1.0;
-          this.particlePositions[i * 3 + 0] = bPos[0] + (Math.random() - 0.5) * 0.4;
+          this.particlePositions[i * 3 + 0] = bPos[0] + (Math.random() - 0.5) * 0.5;
           this.particlePositions[i * 3 + 1] = nozzleY;
-          this.particlePositions[i * 3 + 2] = bPos[2] + (Math.random() - 0.5) * 0.4;
+          this.particlePositions[i * 3 + 2] = bPos[2] + (Math.random() - 0.5) * 0.5;
         }
       }
 
       if (this.particleLifetimes[i] > 0) {
         this.particleLifetimes[i] -= dt * 2.2;
-        this.particlePositions[i * 3 + 1] -= dt * (28.0 * this.throttle);
-        this.particlePositions[i * 3 + 0] += (Math.random() - 0.5) * 0.3;
-        this.particlePositions[i * 3 + 2] += (Math.random() - 0.5) * 0.3;
+        this.particlePositions[i * 3 + 1] -= dt * (32.0 * this.throttle);
+        this.particlePositions[i * 3 + 0] += (Math.random() - 0.5) * 0.4;
+        this.particlePositions[i * 3 + 2] += (Math.random() - 0.5) * 0.4;
       } else {
         this.particlePositions[i * 3 + 1] = -1000;
       }
@@ -315,11 +330,9 @@ export class KspGame {
     } catch (_) {}
 
     // Impart separation kick
-    const bBody = this.booster.native.rapier?.body;
-    const cBody = this.capsule.native.rapier?.body;
-    if (bBody && cBody) {
-      bBody.applyImpulse(new RAPIER.Vector3(0, -15, 0), true);
-      cBody.applyImpulse(new RAPIER.Vector3(0, 15, 0), true);
+    if (this.boosterBody && this.capsuleBody) {
+      this.boosterBody.applyImpulse(new RAPIER.Vector3(0, -25, 0), true);
+      this.capsuleBody.applyImpulse(new RAPIER.Vector3(0, 25, 0), true);
     }
 
     sfx.playDecouple();
@@ -334,10 +347,10 @@ export class KspGame {
   }
 
   getTelemetry(): KspTelemetry {
-    const target = !this.isStaged ? this.booster : this.capsule;
-    const body = target.native.rapier?.body;
-    const vel = body ? body.linvel().y : 0;
-    const alt = Math.max(0, target.position[1] - 6.0);
+    const target = !this.isStaged ? this.boosterBody : this.capsuleBody;
+    const vel = target ? target.linvel().y : 0;
+    const pos = target ? target.translation().y : 6.2;
+    const alt = Math.max(0, pos - 6.2);
 
     return {
       altitude: parseFloat(alt.toFixed(1)),
@@ -353,17 +366,17 @@ export class KspGame {
     this.updateParticles(dt);
 
     // Smooth Chase Camera
-    const target = !this.isStaged ? this.booster : this.capsule;
-    const tPos = target.position;
+    const target = !this.isStaged ? this.boosterBody : this.capsuleBody;
+    const tPos = target ? target.translation() : { x: 0, y: 6.2, z: 0 };
     const camera = this.engine.native.camera;
 
-    const targetCamY = tPos[1] + 4.0;
-    const targetCamZ = tPos[2] + 28.0;
+    const targetCamY = tPos.y + 4.0;
+    const targetCamZ = tPos.z + 28.0;
 
-    camera.position.x += (tPos[0] - camera.position.x) * 0.1;
+    camera.position.x += (tPos.x - camera.position.x) * 0.1;
     camera.position.y += (targetCamY - camera.position.y) * 0.1;
     camera.position.z += (targetCamZ - camera.position.z) * 0.1;
-    camera.lookAt(tPos[0], tPos[1] + 2.0, tPos[2]);
+    camera.lookAt(tPos.x, tPos.y + 2.0, tPos.z);
   }
 
   dispose(): void {

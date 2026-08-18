@@ -54,13 +54,13 @@ export class PsxGame {
     scene.fog = new THREE.FogExp2(0x020305, 0.08);
 
     // 1. Spooky Ambient & Torch Lighting
-    this.engine.add(light({ type: 'ambient', intensity: 0.08, color: 0x223344 }));
+    this.engine.add(light({ type: 'ambient', intensity: 0.15, color: 0x223344 }));
 
-    const torchLight = new THREE.PointLight(0xff6622, 1.8, 14);
+    const torchLight = new THREE.PointLight(0xff6622, 2.5, 16);
     torchLight.position.set(-3.5, 2.5, -8);
     scene.add(torchLight);
 
-    const torchLight2 = new THREE.PointLight(0xff4411, 1.5, 14);
+    const torchLight2 = new THREE.PointLight(0xff4411, 2.0, 16);
     torchLight2.position.set(3.5, 2.5, -18);
     scene.add(torchLight2);
 
@@ -78,10 +78,11 @@ export class PsxGame {
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(0, 1.2, 0)
         .lockRotations()
-        .setAdditionalMass(2.0)
+        .setAdditionalMass(3.0)
+        .setCanSleep(false)
     );
     const playerCollider = this.engine.native.world.createCollider(
-      RAPIER.ColliderDesc.capsule(0.7, 0.4),
+      RAPIER.ColliderDesc.capsule(0.7, 0.4).setFriction(0.0),
       this.playerBody
     );
 
@@ -122,7 +123,8 @@ export class PsxGame {
       handle: () => this.unlockDoor(),
     });
 
-    this.engine.start();
+    // Start presentation loop with update hook
+    this.engine.start(() => this.update());
   }
 
   private buildMansion(scene: THREE.Scene): void {
@@ -229,7 +231,7 @@ export class PsxGame {
       color: 0xdfa020,
       metalness: 0.9,
       roughness: 0.3,
-      emissive: 0x332200,
+      emissive: 0x443300,
     });
     const keyStem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5), keyMat);
     keyStem.rotation.x = Math.PI / 2;
@@ -290,16 +292,21 @@ export class PsxGame {
   }
 
   private setupControls(): void {
-    window.addEventListener('keydown', (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       this.keys[e.code] = true;
-      if (e.code === 'KeyE') {
+      this.keys[e.key.toLowerCase()] = true;
+      if (e.code === 'KeyE' || e.key.toLowerCase() === 'e') {
         this.pickupKey();
       }
-    });
+    };
 
-    window.addEventListener('keyup', (e) => {
+    const onKeyUp = (e: KeyboardEvent) => {
       this.keys[e.code] = false;
-    });
+      this.keys[e.key.toLowerCase()] = false;
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
 
     this.canvas.addEventListener('click', () => {
       if (!this.isLocked) {
@@ -326,12 +333,12 @@ export class PsxGame {
     let forward = 0;
     let strafe = 0;
 
-    if (this.keys['KeyW'] || this.keys['ArrowUp']) forward += 1;
-    if (this.keys['KeyS'] || this.keys['ArrowDown']) forward -= 1;
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) strafe -= 1;
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) strafe += 1;
+    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) forward += 1;
+    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) forward -= 1;
+    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
+    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
 
-    const speed = 4.8;
+    const speed = 5.2;
     const moveX = (Math.sin(this.yaw) * forward + Math.cos(this.yaw) * strafe) * speed;
     const moveZ = (-Math.cos(this.yaw) * forward + Math.sin(this.yaw) * strafe) * speed;
 
@@ -348,7 +355,7 @@ export class PsxGame {
     const p = this.playerBody.translation();
     const d = Math.hypot(p.x - -3.2, p.z - -10);
 
-    if (d < 2.0) {
+    if (d < 2.5) {
       this.pickupKey();
     }
   }
