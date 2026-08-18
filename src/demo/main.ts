@@ -73,6 +73,10 @@ class PlaygroundApp {
       if (this.activeMode === 'flight') {
         if (e.code === 'KeyR' || e.key.toLowerCase() === 'r') {
           (this.currentGame as FlightGame)?.resetPlane();
+        } else if (e.code === 'KeyG' || e.key.toLowerCase() === 'g') {
+          (this.currentGame as FlightGame)?.toggleLandingGear();
+        } else if (e.code === 'KeyC' || e.key.toLowerCase() === 'c') {
+          (this.currentGame as FlightGame)?.toggleCameraView();
         }
       }
     });
@@ -129,20 +133,25 @@ class PlaygroundApp {
       <div class="hud-card flight-card">
         <div class="hud-title">✈️ Aeroplane Flight Simulator</div>
         <div class="instructions-text">
-          <strong>W / S</strong>: Pitch &bull; <strong>A / D</strong>: Roll / Bank<br/>
-          <strong>Q / E</strong>: Rudder / Yaw &bull; <strong>Shift / Ctrl</strong>: Throttle<br/>
-          <strong>R</strong>: Reset to Runway &bull; Fly through all <strong>10 Golden Rings</strong>!
+          <strong>Shift / Ctrl</strong>: Throttle up / down (100% to takeoff)<br/>
+          <strong>W / S</strong>: Pitch &bull; <strong>A / D</strong>: Roll &bull; <strong>Q / E</strong>: Yaw<br/>
+          <strong>G</strong>: Toggle Landing Gear &bull; <strong>C</strong>: Cockpit / Outside View &bull; <strong>R</strong>: Reset Runway
         </div>
         <div class="telemetry-grid">
           <div class="metric"><span class="label">Airspeed:</span> <span id="flight-speed" class="val">0 km/h</span></div>
           <div class="metric"><span class="label">Altitude:</span> <span id="flight-alt" class="val">0 m</span></div>
-          <div class="metric"><span class="label">Heading:</span> <span id="flight-hdg" class="val">000°</span></div>
-          <div class="metric"><span class="label">Rings:</span> <span id="flight-rings" class="val tag">0 / 10</span></div>
+          <div class="metric"><span class="label">Gear:</span> <span id="flight-gear" class="val tag">DOWN</span></div>
+          <div class="metric"><span class="label">View:</span> <span id="flight-view" class="val">Outside</span></div>
+        </div>
+        <div class="controls-row">
+          <button id="btn-toggle-view" class="btn btn-secondary">🎥 View: Cockpit/Outside (C)</button>
+          <button id="btn-toggle-gear" class="btn btn-primary">🛞 Gear Up/Down (G)</button>
+          <button id="btn-reset-plane" class="btn" style="background:#475569; color:white;">🔄 Reset (R)</button>
         </div>
         <div class="throttle-row">
           <label for="flight-throttle">Throttle:</label>
-          <input id="flight-throttle" type="range" min="0" max="100" value="60" />
-          <span id="flight-throttle-val" class="val">60%</span>
+          <input id="flight-throttle" type="range" min="0" max="100" value="0" />
+          <span id="flight-throttle-val" class="val">0%</span>
         </div>
       </div>
     `;
@@ -153,6 +162,18 @@ class PlaygroundApp {
       (this.currentGame as FlightGame)?.setThrottle(val);
       const label = document.getElementById('flight-throttle-val');
       if (label) label.textContent = `${Math.round(val * 100)}%`;
+    });
+
+    document.getElementById('btn-toggle-view')?.addEventListener('click', () => {
+      (this.currentGame as FlightGame)?.toggleCameraView();
+    });
+
+    document.getElementById('btn-toggle-gear')?.addEventListener('click', () => {
+      (this.currentGame as FlightGame)?.toggleLandingGear();
+    });
+
+    document.getElementById('btn-reset-plane')?.addEventListener('click', () => {
+      (this.currentGame as FlightGame)?.resetPlane();
     });
   }
 
@@ -225,15 +246,18 @@ class PlaygroundApp {
           const t = (this.currentGame as FlightGame).getTelemetry();
           const spdEl = document.getElementById('flight-speed');
           const altEl = document.getElementById('flight-alt');
-          const hdgEl = document.getElementById('flight-hdg');
-          const ringsEl = document.getElementById('flight-rings');
+          const gearEl = document.getElementById('flight-gear');
+          const viewEl = document.getElementById('flight-view');
           const throttleSlider = document.getElementById('flight-throttle') as HTMLInputElement;
           const throttleVal = document.getElementById('flight-throttle-val');
 
           if (spdEl) spdEl.textContent = `${t.speed} km/h`;
           if (altEl) altEl.textContent = `${t.altitude} m`;
-          if (hdgEl) hdgEl.textContent = `${t.heading.toString().padStart(3, '0')}°`;
-          if (ringsEl) ringsEl.textContent = `${t.ringsCollected} / ${t.totalRings}`;
+          if (gearEl) {
+            gearEl.textContent = t.gearDown ? 'DOWN' : 'RETRACTED';
+            gearEl.className = `val tag ${t.gearDown ? 'tag-green' : 'tag-orange'}`;
+          }
+          if (viewEl) viewEl.textContent = t.viewMode === 'cockpit' ? 'Cockpit' : 'Outside';
           if (throttleSlider && document.activeElement !== throttleSlider) {
             throttleSlider.value = Math.round(t.throttle * 100).toString();
           }
