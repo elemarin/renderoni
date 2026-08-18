@@ -140,8 +140,8 @@ class PlaygroundApp {
         <div class="telemetry-grid">
           <div class="metric"><span class="label">Airspeed:</span> <span id="flight-speed" class="val">0 km/h</span></div>
           <div class="metric"><span class="label">Altitude:</span> <span id="flight-alt" class="val">0 m</span></div>
-          <div class="metric"><span class="label">Gear:</span> <span id="flight-gear" class="val tag">DOWN</span></div>
-          <div class="metric"><span class="label">View:</span> <span id="flight-view" class="val">Outside</span></div>
+          <div class="metric"><span class="label">Status:</span> <span id="flight-state" class="val tag tag-green">Landed</span></div>
+          <div class="metric"><span class="label">Gear / View:</span> <span id="flight-gear-view" class="val">Down &bull; Outside</span></div>
         </div>
         <div class="controls-row">
           <button id="btn-toggle-view" class="btn btn-secondary">🎥 View: Cockpit/Outside (C)</button>
@@ -246,18 +246,20 @@ class PlaygroundApp {
           const t = (this.currentGame as FlightGame).getTelemetry();
           const spdEl = document.getElementById('flight-speed');
           const altEl = document.getElementById('flight-alt');
-          const gearEl = document.getElementById('flight-gear');
-          const viewEl = document.getElementById('flight-view');
+          const stateEl = document.getElementById('flight-state');
+          const gearViewEl = document.getElementById('flight-gear-view');
           const throttleSlider = document.getElementById('flight-throttle') as HTMLInputElement;
           const throttleVal = document.getElementById('flight-throttle-val');
 
           if (spdEl) spdEl.textContent = `${t.speed} km/h`;
           if (altEl) altEl.textContent = `${t.altitude} m`;
-          if (gearEl) {
-            gearEl.textContent = t.gearDown ? 'DOWN' : 'RETRACTED';
-            gearEl.className = `val tag ${t.gearDown ? 'tag-green' : 'tag-orange'}`;
+          if (stateEl) {
+            stateEl.textContent = t.flightState;
+            stateEl.className = `val tag ${t.flightState === 'Airborne' ? 'tag-green' : 'tag-orange'}`;
           }
-          if (viewEl) viewEl.textContent = t.viewMode === 'cockpit' ? 'Cockpit' : 'Outside';
+          if (gearViewEl) {
+            gearViewEl.textContent = `${t.gearDown ? 'Gear Down' : 'Gear Up'} • ${t.viewMode === 'cockpit' ? 'Cockpit' : 'Outside'}`;
+          }
           if (throttleSlider && document.activeElement !== throttleSlider) {
             throttleSlider.value = Math.round(t.throttle * 100).toString();
           }
