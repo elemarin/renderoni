@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Renderoni — Batteries-Included, Agent-Native 3D Playground</title>
-    <script type="module" crossorigin src="./assets/index-Bb8TMkOF.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BPzf_0sg.css">
+    <title>Renderoni — High-Performance 3D Game Engine & Demos</title>
+    <script type="module" crossorigin src="./assets/index-D4rSnkaF.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Czh0xa0C.css">
   </head>
   <body>
     <!-- 3D WebGL Canvas -->
@@ -14,14 +14,31 @@
     <!-- Top Navigation / Archetype Selector -->
     <nav class="top-nav">
       <div class="brand-badge">🍝 Renderoni</div>
-      <button class="tab-btn active" data-mode="quickstart">🪙 Quickstart Demo</button>
-      <button class="tab-btn" data-mode="flight">✈️ Flight Simulator</button>
-      <button class="tab-btn" data-mode="voxel">🧱 Vast Voxel Sandbox</button>
-      <button class="tab-btn" data-mode="psx">🔦 PSX 3rd-Person</button>
+      <button class="tab-btn active" data-mode="psx">🔦 Echoes of Blackwood (PSX 1st-Person)</button>
+      <button class="tab-btn" data-mode="flight">✈️ Skyward Courier (Flight)</button>
+      <button class="tab-btn" data-mode="voxel">🧱 Monolith: Voxel Ruins</button>
+      <button class="tab-btn" data-mode="quickstart">🪙 Quickstart</button>
     </nav>
 
     <!-- Contextual Game HUD -->
     <div id="game-hud"></div>
+
+    <!-- Retro Note Inspection Overlay (for PSX game) -->
+    <div id="inspect-modal" class="inspect-modal" style="display: none;">
+      <div class="inspect-card">
+        <div class="inspect-header">
+          <span class="inspect-title">📜 Investigation Clue</span>
+          <button id="btn-close-inspect" class="btn-close">×</button>
+        </div>
+        <div id="inspect-body-text" class="inspect-text">...</div>
+        <div class="inspect-hint">[Press E or Click to Dismiss]</div>
+      </div>
+    </div>
+
+    <!-- Hover Interaction Crosshair Prompt -->
+    <div id="interaction-prompt" class="interaction-prompt" style="display: none;">
+      <span id="prompt-text"></span>
+    </div>
 
     <!-- Live Agent Inspector HUD (Bottom Right) -->
     <div class="inspector-panel">
@@ -39,7 +56,11 @@
       <div id="inspector-body">
         <div id="inspector-content" class="inspector-terminal"># Initializing Renderoni Engine...</div>
         <div class="quick-actions-row" id="quick-actions">
-          <button class="chip-btn" data-action="quickstart.respawnCoin">🪙 Respawn Coin</button>
+          <button class="chip-btn" data-action="quest.readJournal">📖 Read Journal</button>
+          <button class="chip-btn" data-action="quest.pickupKey">🗝️ Pickup Key</button>
+          <button class="chip-btn" data-action="quest.solveClock">🕰️ Solve Clock (11:45)</button>
+          <button class="chip-btn" data-action="quest.pickupCrest">🛡️ Pickup Crest</button>
+          <button class="chip-btn" data-action="quest.unlockGate">🚪 Escape Gate</button>
         </div>
         <div class="action-bar">
           <input id="action-input" type="text" placeholder="Dispatch action (e.g. hero.move or JSON)" />

@@ -166,6 +166,36 @@ describe('Modular Subsystems (L1) & Agent Tooling (L2)', () => {
   });
 
   describe('Model Context Protocol (MCP) Server', () => {
+    it('completes the initialize handshake without a game attached', async () => {
+      const mcp = createMCPServer();
+
+      const init = await mcp.handleRequest({
+        method: 'initialize',
+        params: { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'test' } },
+      });
+
+      expect(init.protocolVersion).toBe('2025-11-25');
+      expect(init.capabilities.tools).toEqual({});
+      expect(init.serverInfo.name).toBe('renderoni');
+      expect(init.instructions).toContain('describe');
+
+      await expect(mcp.handleRequest({ method: 'notifications/initialized' })).resolves.toEqual({});
+      await expect(mcp.handleRequest({ method: 'ping' })).resolves.toEqual({});
+
+      const listed = await mcp.handleRequest({ method: 'tools/list' });
+      expect(listed.tools.map((t: { name: string }) => t.name)).toEqual([
+        'describe',
+        'observe',
+        'act',
+        'step',
+        'check',
+      ]);
+      expect(listed.tools[0].inputSchema).toEqual({ type: 'object', properties: {} });
+      expect(listed.tools.find((t: { name: string }) => t.name === 'act').inputSchema.required).toEqual([
+        'name',
+      ]);
+    });
+
     it('handles tools/list and tools/call for describe, act, step, check', async () => {
       const game = await createRenderoni({ mode: 'headless', seed: 42 });
       game.add(body({ id: 'cube', position: [0, 10, 0] }));
@@ -175,6 +205,7 @@ describe('Modular Subsystems (L1) & Agent Tooling (L2)', () => {
       // 1. List tools
       const toolList = await mcp.handleRequest({ method: 'tools/list' });
       expect(toolList.tools.length).toBeGreaterThanOrEqual(5);
+      expect(toolList.tools[0].inputSchema.type).toBe('object');
 
       // 2. Call describe
       const descRes = await mcp.handleRequest({

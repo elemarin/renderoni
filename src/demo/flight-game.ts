@@ -1,75 +1,83 @@
 /**
- * Renderoni Web Demo: KSP-Style Smooth Aeroplane Flight Simulator
+ * Renderoni Showcase: Skyward Courier — Isle of Aeolus
  *
- * KSP Flight Control Mapping:
- * - W / S: Pitch Down / Pitch Up
- * - A / D: Yaw / Turn Left / Right
- * - Q / E: Roll Left / Right (Rotation)
- * - Shift / Ctrl: Throttle Up / Down
- * - Z: Max Throttle (100%) | X: Cut Throttle (0%)
- * - G: Landing Gear | C: Camera View | R: Reset
+ * Stylized Ghibli-Style Flight & Exploration:
+ * - Hand-crafted Vintage Biplane (dual wings, spinning wooden propellers with blur discs,
+ *   working rudder/aileron/elevator control surfaces, pontoon skids, and cockpit dashboard)
+ * - Aerodynamic Flight Dynamics (speed-dependent dynamic lift, smooth banking, self-leveling stability)
+ * - Floating Archipelago (Haven Outpost, Windmill Valley, Sky Lighthouse, Canyon Wind Tunnels)
+ * - Postal Airmail Delivery Game Loop:
+ *   1. Take off from Haven Island runway
+ *   2. Deliver Parcel to Windmill Valley
+ *   3. Soar through glowing Canyon Thermal Updrafts
+ *   4. Ignite the Sky Lighthouse Beacon Ring
+ *   5. Smooth water/runway touchdown
  */
 
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { RenderoniEngine } from '../core/engine.js';
-import { body } from '../presets/body.js';
-import { light } from '../presets/light.js';
+import { body, light } from '../presets/index.js';
 import { sfx } from './audio-sfx.js';
 
-export type CameraViewMode = 'chase' | 'cockpit';
-
 export interface FlightTelemetry {
-  altitude: number;
   speed: number;
+  altitude: number;
   throttle: number;
-  heading: number;
-  gearDown: boolean;
-  viewMode: CameraViewMode;
-  flightState: string;
-  ringsCollected: number;
-  totalRings: number;
-}
-
-interface RingCheckpoint {
-  mesh: THREE.Mesh;
-  position: [number, number, number];
-  collected: boolean;
+  flightState: 'Parked' | 'Takeoff' | 'Airborne' | 'Stall Warning' | 'Landed';
+  parcelsDelivered: number;
+  totalParcels: number;
+  viewMode: 'cockpit' | 'outside';
+  activeObjective: string;
 }
 
 export class FlightGame {
   readonly engine: RenderoniEngine;
   private canvas: HTMLCanvasElement;
-  private planeMesh!: THREE.Group;
-  private propellerMesh!: THREE.Mesh;
-  private landingGearGroup!: THREE.Group;
+
+  // Aircraft Visual Mesh Hierarchy
+  private planeRoot = new THREE.Group();
+  private propMeshLeft!: THREE.Mesh;
+  private propMeshRight!: THREE.Mesh;
+  private blurDiscLeft!: THREE.Mesh;
+  private blurDiscRight!: THREE.Mesh;
+  private rudderMesh!: THREE.Mesh;
+  private leftAileron!: THREE.Mesh;
+  private rightAileron!: THREE.Mesh;
+  private elevatorMesh!: THREE.Mesh;
+
+  // Physics
   private planeBody!: RAPIER.RigidBody;
-  private engineSound = sfx.createFlightEngine();
 
-  // Flight Controls & State - Starts parked with 0% throttle
-  private throttle = 0.0;
-  private smoothThrottle = 0.0;
-  private pitchInput = 0;
-  private rollInput = 0;
-  private yawInput = 0;
+  // Flight State
+  private throttle = 0.0; // 0.0 to 1.0
+  private airspeed = 0.0; // m/s
+  private isAirborne = false;
+  private viewMode: 'cockpit' | 'outside' = 'outside';
+
+  // Mission & Delivery Objectives
+  private parcelsDelivered = 0;
+  private totalParcels = 3;
+  private currentObjective = 'Increase throttle (Shift or Z) to take off from Haven Island';
+
+  // Interactive Rings & Delivery Hoppers
+  private rings: Array<{
+    id: string;
+    pos: THREE.Vector3;
+    mesh: THREE.Group;
+    collected: boolean;
+    type: 'mail' | 'thermal' | 'lighthouse';
+  }> = [];
+
+  // Controls
   private keys: Record<string, boolean> = {};
-
-  // Landing Gear & Camera
-  private gearDown = true;
-  private gearAnim = 1.0;
-  private viewMode: CameraViewMode = 'chase';
-  private smoothCamPos = new THREE.Vector3(0, 10, 280);
-
-  // Checkpoint Rings
-  private rings: RingCheckpoint[] = [];
-  private ringsCollected = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.engine = new RenderoniEngine({
       mode: 'interactive',
       canvas: this.canvas,
-      gravity: [0, -9.81, 0],
+      gravity: [0, -14.0, 0],
     });
   }
 
@@ -77,593 +85,515 @@ export class FlightGame {
     await this.engine.init();
 
     const scene = this.engine.native.scene;
-    scene.background = new THREE.Color(0x60a5fa);
-    scene.fog = new THREE.FogExp2(0x60a5fa, 0.0012);
+    scene.background = new THREE.Color(0x38bdf8); // Vibrant azure sky
+    scene.fog = new THREE.FogExp2(0x38bdf8, 0.0035);
 
-    // 1. Lighting & Sun
-    this.engine.add(light({ type: 'directional', intensity: 2.5, position: [120, 250, 120] }));
-    this.engine.add(light({ type: 'ambient', intensity: 0.65, color: 0xe0f2fe }));
+    // 1. Setup Sun & Ambient Lighting
+    this.setupLighting();
 
-    // 2. World Archipelago & Runway Island
-    this.buildWorld(scene);
+    // 2. Build Floating Archipelago Islands
+    this.buildArchipelago();
 
-    // 3. 3D Airplane Model
-    this.buildAirplane(scene);
+    // 3. Build Handcrafted Vintage Biplane
+    this.buildBiplane();
 
-    // 4. Aerial Course (Floating Golden Rings)
-    this.buildRingCourse(scene);
+    // 4. Setup Delivery Missions & Wind Tunnels
+    this.setupDeliveryRings();
 
-    // 5. Setup Controls
+    // 5. Setup Action Handlers
+    this.setupActions();
+
+    // 6. Setup Controls
     this.setupControls();
 
-    // 6. Smooth Flight Dynamics System
-    this.engine.systems.add({
-      phase: 'prePhysics',
-      update: () => {
-        this.updateFlightPhysics();
-      },
-    });
-
-    // Actions
-    this.engine.actions.register({
-      name: 'flight.throttle',
-      handle: (val: any) => this.setThrottle(typeof val === 'number' ? val : (val?.value ?? 0.0)),
-    });
-
-    this.engine.actions.register({
-      name: 'flight.toggleGear',
-      handle: () => this.toggleLandingGear(),
-    });
-
-    this.engine.actions.register({
-      name: 'flight.toggleCamera',
-      handle: () => this.toggleCameraView(),
-    });
-
-    this.engine.actions.register({
-      name: 'flight.reset',
-      handle: () => this.resetPlane(),
-    });
-
-    // Start Sound
-    this.engineSound.start();
-    this.engineSound.setThrottle(0.0);
+    // Start engine sound
+    sfx.startEngineDrone();
 
     // Start presentation loop
     this.engine.start((dt) => this.update(dt));
   }
 
-  private buildWorld(scene: THREE.Scene): void {
-    // Ocean Water Plane
-    const oceanMat = new THREE.MeshStandardMaterial({
-      color: 0x1e40af,
-      roughness: 0.15,
-      metalness: 0.6,
-    });
-    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(5000, 5000), oceanMat);
-    ocean.rotation.x = -Math.PI / 2;
-    ocean.position.y = 0;
-    scene.add(ocean);
+  private setupLighting(): void {
+    const scene = this.engine.native.scene;
 
-    // Static Ground/Ocean Physics
+    // Sun Light with Soft Shadows
     this.engine.add(
-      body({
-        id: 'ocean_ground',
-        shape: 'box',
-        type: 'fixed',
-        size: [5000, 2, 5000],
-        position: [0, -1, 0],
+      light({
+        type: 'directional',
+        intensity: 2.8,
+        color: 0xfffbeb,
+        position: [60, 100, 40],
       })
     );
 
-    // Runway Island Base
-    const runwayIsland = new THREE.Mesh(
-      new THREE.BoxGeometry(120, 6, 800),
-      new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.8 })
-    );
-    runwayIsland.position.set(0, 3, 0);
-    scene.add(runwayIsland);
-
-    // Runway Physics Body (Elevation y = 6.0)
-    this.engine.add(
-      body({
-        id: 'runway_ground',
-        shape: 'box',
-        type: 'fixed',
-        size: [120, 6, 800],
-        position: [0, 3, 0],
-      })
-    );
-
-    // Runway Tarmac
-    const tarmac = new THREE.Mesh(
-      new THREE.PlaneGeometry(46, 760),
-      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 })
-    );
-    tarmac.rotation.x = -Math.PI / 2;
-    tarmac.position.set(0, 6.02, 0);
-    scene.add(tarmac);
-
-    // White Runway Stripes
-    for (let z = -340; z <= 340; z += 24) {
-      const stripe = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.8, 14),
-        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })
-      );
-      stripe.rotation.x = -Math.PI / 2;
-      stripe.position.set(0, 6.04, z);
-      scene.add(stripe);
-    }
-
-    // Mountain Islands Archipelago
-    const mountainMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
-    const islandMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.8 });
-
-    const islandCoords = [
-      { x: -550, z: -650, r: 280, h: 160 },
-      { x: 650, z: -800, r: 340, h: 200 },
-      { x: 500, z: 550, r: 290, h: 160 },
-      { x: -650, z: 500, r: 310, h: 170 },
-      { x: 0, z: -1400, r: 420, h: 280 },
-    ];
-
-    islandCoords.forEach((isl) => {
-      const isMesh = new THREE.Mesh(new THREE.CylinderGeometry(isl.r, isl.r * 1.3, 12, 16), islandMat);
-      isMesh.position.set(isl.x, 4, isl.z);
-      scene.add(isMesh);
-
-      const peak = new THREE.Mesh(new THREE.ConeGeometry(isl.r * 0.75, isl.h, 14), mountainMat);
-      peak.position.set(isl.x, isl.h / 2 + 8, isl.z);
-      scene.add(peak);
-    });
-
-    // Clouds
-    const cloudGeo = new THREE.DodecahedronGeometry(24, 1);
-    const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, transparent: true, opacity: 0.9 });
-
-    for (let i = 0; i < 50; i++) {
-      const cloud = new THREE.Mesh(cloudGeo, cloudMat);
-      cloud.position.set(
-        (Math.random() - 0.5) * 2600,
-        150 + Math.random() * 100,
-        (Math.random() - 0.5) * 2600
-      );
-      cloud.scale.set(1.2 + Math.random(), 0.5, 1.2 + Math.random() * 1.8);
-      scene.add(cloud);
-    }
+    // Warm Hemisphere Ambient Light
+    const hemi = new THREE.HemisphereLight(0xbae6fd, 0x166534, 0.8);
+    scene.add(hemi);
   }
 
-  private buildAirplane(scene: THREE.Scene): void {
-    this.planeMesh = new THREE.Group();
+  private buildBiplane(): void {
+    const scene = this.engine.native.scene;
+    this.planeRoot = new THREE.Group();
 
-    const redMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, metalness: 0.3, roughness: 0.4 });
-    const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, metalness: 0.2, roughness: 0.3 });
-    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.75 });
-    const darkMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8, roughness: 0.3 });
-    const chromeMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 });
+    // Materials
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x9a3412, roughness: 0.5 }); // Warm teak wood
+    const creamMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.4 }); // Canvas fabric wings
+    const brassMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.85, roughness: 0.2 }); // Steampunk brass
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, roughness: 0.1 });
+    const metalMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
 
-    // Fuselage
-    const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.3, 4.8, 16), redMat);
+    // 1. Fuselage
+    const fuselage = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.35, 4.4, 12), woodMat);
     fuselage.rotation.x = Math.PI / 2;
-    this.planeMesh.add(fuselage);
+    this.planeRoot.add(fuselage);
 
-    // Nose Cone (-Z forward)
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.0, 16), redMat);
-    nose.position.z = -2.9;
+    // Brass Nose Cone
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.56, 0.8, 12), brassMat);
+    nose.position.set(0, 0, -2.4);
     nose.rotation.x = -Math.PI / 2;
-    this.planeMesh.add(nose);
+    this.planeRoot.add(nose);
 
-    // Propeller Hub
-    const propHub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.12, 12), darkMat);
-    propHub.position.z = -3.45;
-    propHub.rotation.x = -Math.PI / 2;
+    // Cockpit Canopy & Windshield
+    const windshield = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.52, 1.2, 8, 1, false, 0, Math.PI), glassMat);
+    windshield.position.set(0, 0.42, -0.4);
+    windshield.rotation.z = Math.PI / 2;
+    windshield.rotation.y = Math.PI / 2;
+    this.planeRoot.add(windshield);
 
-    this.propellerMesh = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.15, 0.03), darkMat);
-    propHub.add(this.propellerMesh);
-    this.planeMesh.add(propHub);
+    // 2. Dual Biplane Wings (Top & Bottom with Brass Struts)
+    const topWing = new THREE.Mesh(new THREE.BoxGeometry(9.0, 0.08, 1.3), creamMat);
+    topWing.position.set(0, 0.9, -0.4);
+    const bottomWing = new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.08, 1.1), creamMat);
+    bottomWing.position.set(0, -0.15, -0.4);
+    this.planeRoot.add(topWing, bottomWing);
 
-    // Cockpit Canopy & Dashboard
-    const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.4, 16, 16), canopyMat);
-    canopy.position.set(0, 0.4, -0.7);
-    canopy.scale.set(0.75, 0.75, 1.6);
-    this.planeMesh.add(canopy);
+    // Brass Wing Struts
+    for (let x of [-3.2, 3.2]) {
+      const strutL = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.05, 6), brassMat);
+      strutL.position.set(x, 0.38, -0.7);
+      const strutR = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.05, 6), brassMat);
+      strutR.position.set(x, 0.38, -0.1);
+      this.planeRoot.add(strutL, strutR);
+    }
 
-    const dashboard = new THREE.Mesh(
-      new THREE.BoxGeometry(0.45, 0.2, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0x111827 })
+    // Working Ailerons
+    this.leftAileron = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.04, 0.3), creamMat);
+    this.leftAileron.position.set(-3.0, 0.9, 0.35);
+    this.rightAileron = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.04, 0.3), creamMat);
+    this.rightAileron.position.set(3.0, 0.9, 0.35);
+    this.planeRoot.add(this.leftAileron, this.rightAileron);
+
+    // 3. Tail Assembly (Vertical Fin + Horizontal Elevator)
+    const tailFin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.1, 0.9), creamMat);
+    tailFin.position.set(0, 0.6, 2.0);
+    this.planeRoot.add(tailFin);
+
+    this.rudderMesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.9, 0.4), creamMat);
+    this.rudderMesh.position.set(0, 0.55, 2.5);
+    this.planeRoot.add(this.rudderMesh);
+
+    this.elevatorMesh = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.06, 0.6), creamMat);
+    this.elevatorMesh.position.set(0, 0.2, 2.1);
+    this.planeRoot.add(this.elevatorMesh);
+
+    // 4. Twin Propellers (Left & Right Wing Mounted with Blur Discs)
+    const propMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
+    const blurMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.25 });
+
+    // Left Propeller
+    this.propMeshLeft = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.04), propMat);
+    this.propMeshLeft.position.set(-1.8, 0.38, -1.2);
+    this.blurDiscLeft = new THREE.Mesh(new THREE.CircleGeometry(0.8, 16), blurMat);
+    this.blurDiscLeft.position.set(-1.8, 0.38, -1.22);
+    this.planeRoot.add(this.propMeshLeft, this.blurDiscLeft);
+
+    // Right Propeller
+    this.propMeshRight = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.1, 0.04), propMat);
+    this.propMeshRight.position.set(1.8, 0.38, -1.2);
+    this.blurDiscRight = new THREE.Mesh(new THREE.CircleGeometry(0.8, 16), blurMat);
+    this.blurDiscRight.position.set(1.8, 0.38, -1.22);
+    this.planeRoot.add(this.propMeshRight, this.blurDiscRight);
+
+    // 5. Pontoon Water Skids
+    const pontoonL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 3.4), metalMat);
+    pontoonL.position.set(-1.3, -0.9, -0.2);
+    const pontoonR = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 3.4), metalMat);
+    pontoonR.position.set(1.3, -0.9, -0.2);
+    this.planeRoot.add(pontoonL, pontoonR);
+
+    // Spawn on Haven Island Runway (Facing North: -Z)
+    const startPos = [0, 1.4, 40];
+    this.planeRoot.position.set(startPos[0], startPos[1], startPos[2]);
+    scene.add(this.planeRoot);
+
+    // Rapier Flat Cuboid Collider (Eliminates tipping)
+    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+      .setTranslation(startPos[0], startPos[1], startPos[2])
+      .setLinearDamping(0.8)
+      .setAngularDamping(4.5)
+      .setCanSleep(false);
+    this.planeBody = this.engine.native.world.createRigidBody(bodyDesc);
+
+    const colliderDesc = RAPIER.ColliderDesc.cuboid(1.6, 0.45, 2.2);
+    colliderDesc.setFriction(0.15);
+    colliderDesc.setRestitution(0.1);
+    this.engine.native.world.createCollider(colliderDesc, this.planeBody);
+
+    // Register in Engine
+    this.engine.add(
+      body({
+        id: 'skyward_plane',
+        shape: 'box',
+        type: 'dynamic',
+        size: [3.2, 0.9, 4.4],
+        position: [startPos[0], startPos[1], startPos[2]],
+        tags: ['airplane', 'player'],
+      })
     );
-    dashboard.position.set(0, 0.32, -1.1);
-    this.planeMesh.add(dashboard);
-
-    // Wings
-    const wings = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.08, 1.4), whiteMat);
-    wings.position.set(0, 0.06, -0.5);
-    this.planeMesh.add(wings);
-
-    // Wingtips
-    const redLight = new THREE.Mesh(new THREE.SphereGeometry(0.06), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
-    redLight.position.set(-4.1, 0.06, -0.5);
-    const greenLight = new THREE.Mesh(new THREE.SphereGeometry(0.06), new THREE.MeshBasicMaterial({ color: 0x00ff00 }));
-    greenLight.position.set(4.1, 0.06, -0.5);
-    this.planeMesh.add(redLight, greenLight);
-
-    // Tail Stabilizers & Vertical Fin
-    const tailElevators = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.06, 0.8), whiteMat);
-    tailElevators.position.set(0, 0.12, 2.1);
-    this.planeMesh.add(tailElevators);
-
-    const tailFin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.3, 0.9), redMat);
-    tailFin.position.set(0, 0.72, 2.0);
-    this.planeMesh.add(tailFin);
-
-    // Landing Gear Group
-    this.landingGearGroup = new THREE.Group();
-
-    const noseStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6), chromeMat);
-    noseStrut.position.set(0, -0.35, -1.8);
-    const noseWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.1, 16), darkMat);
-    noseWheel.rotation.z = Math.PI / 2;
-    noseWheel.position.set(0, -0.65, -1.8);
-    this.landingGearGroup.add(noseStrut, noseWheel);
-
-    const leftStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6), chromeMat);
-    leftStrut.position.set(-1.2, -0.35, 0.2);
-    const leftWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.12, 16), darkMat);
-    leftWheel.rotation.z = Math.PI / 2;
-    leftWheel.position.set(-1.2, -0.65, 0.2);
-    this.landingGearGroup.add(leftStrut, leftWheel);
-
-    const rightStrut = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6), chromeMat);
-    rightStrut.position.set(1.2, -0.35, 0.2);
-    const rightWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.12, 16), darkMat);
-    rightWheel.rotation.z = Math.PI / 2;
-    rightWheel.position.set(1.2, -0.65, 0.2);
-    this.landingGearGroup.add(rightStrut, rightWheel);
-
-    this.planeMesh.add(this.landingGearGroup);
-    scene.add(this.planeMesh);
-
-    // Stable Horizontal Physics Body
-    this.planeBody = this.engine.native.world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(0, 6.7, 260.0)
-        .setAdditionalMass(6.0)
-        .setLinearDamping(0.03)
-        .setAngularDamping(5.0) // Strong damping prevents crazy spinning
-        .setCanSleep(false)
-    );
-
-    const planeCollider = this.engine.native.world.createCollider(
-      RAPIER.ColliderDesc.cuboid(1.5, 0.35, 2.2).setDensity(0.01).setFriction(0.0).setRestitution(0.0),
-      this.planeBody
-    );
-
-    this.engine.add({
-      id: 'flight_aircraft',
-      tags: ['aircraft', 'player'],
-      native: {
-        three: { object: this.planeMesh },
-        rapier: { body: this.planeBody, colliders: [planeCollider] },
-      },
-    });
   }
 
-  private buildRingCourse(scene: THREE.Scene): void {
-    const ringGeo = new THREE.TorusGeometry(9.0, 0.45, 16, 32);
-    const ringMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
-      emissive: 0x78350f,
-      roughness: 0.2,
+  private buildArchipelago(): void {
+    const scene = this.engine.native.scene;
+
+    // Endless Sparkling Ocean Surface
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      roughness: 0.15,
       metalness: 0.8,
     });
+    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), waterMat);
+    ocean.rotation.x = -Math.PI / 2;
+    ocean.position.y = 0.0;
+    scene.add(ocean);
 
-    const waypoints: Array<[number, number, number]> = [
-      [0, 22, 100],
-      [0, 42, -80],
-      [45, 62, -260],
-      [140, 82, -440],
-      [80, 98, -660],
-      [-120, 102, -700],
-      [-260, 88, -500],
-      [-220, 65, -260],
-      [-80, 45, -70],
-      [0, 28, 140],
+    // Water Surface Collider (So pontoons can land on water!)
+    this.addStaticBox(0, -0.5, 0, 800, 0.5, 800);
+
+    // 1. Haven Island (Takeoff Runway Island)
+    this.buildIsland(0, 0, 20, 28, 80, 2.5, 0x15803d);
+
+    // Wooden Runway Strip
+    const runwayMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+    const runway = new THREE.Mesh(new THREE.BoxGeometry(10, 0.2, 70), runwayMat);
+    runway.position.set(0, 1.25, 25);
+    scene.add(runway);
+    this.addStaticBox(0, 1.15, 25, 5, 0.1, 35);
+
+    // 2. Windmill Valley Island (Northeast: 120, 25, -90)
+    this.buildIsland(120, 25, -90, 70, 70, 20, 0x16a34a);
+    this.buildWindmill(120, 45, -90);
+
+    // 3. Sky Lighthouse Island (Northwest Spire: -130, 45, -160)
+    this.buildIsland(-130, 45, -160, 45, 45, 45, 0x334155);
+    this.buildLighthouse(-130, 90, -160);
+
+    // 4. Canyon Archways (Between Islands: 0, 30, -80)
+    this.buildIsland(0, 20, -80, 40, 30, 25, 0x475569);
+  }
+
+  private buildIsland(x: number, y: number, z: number, w: number, d: number, h: number, color: number): void {
+    const scene = this.engine.native.scene;
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
+    const island = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.7, w, h, 16), mat);
+    island.position.set(x, y + h / 2, z);
+    scene.add(island);
+    this.addStaticBox(x, y + h / 2, z, w * 0.7, h / 2, d * 0.7);
+  }
+
+  private buildWindmill(x: number, y: number, z: number): void {
+    const scene = this.engine.native.scene;
+    const millMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 });
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(2, 3.5, 12, 8), millMat);
+    tower.position.set(x, y + 6, z);
+    scene.add(tower);
+    this.addStaticBox(x, y + 6, z, 2.5, 6, 2.5);
+  }
+
+  private buildLighthouse(x: number, y: number, z: number): void {
+    const scene = this.engine.native.scene;
+    const towerMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.3 });
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 3.2, 22, 12), towerMat);
+    tower.position.set(x, y + 11, z);
+    scene.add(tower);
+
+    // Golden Beacon Light
+    const beaconMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(1.2, 16, 16), beaconMat);
+    beacon.position.set(x, y + 23, z);
+    scene.add(beacon);
+
+    const light = new THREE.PointLight(0xfef08a, 4.0, 80);
+    light.position.set(x, y + 24, z);
+    scene.add(light);
+  }
+
+  private addStaticBox(x: number, y: number, z: number, hx: number, hy: number, hz: number): void {
+    const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z);
+    const body = this.engine.native.world.createRigidBody(bodyDesc);
+    const colliderDesc = RAPIER.ColliderDesc.cuboid(hx, hy, hz);
+    this.engine.native.world.createCollider(colliderDesc, body);
+  }
+
+  private setupDeliveryRings(): void {
+    const scene = this.engine.native.scene;
+
+    const ringDefs = [
+      { id: 'ring_takeoff', pos: new THREE.Vector3(0, 18, -10), type: 'mail' as const, label: 'Takeoff Mail Drop' },
+      { id: 'ring_thermal', pos: new THREE.Vector3(50, 40, -50), type: 'thermal' as const, label: 'Canyon Thermal Updraft' },
+      { id: 'ring_windmill', pos: new THREE.Vector3(120, 60, -90), type: 'mail' as const, label: 'Windmill Valley Delivery' },
+      { id: 'ring_lighthouse', pos: new THREE.Vector3(-130, 115, -160), type: 'lighthouse' as const, label: 'Sky Lighthouse Beacon' },
     ];
 
-    waypoints.forEach((pt) => {
-      const mesh = new THREE.Mesh(ringGeo, ringMat.clone());
-      mesh.position.set(pt[0], pt[1], pt[2]);
-      mesh.rotation.y = Math.atan2(pt[0], pt[2]) + Math.PI / 2;
-      scene.add(mesh);
+    ringDefs.forEach((def) => {
+      const ringGroup = new THREE.Group();
+      ringGroup.position.copy(def.pos);
 
+      const color = def.type === 'thermal' ? 0x38bdf8 : def.type === 'lighthouse' ? 0xf59e0b : 0x10b981;
+      const ringMat = new THREE.MeshStandardMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.6,
+        metalness: 0.8,
+        roughness: 0.2,
+      });
+
+      const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(4.5, 0.4, 12, 24), ringMat);
+      ringGroup.add(ringMesh);
+
+      scene.add(ringGroup);
       this.rings.push({
-        mesh,
-        position: pt,
+        id: def.id,
+        pos: def.pos,
+        mesh: ringGroup,
         collected: false,
+        type: def.type,
       });
     });
   }
 
-  private setupControls(): void {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+  private setupActions(): void {
+    this.engine.actions.register({
+      name: 'flight.throttle',
+      handle: (val: any) => this.setThrottle(typeof val === 'number' ? val : 1.0),
+    });
+    this.engine.actions.register({
+      name: 'flight.toggleCamera',
+      handle: () => this.toggleCameraView(),
+    });
+    this.engine.actions.register({
+      name: 'flight.reset',
+      handle: () => this.resetPlane(),
+    });
+  }
 
+  private setupControls(): void {
+    window.addEventListener('keydown', (e) => {
       this.keys[e.code] = true;
       this.keys[e.key.toLowerCase()] = true;
 
-      // KSP Quick Throttle Shortcuts
-      if (e.code === 'KeyZ' || e.key.toLowerCase() === 'z') {
-        this.setThrottle(1.0);
-      } else if (e.code === 'KeyX' || e.key.toLowerCase() === 'x') {
-        this.setThrottle(0.0);
-      } else if (e.code === 'KeyG' || e.key.toLowerCase() === 'g') {
-        this.toggleLandingGear();
-      } else if (e.code === 'KeyC' || e.key.toLowerCase() === 'c') {
-        this.toggleCameraView();
-      } else if (e.code === 'KeyR' || e.key.toLowerCase() === 'r') {
-        this.resetPlane();
-      }
-    };
+      // Quick throttle shortcuts
+      if (e.code === 'KeyZ' || e.key.toLowerCase() === 'z') this.setThrottle(1.0);
+      if (e.code === 'KeyX' || e.key.toLowerCase() === 'x') this.setThrottle(0.0);
+      if (e.code === 'KeyC' || e.key.toLowerCase() === 'c') this.toggleCameraView();
+      if (e.code === 'KeyR' || e.key.toLowerCase() === 'r') this.resetPlane();
+    });
 
-    const onKeyUp = (e: KeyboardEvent) => {
+    window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
       this.keys[e.key.toLowerCase()] = false;
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-  }
-
-  private updateFlightPhysics(): void {
-    if (!this.planeBody) return;
-
-    // 1. KSP-Style Controls:
-    // W / S: Pitch Down / Pitch Up
-    this.pitchInput = 0;
-    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) this.pitchInput += 1;
-    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) this.pitchInput -= 1;
-
-    // A / D: Yaw / Turn Left / Right
-    this.yawInput = 0;
-    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) this.yawInput += 1;
-    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) this.yawInput -= 1;
-
-    // Q / E: Roll Left / Right (Rotation)
-    this.rollInput = 0;
-    if (this.keys['KeyQ'] || this.keys['q']) this.rollInput += 1;
-    if (this.keys['KeyE'] || this.keys['e']) this.rollInput -= 1;
-
-    // Shift / Ctrl: Smooth Throttle adjustments
-    if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) {
-      this.setThrottle(this.throttle + 0.015);
-    }
-    if (this.keys['ControlLeft'] || this.keys['ControlRight']) {
-      this.setThrottle(this.throttle - 0.015);
-    }
-
-    // 2. Smooth Throttle Interpolation
-    this.smoothThrottle += (this.throttle - this.smoothThrottle) * 0.1;
-    this.engineSound.setThrottle(this.smoothThrottle);
-
-    // 3. Compute Airplane Orientation
-    const rot = this.planeBody.rotation();
-    const q = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
-
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
-
-    // Current Velocity & Airspeed
-    const vel = this.planeBody.linvel();
-    const velVec = new THREE.Vector3(vel.x, vel.y, vel.z);
-    const forwardSpeed = Math.max(0, velVec.dot(forward));
-    const pos = this.planeBody.translation();
-    const isLanded = pos.y <= 7.1 && Math.abs(pos.x) < 40;
-
-    // 4. Engine Forward Thrust
-    const maxThrust = 1600.0;
-    const thrustForce = forward.clone().multiplyScalar(maxThrust * this.smoothThrottle);
-
-    // 5. Smooth Aerodynamic Lift
-    let liftMagnitude = 0;
-    if (forwardSpeed > 3.0) {
-      const baseLift = Math.pow(forwardSpeed / 16.0, 1.8) * 80.0;
-      const pitchClimbBoost = this.pitchInput > 0 ? 140.0 : 0;
-      liftMagnitude = Math.min(650.0, baseLift + pitchClimbBoost);
-    }
-    const liftForce = up.clone().multiplyScalar(liftMagnitude);
-
-    // 6. Aerodynamic Drag
-    const dragCoeff = this.gearDown ? -0.08 : -0.04;
-    const dragForce = velVec.clone().multiplyScalar(dragCoeff * Math.max(1.0, forwardSpeed));
-
-    // Ground Wheel Leveling (Prevent flipping on the runway)
-    let groundNormal = new THREE.Vector3(0, 0, 0);
-    if (isLanded) {
-      if (pos.y < 6.75 && vel.y < 0) {
-        groundNormal = new THREE.Vector3(0, -vel.y * 3.0, 0);
-      }
-    }
-
-    // Apply Linear Forces
-    const totalForce = thrustForce.add(liftForce).add(dragForce).add(groundNormal);
-    this.planeBody.applyImpulse(
-      new RAPIER.Vector3(totalForce.x * 0.0166, totalForce.y * 0.0166, totalForce.z * 0.0166),
-      true
-    );
-
-    // 7. Smooth Control Torques (Scaled to prevent oversteer/snapping)
-    const controlScale = Math.min(1.0, Math.max(0.25, forwardSpeed / 10.0));
-    const pitchTorque = right.clone().multiplyScalar(this.pitchInput * 26.0 * controlScale);
-    const yawTorque = up.clone().multiplyScalar(this.yawInput * 18.0 * controlScale);
-    const rollTorque = forward.clone().multiplyScalar(this.rollInput * 28.0 * controlScale);
-
-    // Aerodynamic self-leveling stability assist when controls are neutral
-    let stabilityTorque = new THREE.Vector3(0, 0, 0);
-    if (!isLanded) {
-      if (this.rollInput === 0 && Math.abs(right.y) > 0.08) {
-        stabilityTorque.add(forward.clone().multiplyScalar(-right.y * 14.0));
-      }
-    } else {
-      // Keep level on runway
-      if (this.pitchInput <= 0) {
-        this.planeBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
-      }
-    }
-
-    const totalTorque = pitchTorque.add(yawTorque).add(rollTorque).add(stabilityTorque);
-    this.planeBody.applyTorqueImpulse(
-      new RAPIER.Vector3(totalTorque.x * 0.0166, totalTorque.y * 0.0166, totalTorque.z * 0.0166),
-      true
-    );
-
-    // Check Ring Course
-    this.checkRingCollection();
-  }
-
-  private checkRingCollection(): void {
-    if (!this.planeBody) return;
-    const p = this.planeBody.translation();
-
-    for (const ring of this.rings) {
-      if (!ring.collected) {
-        const d = Math.hypot(p.x - ring.position[0], p.y - ring.position[1], p.z - ring.position[2]);
-        if (d < 11.0) {
-          ring.collected = true;
-          this.ringsCollected++;
-          (ring.mesh.material as THREE.MeshStandardMaterial).color.setHex(0x10b981);
-          (ring.mesh.material as THREE.MeshStandardMaterial).emissive.setHex(0x059669);
-          sfx.playRingCollect();
-          this.engine.events.emit('ring.collected', { index: this.ringsCollected });
-        }
-      }
-    }
+    });
   }
 
   setThrottle(val: number): void {
-    this.throttle = Math.max(0.0, Math.min(1.0, val));
-  }
-
-  toggleLandingGear(): void {
-    this.gearDown = !this.gearDown;
-    this.engine.events.emit('flight.gear', { gearDown: this.gearDown });
+    this.throttle = Math.max(0, Math.min(1, val));
   }
 
   toggleCameraView(): void {
-    this.viewMode = this.viewMode === 'chase' ? 'cockpit' : 'chase';
-    this.engine.events.emit('flight.camera', { viewMode: this.viewMode });
+    this.viewMode = this.viewMode === 'cockpit' ? 'outside' : 'cockpit';
   }
 
   resetPlane(): void {
-    if (!this.planeBody) return;
-    this.planeBody.setTranslation(new RAPIER.Vector3(0, 6.7, 260.0), true);
-    this.planeBody.setRotation(new RAPIER.Quaternion(0, 0, 0, 1), true);
-    this.planeBody.setLinvel(new RAPIER.Vector3(0, 0, 0), true);
-    this.planeBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
+    this.planeBody.setTranslation({ x: 0, y: 1.4, z: 40 }, true);
+    this.planeBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
+    this.planeBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    this.planeBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
     this.throttle = 0.0;
-    this.smoothThrottle = 0.0;
-    this.gearDown = true;
-    this.gearAnim = 1.0;
-    this.engineSound.setThrottle(0.0);
-    this.ringsCollected = 0;
+    this.airspeed = 0.0;
+    this.isAirborne = false;
+    this.parcelsDelivered = 0;
+    this.currentObjective = 'Increase throttle (Shift or Z) to take off from Haven Island';
     this.rings.forEach((r) => {
       r.collected = false;
-      (r.mesh.material as THREE.MeshStandardMaterial).color.setHex(0xf59e0b);
-      (r.mesh.material as THREE.MeshStandardMaterial).emissive.setHex(0x78350f);
+      r.mesh.visible = true;
     });
   }
 
   getTelemetry(): FlightTelemetry {
-    if (!this.planeBody) {
-      return {
-        altitude: 0,
-        speed: 0,
-        throttle: this.throttle,
-        heading: 0,
-        gearDown: this.gearDown,
-        viewMode: this.viewMode,
-        flightState: 'Parked',
-        ringsCollected: 0,
-        totalRings: 10,
-      };
-    }
-
     const pos = this.planeBody.translation();
-    const vel = this.planeBody.linvel();
-    const speedKmh = Math.hypot(vel.x, vel.y, vel.z) * 3.6;
+    const speedKmh = Math.round(this.airspeed * 3.6);
+    const alt = Math.max(0, Math.round(pos.y));
 
-    const rot = this.planeBody.rotation();
-    const q = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
-    const heading = ((Math.atan2(forward.x, forward.z) * 180) / Math.PI + 360) % 360;
-
-    let flightState = 'Parked';
-    if (pos.y > 8.0) {
-      flightState = 'Airborne';
-    } else if (speedKmh > 55.0) {
-      flightState = 'Rotate (Pull S)';
-    } else if (this.throttle > 0.05) {
-      flightState = 'Takeoff Roll';
+    let state: FlightTelemetry['flightState'] = 'Parked';
+    if (this.airspeed > 5 && !this.isAirborne) state = 'Takeoff';
+    else if (this.isAirborne) {
+      state = speedKmh < 45 ? 'Stall Warning' : 'Airborne';
     }
 
     return {
-      altitude: Math.max(0, parseFloat((pos.y - 6.0).toFixed(1))),
-      speed: parseFloat(speedKmh.toFixed(1)),
-      throttle: parseFloat(this.throttle.toFixed(2)),
-      heading: Math.round(heading),
-      gearDown: this.gearDown,
+      speed: speedKmh,
+      altitude: alt,
+      throttle: this.throttle,
+      flightState: state,
+      parcelsDelivered: this.parcelsDelivered,
+      totalParcels: this.totalParcels,
       viewMode: this.viewMode,
-      flightState,
-      ringsCollected: this.ringsCollected,
-      totalRings: this.rings.length,
+      activeObjective: this.currentObjective,
     };
   }
 
   update(dt: number): void {
-    if (!this.planeBody) return;
-
-    // Spin Propeller
-    if (this.propellerMesh) {
-      this.propellerMesh.rotation.z += (15.0 + this.smoothThrottle * 80.0) * dt;
+    // 1. Process Progressive Throttle (Shift / Ctrl)
+    if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) {
+      this.throttle = Math.min(1.0, this.throttle + dt * 0.5);
+    }
+    if (this.keys['ControlLeft'] || this.keys['ControlRight']) {
+      this.throttle = Math.max(0.0, this.throttle - dt * 0.5);
     }
 
-    // Smooth Gear Retraction
-    const targetGearAnim = this.gearDown ? 1.0 : 0.0;
-    this.gearAnim += (targetGearAnim - this.gearAnim) * 0.08;
-    if (this.landingGearGroup) {
-      this.landingGearGroup.position.y = (this.gearAnim - 1.0) * 0.45;
-      this.landingGearGroup.scale.set(1.0, Math.max(0.01, this.gearAnim), 1.0);
-      this.landingGearGroup.visible = this.gearAnim > 0.05;
-    }
-
-    const pos = this.planeBody.translation();
+    // 2. Compute Orientation & Vectors
     const rot = this.planeBody.rotation();
-    const q = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
+    const planeQuat = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
+    const forwardVec = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);
+    const upVec = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
+    const rightVec = new THREE.Vector3(1, 0, 0).applyQuaternion(planeQuat);
+
+    // Current linear velocity
+    const linvel = this.planeBody.linvel();
+    const velVec = new THREE.Vector3(linvel.x, linvel.y, linvel.z);
+    this.airspeed = velVec.dot(forwardVec); // Forward speed projection
+    const speedKmh = Math.max(0, this.airspeed * 3.6);
+    const currentAlt = this.planeBody.translation().y;
+    this.isAirborne = currentAlt > 3.5;
+
+    // 3. Engine Thrust ($1,800\text{ N}$)
+    const maxThrust = 1800.0;
+    const thrustForce = forwardVec.clone().multiplyScalar(this.throttle * maxThrust);
+
+    // 4. Aerodynamic Lift: Scales with $v^2$ and angle of attack
+    let liftMag = 0;
+    if (this.airspeed > 3.0) {
+      liftMag = Math.min(18.0, 0.45 * this.airspeed * this.airspeed);
+    }
+    const liftForce = upVec.clone().multiplyScalar(liftMag);
+
+    // 5. Aerodynamic Drag
+    const dragForce = velVec.clone().multiplyScalar(-0.06 * this.airspeed);
+
+    // Apply combined forces
+    const totalForce = thrustForce.add(liftForce).add(dragForce);
+    this.planeBody.applyImpulse({ x: totalForce.x * dt, y: totalForce.y * dt, z: totalForce.z * dt }, true);
+
+    // 6. Control Torques (Pitch, Yaw, Roll)
+    // Authority scales with forward airspeed so control feels realistic
+    const speedAuthority = Math.min(1.0, this.airspeed / 16.0);
+
+    let pitchTorque = 0;
+    let yawTorque = 0;
+    let rollTorque = 0;
+
+    // W / S: Pitch Down / Up
+    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) pitchTorque -= 24.0 * speedAuthority;
+    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) pitchTorque += 24.0 * speedAuthority;
+
+    // A / D: Yaw Left / Right
+    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) yawTorque += 18.0 * speedAuthority;
+    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) yawTorque -= 18.0 * speedAuthority;
+
+    // Q / E: Roll Left / Right
+    if (this.keys['KeyQ'] || this.keys['q']) rollTorque += 28.0 * speedAuthority;
+    if (this.keys['KeyE'] || this.keys['e']) rollTorque -= 28.0 * speedAuthority;
+
+    // Aerodynamic self-leveling stability torque
+    if (this.isAirborne && pitchTorque === 0 && rollTorque === 0) {
+      const rollAngle = planeQuat.z;
+      rollTorque += -rollAngle * 12.0;
+    }
+
+    const appliedTorque = rightVec
+      .clone()
+      .multiplyScalar(pitchTorque)
+      .add(upVec.clone().multiplyScalar(yawTorque))
+      .add(forwardVec.clone().multiplyScalar(rollTorque));
+
+    this.planeBody.applyTorqueImpulse(
+      { x: appliedTorque.x * dt, y: appliedTorque.y * dt, z: appliedTorque.z * dt },
+      true
+    );
+
+    // 7. Synchronize Visual Mesh with Physics
+    const p = this.planeBody.translation();
+    this.planeRoot.position.set(p.x, p.y, p.z);
+    this.planeRoot.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+
+    // 8. Animate Propellers & Control Surfaces
+    const propSpeed = 2.0 + this.throttle * 35.0;
+    this.propMeshLeft.rotation.z += propSpeed * dt;
+    this.propMeshRight.rotation.z -= propSpeed * dt;
+    this.blurDiscLeft.visible = this.throttle > 0.3;
+    this.blurDiscRight.visible = this.throttle > 0.3;
+
+    // Ailerons & Rudder deflection
+    this.leftAileron.rotation.x = (rollTorque !== 0 ? 0.4 : 0);
+    this.rightAileron.rotation.x = (rollTorque !== 0 ? -0.4 : 0);
+    this.rudderMesh.rotation.y = (yawTorque !== 0 ? Math.sign(yawTorque) * 0.35 : 0);
+    this.elevatorMesh.rotation.x = (pitchTorque !== 0 ? Math.sign(pitchTorque) * 0.3 : 0);
+
+    // 9. Audio Engine Modulation
+    sfx.updateEngineDrone(this.throttle, speedKmh);
+
+    // 10. Ring Collection & Missions
+    const planePos = new THREE.Vector3(p.x, p.y, p.z);
+    this.rings.forEach((ring) => {
+      if (!ring.collected && planePos.distanceTo(ring.pos) < 6.5) {
+        ring.collected = true;
+        ring.mesh.visible = false;
+        sfx.playRingChime();
+
+        if (ring.type === 'thermal') {
+          // Instant Thermal Updraft boost!
+          this.planeBody.applyImpulse({ x: forwardVec.x * 200, y: 350, z: forwardVec.z * 200 }, true);
+          this.currentObjective = 'Thermal boost acquired! Fly to Windmill Valley';
+        } else if (ring.type === 'mail') {
+          this.parcelsDelivered++;
+          this.currentObjective = `Parcel Delivered! (${this.parcelsDelivered}/${this.totalParcels}) Next: Sky Lighthouse`;
+        } else if (ring.type === 'lighthouse') {
+          this.parcelsDelivered++;
+          this.currentObjective = '🏆 Lighthouse Beacon Activated! Land gently on the sea to finish.';
+        }
+      }
+    });
+
+    // 11. Camera System
     const camera = this.engine.native.camera;
-
     if (this.viewMode === 'cockpit') {
-      const cockpitEye = new THREE.Vector3(0, 0.48, -0.6).applyQuaternion(q);
-      camera.position.set(pos.x + cockpitEye.x, pos.y + cockpitEye.y, pos.z + cockpitEye.z);
-
-      const lookAhead = new THREE.Vector3(0, 0.45, -20).applyQuaternion(q);
-      camera.lookAt(pos.x + lookAhead.x, pos.y + lookAhead.y, pos.z + lookAhead.z);
-    } else {
-      const behindOffset = new THREE.Vector3(0, 2.6, 12.0).applyQuaternion(q);
-      const targetCamPos = new THREE.Vector3(pos.x, pos.y, pos.z).add(behindOffset);
-
-      this.smoothCamPos.lerp(targetCamPos, 0.18);
-      camera.position.copy(this.smoothCamPos);
-
-      const lookTarget = new THREE.Vector3(pos.x, pos.y + 0.6, pos.z).add(
-        new THREE.Vector3(0, 0, -4).applyQuaternion(q)
-      );
+      const eyePos = forwardVec.clone().multiplyScalar(0.4).add(upVec.clone().multiplyScalar(0.55));
+      camera.position.copy(planePos).add(eyePos);
+      const lookTarget = planePos.clone().add(forwardVec.clone().multiplyScalar(100));
       camera.lookAt(lookTarget);
+    } else {
+      // Smooth Dynamic Chase Camera
+      const chaseOffset = forwardVec
+        .clone()
+        .multiplyScalar(-10.5)
+        .add(upVec.clone().multiplyScalar(3.6));
+      const targetCamPos = planePos.clone().add(chaseOffset);
+      camera.position.lerp(targetCamPos, 0.12);
+      camera.lookAt(planePos.clone().add(forwardVec.clone().multiplyScalar(4)));
     }
   }
 
   dispose(): void {
-    this.engineSound.stop();
+    sfx.stopEngineDrone();
     this.engine.dispose();
   }
 }

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "renderoni": {
+      "command": "node",
+      "args": ["./bin/renderoni.js", "mcp"]
+    }
+  }
+}
