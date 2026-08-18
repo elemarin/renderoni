@@ -2,16 +2,16 @@
  * Renderoni Interactive Web Playground & Live Agent Inspector
  */
 
-import { KspGame } from './ksp-game.js';
+import { FlightGame } from './flight-game.js';
 import { VoxelGame } from './voxel-game.js';
 import { PsxGame } from './psx-game.js';
 import { ObservationEngine } from '../core/observations.js';
 
-type GameMode = 'ksp' | 'voxel' | 'psx';
+type GameMode = 'flight' | 'voxel' | 'psx';
 
 class PlaygroundApp {
-  private activeMode: GameMode = 'ksp';
-  private currentGame: KspGame | VoxelGame | PsxGame | null = null;
+  private activeMode: GameMode = 'flight';
+  private currentGame: FlightGame | VoxelGame | PsxGame | null = null;
   private canvas: HTMLCanvasElement;
   private isInspectorOpen = true;
 
@@ -26,7 +26,7 @@ class PlaygroundApp {
   constructor() {
     this.canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     this.initDOM();
-    this.switchGame('ksp');
+    this.switchGame('flight');
     this.startHUDUpdateLoop();
   }
 
@@ -68,15 +68,11 @@ class PlaygroundApp {
 
     // Global Key shortcuts
     window.addEventListener('keydown', (e) => {
-      // Don't capture keys if typing in the action input bar
       if (document.activeElement === this.actionInput) return;
 
-      if (this.activeMode === 'ksp') {
-        if (e.code === 'Space') {
-          e.preventDefault();
-          (this.currentGame as KspGame)?.launch();
-        } else if (e.code === 'KeyX' || e.key.toLowerCase() === 'x') {
-          (this.currentGame as KspGame)?.stage();
+      if (this.activeMode === 'flight') {
+        if (e.code === 'KeyR' || e.key.toLowerCase() === 'r') {
+          (this.currentGame as FlightGame)?.resetPlane();
         }
       }
     });
@@ -111,10 +107,10 @@ class PlaygroundApp {
     });
 
     // Mount Game
-    if (mode === 'ksp') {
-      this.currentGame = new KspGame(this.canvas);
+    if (mode === 'flight') {
+      this.currentGame = new FlightGame(this.canvas);
       await this.currentGame.init();
-      this.mountKspHUD();
+      this.mountFlightHUD();
     } else if (mode === 'voxel') {
       this.currentGame = new VoxelGame(this.canvas);
       await this.currentGame.init();
@@ -128,41 +124,34 @@ class PlaygroundApp {
     this.handleResize();
   }
 
-  private mountKspHUD(): void {
+  private mountFlightHUD(): void {
     this.hudContainer.innerHTML = `
-      <div class="hud-card scifi-card">
-        <div class="hud-title">🚀 KSP Rocket Telemetry (Archetype A)</div>
-        <div class="telemetry-grid">
-          <div class="metric"><span class="label">Altitude:</span> <span id="ksp-alt" class="val">0.0 m</span></div>
-          <div class="metric"><span class="label">Speed:</span> <span id="ksp-vel" class="val">0.0 m/s</span></div>
-          <div class="metric"><span class="label">Stage:</span> <span id="ksp-stage" class="val">Stage 1</span></div>
-          <div class="metric"><span class="label">Status:</span> <span id="ksp-status" class="val tag">On Pad</span></div>
+      <div class="hud-card flight-card">
+        <div class="hud-title">✈️ Aeroplane Flight Simulator</div>
+        <div class="instructions-text">
+          <strong>W / S</strong>: Pitch &bull; <strong>A / D</strong>: Roll / Bank<br/>
+          <strong>Q / E</strong>: Rudder / Yaw &bull; <strong>Shift / Ctrl</strong>: Throttle<br/>
+          <strong>R</strong>: Reset to Runway &bull; Fly through all <strong>10 Golden Rings</strong>!
         </div>
-        <div class="controls-row">
-          <button id="btn-ksp-launch" class="btn btn-primary">🔥 Launch (Space)</button>
-          <button id="btn-ksp-stage" class="btn btn-secondary">💥 Separate Stage (X)</button>
+        <div class="telemetry-grid">
+          <div class="metric"><span class="label">Airspeed:</span> <span id="flight-speed" class="val">0 km/h</span></div>
+          <div class="metric"><span class="label">Altitude:</span> <span id="flight-alt" class="val">0 m</span></div>
+          <div class="metric"><span class="label">Heading:</span> <span id="flight-hdg" class="val">000°</span></div>
+          <div class="metric"><span class="label">Rings:</span> <span id="flight-rings" class="val tag">0 / 10</span></div>
         </div>
         <div class="throttle-row">
-          <label for="ksp-throttle">Throttle:</label>
-          <input id="ksp-throttle" type="range" min="0" max="100" value="100" />
-          <span id="ksp-throttle-val" class="val">100%</span>
+          <label for="flight-throttle">Throttle:</label>
+          <input id="flight-throttle" type="range" min="0" max="100" value="60" />
+          <span id="flight-throttle-val" class="val">60%</span>
         </div>
       </div>
     `;
 
-    document.getElementById('btn-ksp-launch')?.addEventListener('click', () => {
-      (this.currentGame as KspGame)?.launch();
-    });
-
-    document.getElementById('btn-ksp-stage')?.addEventListener('click', () => {
-      (this.currentGame as KspGame)?.stage();
-    });
-
-    const throttleInput = document.getElementById('ksp-throttle') as HTMLInputElement;
+    const throttleInput = document.getElementById('flight-throttle') as HTMLInputElement;
     throttleInput?.addEventListener('input', (e) => {
       const val = parseFloat((e.target as HTMLInputElement).value) / 100;
-      (this.currentGame as KspGame)?.setThrottle(val);
-      const label = document.getElementById('ksp-throttle-val');
+      (this.currentGame as FlightGame)?.setThrottle(val);
+      const label = document.getElementById('flight-throttle-val');
       if (label) label.textContent = `${Math.round(val * 100)}%`;
     });
   }
@@ -170,15 +159,24 @@ class PlaygroundApp {
   private mountVoxelHUD(): void {
     this.hudContainer.innerHTML = `
       <div class="hud-card">
-        <div class="hud-title">🧱 Infinite Voxel Sandbox (Archetype B)</div>
+        <div class="hud-title">🧱 Vast Voxel Sandbox</div>
         <div class="instructions-text">
           Click screen to <strong>Lock Pointer</strong><br/>
-          <strong>WASD</strong>: Walk & Auto-step &bull; <strong>Space</strong>: Jump<br/>
-          <strong>Left Click</strong>: Break Voxel &bull; <strong>Right Click</strong>: Place Voxel
+          <strong>WASD</strong>: Walk &bull; <strong>Shift</strong>: Sprint &bull; <strong>Space</strong>: Jump<br/>
+          <strong>Left Click</strong>: Break Block &bull; <strong>Right Click</strong>: Place Block<br/>
+          Keys <strong>1-6</strong>: Select Block (Grass, Stone, Wood, Leaves, Sand, Lantern)
         </div>
         <div class="telemetry-grid">
           <div class="metric"><span class="label">Position:</span> <span id="vox-pos" class="val">0, 0, 0</span></div>
           <div class="metric"><span class="label">Loaded Blocks:</span> <span id="vox-blocks" class="val">0</span></div>
+        </div>
+        <div class="hotbar">
+          <span class="hotbar-item active" data-type="grass">1: Grass</span>
+          <span class="hotbar-item" data-type="stone">2: Stone</span>
+          <span class="hotbar-item" data-type="wood">3: Wood</span>
+          <span class="hotbar-item" data-type="leaves">4: Leaves</span>
+          <span class="hotbar-item" data-type="sand">5: Sand</span>
+          <span class="hotbar-item" data-type="lantern">6: Lantern</span>
         </div>
       </div>
       <div class="crosshair">+</div>
@@ -188,13 +186,14 @@ class PlaygroundApp {
   private mountPsxHUD(): void {
     this.hudContainer.innerHTML = `
       <div class="hud-card psx-card">
-        <div class="hud-title">🔦 PSX Retro Horror (Archetype C)</div>
+        <div class="hud-title">🔦 PSX 3rd-Person Horror</div>
         <div class="instructions-text">
-          Click screen to <strong>Lock Pointer</strong> &bull; <strong>WASD</strong>: Walk<br/>
-          Walk to the table to grab the <strong>Rusty Key</strong>, then approach the <strong>Iron Gate</strong> at the end of the hall.
+          Click screen to <strong>Lock Pointer</strong> &bull; Move mouse to Orbit Camera<br/>
+          <strong>WASD</strong>: Walk Detective &bull; <strong>E</strong>: Interact<br/>
+          Find the <strong>Rusty Key</strong> on the table to unlock the <strong>Sealed Iron Gate</strong>!
         </div>
         <div class="quest-box">
-          <div class="label">Active Quest:</div>
+          <div class="label">Current Objective:</div>
           <div id="psx-quest" class="quest-status">Find the Rusty Key</div>
         </div>
       </div>
@@ -222,24 +221,34 @@ class PlaygroundApp {
   private startHUDUpdateLoop(): void {
     const updateHUD = () => {
       if (this.currentGame) {
-        if (this.activeMode === 'ksp') {
-          const t = (this.currentGame as KspGame).getTelemetry();
-          const altEl = document.getElementById('ksp-alt');
-          const velEl = document.getElementById('ksp-vel');
-          const stageEl = document.getElementById('ksp-stage');
-          const statusEl = document.getElementById('ksp-status');
+        if (this.activeMode === 'flight') {
+          const t = (this.currentGame as FlightGame).getTelemetry();
+          const spdEl = document.getElementById('flight-speed');
+          const altEl = document.getElementById('flight-alt');
+          const hdgEl = document.getElementById('flight-hdg');
+          const ringsEl = document.getElementById('flight-rings');
+          const throttleSlider = document.getElementById('flight-throttle') as HTMLInputElement;
+          const throttleVal = document.getElementById('flight-throttle-val');
+
+          if (spdEl) spdEl.textContent = `${t.speed} km/h`;
           if (altEl) altEl.textContent = `${t.altitude} m`;
-          if (velEl) velEl.textContent = `${t.velocity} m/s`;
-          if (stageEl) stageEl.textContent = `Stage ${t.stage}`;
-          if (statusEl) {
-            statusEl.textContent = t.isStaged ? 'Stage 2 In Flight' : t.isLaunched ? 'Ascending' : 'On Pad';
+          if (hdgEl) hdgEl.textContent = `${t.heading.toString().padStart(3, '0')}°`;
+          if (ringsEl) ringsEl.textContent = `${t.ringsCollected} / ${t.totalRings}`;
+          if (throttleSlider && document.activeElement !== throttleSlider) {
+            throttleSlider.value = Math.round(t.throttle * 100).toString();
           }
+          if (throttleVal) throttleVal.textContent = `${Math.round(t.throttle * 100)}%`;
         } else if (this.activeMode === 'voxel') {
           const t = (this.currentGame as VoxelGame).getTelemetry();
           const posEl = document.getElementById('vox-pos');
           const blocksEl = document.getElementById('vox-blocks');
           if (posEl) posEl.textContent = `${t.playerPos[0]}, ${t.playerPos[1]}, ${t.playerPos[2]}`;
           if (blocksEl) blocksEl.textContent = `${t.blockCount}`;
+
+          document.querySelectorAll('.hotbar-item').forEach((item) => {
+            const el = item as HTMLElement;
+            el.classList.toggle('active', el.dataset.type === t.selectedBlockType);
+          });
         } else if (this.activeMode === 'psx') {
           const t = (this.currentGame as PsxGame).getTelemetry();
           const questEl = document.getElementById('psx-quest');

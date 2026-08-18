@@ -1,5 +1,5 @@
 /**
- * Renderoni Web Demo: PSX Retro Survival Horror (Archetype C)
+ * Renderoni Web Demo: PSX 3rd-Person Survival Horror (Archetype C)
  */
 
 import * as THREE from 'three';
@@ -21,6 +21,9 @@ export class PsxGame {
   readonly engine: RenderoniEngine;
   private canvas: HTMLCanvasElement;
   private playerBody!: RAPIER.RigidBody;
+  private characterGroup!: THREE.Group;
+  private leftLegMesh!: THREE.Mesh;
+  private rightLegMesh!: THREE.Mesh;
   private keyEntity: any = null;
   private doorMesh: THREE.Group | null = null;
   private flashlight: THREE.SpotLight | null = null;
@@ -30,12 +33,13 @@ export class PsxGame {
   private isDoorOpen = false;
   private questStatus = 'Find the Rusty Key';
 
-  // Controls
+  // 3rd-Person Controls & Camera Orbit
   private keys: Record<string, boolean> = {};
-  private yaw = 0;
-  private pitch = 0;
+  private camYaw = 0;
+  private camPitch = 0.25;
   private isLocked = false;
-  private walkBob = 0;
+  private walkAnim = 0;
+  private isMoving = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -51,59 +55,35 @@ export class PsxGame {
 
     const scene = this.engine.native.scene;
     scene.background = new THREE.Color(0x020305);
-    scene.fog = new THREE.FogExp2(0x020305, 0.08);
+    scene.fog = new THREE.FogExp2(0x020305, 0.05);
 
-    // 1. Spooky Ambient & Torch Lighting
-    this.engine.add(light({ type: 'ambient', intensity: 0.15, color: 0x223344 }));
+    // 1. Spooky Lighting & Torches
+    this.engine.add(light({ type: 'ambient', intensity: 0.12, color: 0x223344 }));
 
-    const torchLight = new THREE.PointLight(0xff6622, 2.5, 16);
-    torchLight.position.set(-3.5, 2.5, -8);
-    scene.add(torchLight);
+    const torch1 = new THREE.PointLight(0xff6622, 2.5, 18);
+    torch1.position.set(-4.0, 2.8, -8);
+    scene.add(torch1);
 
-    const torchLight2 = new THREE.PointLight(0xff4411, 2.0, 16);
-    torchLight2.position.set(3.5, 2.5, -18);
-    scene.add(torchLight2);
+    const torch2 = new THREE.PointLight(0xff4411, 2.2, 18);
+    torch2.position.set(4.0, 2.8, -20);
+    scene.add(torch2);
 
-    // 2. Mansion Hallway Architecture
+    // 2. Gothic Manor Architecture
     this.buildMansion(scene);
 
-    // 3. Table & Rusty Key Item
+    // 3. Table & Glowing Key Item
     this.buildKeyItem(scene);
 
-    // 4. Sealed Iron Gate & Sensor Trigger
+    // 4. Sealed Iron Gate & Sensor
     this.buildIronGate(scene);
 
-    // 5. Player Explorer & Flashlight
-    this.playerBody = this.engine.native.world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(0, 1.2, 0)
-        .lockRotations()
-        .setAdditionalMass(3.0)
-        .setCanSleep(false)
-    );
-    const playerCollider = this.engine.native.world.createCollider(
-      RAPIER.ColliderDesc.capsule(0.7, 0.4).setFriction(0.0),
-      this.playerBody
-    );
-
-    this.engine.add({
-      id: 'player_detective',
-      tags: ['player', 'kcc'],
-      native: {
-        rapier: { body: this.playerBody, colliders: [playerCollider] },
-      },
-    });
-
-    // Flashlight SpotLight attached to player camera
-    this.flashlight = new THREE.SpotLight(0xffeedd, 3.5, 28, Math.PI / 6, 0.4, 1.2);
-    this.flashlight.position.set(0, 1.5, 0);
-    scene.add(this.flashlight);
-    scene.add(this.flashlight.target);
+    // 5. 3rd-Person Character Avatar (Detective with Coat & Flashlight)
+    this.buildCharacter(scene);
 
     // 6. Setup Controls
     this.setupControls();
 
-    // 7. Movement & Interaction System
+    // 7. Systems: Movement & Interaction
     this.engine.systems.add({
       phase: 'prePhysics',
       update: () => {
@@ -123,8 +103,83 @@ export class PsxGame {
       handle: () => this.unlockDoor(),
     });
 
-    // Start presentation loop with update hook
-    this.engine.start(() => this.update());
+    // Start presentation loop with 3rd-person camera update hook
+    this.engine.start((dt) => this.update(dt));
+  }
+
+  private buildCharacter(scene: THREE.Scene): void {
+    this.characterGroup = new THREE.Group();
+
+    const coatMat = new THREE.MeshStandardMaterial({ color: 0x3b2d24, roughness: 0.8 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a373, roughness: 0.6 });
+    const hatMat = new THREE.MeshStandardMaterial({ color: 0x221a14, roughness: 0.9 });
+    const pantMat = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.9 });
+
+    // Torso / Trench Coat
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.45), coatMat);
+    torso.position.y = 1.1;
+    this.characterGroup.add(torso);
+
+    // Head
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 0.35), skinMat);
+    head.position.y = 1.75;
+    this.characterGroup.add(head);
+
+    // Fedora Hat
+    const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.05, 16), hatMat);
+    hatBrim.position.y = 1.95;
+    const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.26, 0.22, 16), hatMat);
+    hatCrown.position.y = 2.08;
+    this.characterGroup.add(hatBrim, hatCrown);
+
+    // Legs
+    const legGeo = new THREE.BoxGeometry(0.24, 0.7, 0.24);
+    this.leftLegMesh = new THREE.Mesh(legGeo, pantMat);
+    this.leftLegMesh.position.set(-0.18, 0.4, 0);
+    this.rightLegMesh = new THREE.Mesh(legGeo, pantMat);
+    this.rightLegMesh.position.set(0.18, 0.4, 0);
+    this.characterGroup.add(this.leftLegMesh, this.rightLegMesh);
+
+    // Flashlight in hand
+    const flashlightMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.06, 0.04, 0.35, 12),
+      new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.8 })
+    );
+    flashlightMesh.position.set(0.35, 1.0, 0.3);
+    flashlightMesh.rotation.x = Math.PI / 2;
+    this.characterGroup.add(flashlightMesh);
+
+    // Flashlight SpotLight
+    this.flashlight = new THREE.SpotLight(0xffeedd, 3.8, 30, Math.PI / 5, 0.3, 1.2);
+    this.flashlight.position.set(0.35, 1.1, 0.4);
+    this.characterGroup.add(this.flashlight);
+    this.characterGroup.add(this.flashlight.target);
+    this.flashlight.target.position.set(0.35, 0.9, 10);
+
+    scene.add(this.characterGroup);
+
+    // Physics Rigid Body
+    this.playerBody = this.engine.native.world.createRigidBody(
+      RAPIER.RigidBodyDesc.dynamic()
+        .setTranslation(0, 1.2, 0)
+        .lockRotations()
+        .setAdditionalMass(3.0)
+        .setLinearDamping(0.2)
+        .setCanSleep(false)
+    );
+    const playerCollider = this.engine.native.world.createCollider(
+      RAPIER.ColliderDesc.capsule(0.7, 0.4).setFriction(0.0),
+      this.playerBody
+    );
+
+    this.engine.add({
+      id: 'player_detective',
+      tags: ['player', '3rd_person'],
+      native: {
+        three: { object: this.characterGroup },
+        rapier: { body: this.playerBody, colliders: [playerCollider] },
+      },
+    });
   }
 
   private buildMansion(scene: THREE.Scene): void {
@@ -133,9 +188,9 @@ export class PsxGame {
     const woodMat = new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.8 });
 
     // Floor
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 40), floorMat);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(14, 50), floorMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(0, 0, -15);
+    floor.position.set(0, 0, -20);
     scene.add(floor);
 
     this.engine.add(
@@ -143,20 +198,20 @@ export class PsxGame {
         id: 'floor',
         shape: 'box',
         type: 'fixed',
-        size: [10, 1, 40],
-        position: [0, -0.5, -15],
+        size: [14, 1, 50],
+        position: [0, -0.5, -20],
       })
     );
 
     // Ceiling
-    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(10, 40), wallMat);
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(14, 50), wallMat);
     ceiling.rotation.x = Math.PI / 2;
-    ceiling.position.set(0, 4.0, -15);
+    ceiling.position.set(0, 4.5, -20);
     scene.add(ceiling);
 
     // Left Wall
-    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1, 4.5, 40), wallMat);
-    leftWall.position.set(-4.5, 2.0, -15);
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(1, 5.0, 50), wallMat);
+    leftWall.position.set(-6.5, 2.2, -20);
     scene.add(leftWall);
 
     this.engine.add(
@@ -164,14 +219,14 @@ export class PsxGame {
         id: 'left_wall',
         shape: 'box',
         type: 'fixed',
-        size: [1, 4.5, 40],
-        position: [-4.5, 2.0, -15],
+        size: [1, 5.0, 50],
+        position: [-6.5, 2.2, -20],
       })
     );
 
     // Right Wall
-    const rightWall = new THREE.Mesh(new THREE.BoxGeometry(1, 4.5, 40), wallMat);
-    rightWall.position.set(4.5, 2.0, -15);
+    const rightWall = new THREE.Mesh(new THREE.BoxGeometry(1, 5.0, 50), wallMat);
+    rightWall.position.set(6.5, 2.2, -20);
     scene.add(rightWall);
 
     this.engine.add(
@@ -179,14 +234,14 @@ export class PsxGame {
         id: 'right_wall',
         shape: 'box',
         type: 'fixed',
-        size: [1, 4.5, 40],
-        position: [4.5, 2.0, -15],
+        size: [1, 5.0, 50],
+        position: [6.5, 2.2, -20],
       })
     );
 
     // Back Wall
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(10, 4.5, 1), wallMat);
-    backWall.position.set(0, 2.0, 5);
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(14, 5.0, 1), wallMat);
+    backWall.position.set(0, 2.2, 5);
     scene.add(backWall);
 
     this.engine.add(
@@ -194,15 +249,15 @@ export class PsxGame {
         id: 'back_wall',
         shape: 'box',
         type: 'fixed',
-        size: [10, 4.5, 1],
-        position: [0, 2.0, 5],
+        size: [14, 5.0, 1],
+        position: [0, 2.2, 5],
       })
     );
 
-    // Ceiling wooden cross beams
-    for (let z = 0; z > -32; z -= 6) {
-      const beam = new THREE.Mesh(new THREE.BoxGeometry(9.0, 0.4, 0.4), woodMat);
-      beam.position.set(0, 3.8, z);
+    // Wooden cross beams
+    for (let z = 0; z > -42; z -= 6) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(13.0, 0.4, 0.4), woodMat);
+      beam.position.set(0, 4.3, z);
       scene.add(beam);
     }
   }
@@ -210,19 +265,19 @@ export class PsxGame {
   private buildKeyItem(scene: THREE.Scene): void {
     // Wooden Table
     const tableMat = new THREE.MeshStandardMaterial({ color: 0x3d2716, roughness: 0.7 });
-    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 1.4), tableMat);
-    tableTop.position.set(-3.2, 1.0, -10);
+    const tableTop = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.1, 1.4), tableMat);
+    tableTop.position.set(-4.5, 1.0, -12);
     scene.add(tableTop);
 
     const legGeo = new THREE.BoxGeometry(0.12, 1.0, 0.12);
     const l1 = new THREE.Mesh(legGeo, tableMat);
-    l1.position.set(-3.9, 0.5, -9.4);
+    l1.position.set(-5.4, 0.5, -11.4);
     const l2 = new THREE.Mesh(legGeo, tableMat);
-    l2.position.set(-2.5, 0.5, -9.4);
+    l2.position.set(-3.6, 0.5, -11.4);
     const l3 = new THREE.Mesh(legGeo, tableMat);
-    l3.position.set(-3.9, 0.5, -10.6);
+    l3.position.set(-5.4, 0.5, -12.6);
     const l4 = new THREE.Mesh(legGeo, tableMat);
-    l4.position.set(-2.5, 0.5, -10.6);
+    l4.position.set(-3.6, 0.5, -12.6);
     scene.add(l1, l2, l3, l4);
 
     // Glowing Golden Rusty Key
@@ -231,41 +286,39 @@ export class PsxGame {
       color: 0xdfa020,
       metalness: 0.9,
       roughness: 0.3,
-      emissive: 0x443300,
+      emissive: 0x553300,
     });
-    const keyStem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.5), keyMat);
+    const keyStem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6), keyMat);
     keyStem.rotation.x = Math.PI / 2;
-    const keyRing = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 8, 16), keyMat);
-    keyRing.position.z = 0.25;
+    const keyRing = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.04, 8, 16), keyMat);
+    keyRing.position.z = 0.3;
     keyGroup.add(keyStem, keyRing);
-    keyGroup.position.set(-3.2, 1.2, -10);
+    keyGroup.position.set(-4.5, 1.3, -12);
     scene.add(keyGroup);
 
     this.keyEntity = keyGroup;
   }
 
   private buildIronGate(scene: THREE.Scene): void {
-    // Gate arch frame
     const archMat = new THREE.MeshStandardMaterial({ color: 0x1a1e24, metalness: 0.8, roughness: 0.3 });
-    const postL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.0, 0.5), archMat);
-    postL.position.set(-2.5, 2.0, -28);
-    const postR = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4.0, 0.5), archMat);
-    postR.position.set(2.5, 2.0, -28);
-    const archTop = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.5, 0.5), archMat);
-    archTop.position.set(0, 3.8, -28);
+    const postL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.2, 0.6), archMat);
+    postL.position.set(-3.0, 2.1, -32);
+    const postR = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.2, 0.6), archMat);
+    postR.position.set(3.0, 2.1, -32);
+    const archTop = new THREE.Mesh(new THREE.BoxGeometry(6.6, 0.6, 0.6), archMat);
+    archTop.position.set(0, 4.2, -32);
     scene.add(postL, postR, archTop);
 
     // Gate Left & Right Doors
     this.doorMesh = new THREE.Group();
-    this.doorMesh.position.set(-2.25, 0, -28);
+    this.doorMesh.position.set(-2.7, 0, -32);
 
-    const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(4.5, 3.5, 0.1), archMat);
-    doorPanel.position.set(2.25, 1.75, 0);
+    const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(5.4, 3.8, 0.1), archMat);
+    doorPanel.position.set(2.7, 1.9, 0);
 
-    // Bars
-    for (let x = 0.5; x < 4.0; x += 0.6) {
-      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.2), archMat);
-      bar.position.set(x, 1.75, 0);
+    for (let x = 0.6; x < 5.0; x += 0.6) {
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.4), archMat);
+      bar.position.set(x, 1.9, 0);
       this.doorMesh.add(bar);
     }
     this.doorMesh.add(doorPanel);
@@ -276,8 +329,8 @@ export class PsxGame {
       sensor({
         id: 'door_trigger',
         shape: 'box',
-        size: [5.0, 4.0, 4.0],
-        position: [0, 2.0, -26],
+        size: [6.0, 4.0, 5.0],
+        position: [0, 2.0, -30],
       })
     );
 
@@ -320,10 +373,10 @@ export class PsxGame {
 
     document.addEventListener('mousemove', (e) => {
       if (!this.isLocked) return;
-      const sensitivity = 0.0022;
-      this.yaw -= e.movementX * sensitivity;
-      this.pitch -= e.movementY * sensitivity;
-      this.pitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.pitch));
+      const sensitivity = 0.0024;
+      this.camYaw -= e.movementX * sensitivity;
+      this.camPitch += e.movementY * sensitivity;
+      this.camPitch = Math.max(0.05, Math.min(Math.PI / 3.0, this.camPitch));
     });
   }
 
@@ -338,24 +391,28 @@ export class PsxGame {
     if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
     if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
 
-    const speed = 5.2;
-    const moveX = (Math.sin(this.yaw) * forward + Math.cos(this.yaw) * strafe) * speed;
-    const moveZ = (-Math.cos(this.yaw) * forward + Math.sin(this.yaw) * strafe) * speed;
+    this.isMoving = forward !== 0 || strafe !== 0;
+
+    const speed = 5.6;
+    const moveX = (Math.sin(this.camYaw) * forward + Math.cos(this.camYaw) * strafe) * speed;
+    const moveZ = (-Math.cos(this.camYaw) * forward + Math.sin(this.camYaw) * strafe) * speed;
 
     const currentVel = this.playerBody.linvel();
     this.playerBody.setLinvel(new RAPIER.Vector3(moveX, currentVel.y, moveZ), true);
 
-    if (forward !== 0 || strafe !== 0) {
-      this.walkBob += 0.16;
+    // Rotate Character to face direction of movement
+    if (this.isMoving && this.characterGroup) {
+      const targetAngle = Math.atan2(moveX, moveZ);
+      this.characterGroup.rotation.y = targetAngle;
     }
   }
 
   private checkKeyPickup(): void {
     if (this.hasKey || !this.playerBody) return;
     const p = this.playerBody.translation();
-    const d = Math.hypot(p.x - -3.2, p.z - -10);
+    const d = Math.hypot(p.x - -4.5, p.z - -12);
 
-    if (d < 2.5) {
+    if (d < 2.8) {
       this.pickupKey();
     }
   }
@@ -363,7 +420,7 @@ export class PsxGame {
   pickupKey(): void {
     if (this.hasKey) return;
     this.hasKey = true;
-    this.questStatus = 'Key Acquired! Head to the Iron Gate at the end of the hall';
+    this.questStatus = 'Key Acquired! Proceed to the Iron Gate';
 
     if (this.keyEntity) {
       this.keyEntity.visible = false;
@@ -376,7 +433,7 @@ export class PsxGame {
   unlockDoor(): void {
     if (this.isDoorOpen) return;
     this.isDoorOpen = true;
-    this.questStatus = 'Gate Unlocked! Escaped the Manor!';
+    this.questStatus = 'Mansion Gate Unlocked! Escaped!';
 
     sfx.playDoorUnlock();
     this.engine.events.emit('door.opened', { door: 'iron_gate' });
@@ -393,32 +450,33 @@ export class PsxGame {
     };
   }
 
-  update(): void {
-    if (!this.playerBody) return;
+  update(dt: number): void {
+    if (!this.playerBody || !this.characterGroup) return;
 
     const pPos = this.playerBody.translation();
+    this.characterGroup.position.set(pPos.x, pPos.y, pPos.z);
+
+    // 3rd-Person Orbit / Chase Camera
+    const camDistance = 4.6;
+    const camHeight = Math.sin(this.camPitch) * camDistance + 1.6;
+    const camHorizDist = Math.cos(this.camPitch) * camDistance;
+
+    const targetCamX = pPos.x + Math.sin(this.camYaw) * camHorizDist;
+    const targetCamY = pPos.y + camHeight;
+    const targetCamZ = pPos.z + Math.cos(this.camYaw) * camHorizDist;
+
     const camera = this.engine.native.camera;
+    camera.position.lerp(new THREE.Vector3(targetCamX, targetCamY, targetCamZ), 0.15);
+    camera.lookAt(pPos.x, pPos.y + 1.2, pPos.z);
 
-    // Head bobbing
-    const bobOffset = Math.sin(this.walkBob) * 0.05;
-    camera.position.set(pPos.x, pPos.y + 0.6 + bobOffset, pPos.z);
-
-    // Camera Direction
-    const dir = new THREE.Vector3(
-      Math.sin(this.yaw) * Math.cos(this.pitch),
-      Math.sin(this.pitch),
-      -Math.cos(this.yaw) * Math.cos(this.pitch)
-    );
-    camera.lookAt(pPos.x + dir.x, pPos.y + 0.6 + dir.y, pPos.z + dir.z);
-
-    // Flashlight follows camera position & look target
-    if (this.flashlight) {
-      this.flashlight.position.copy(camera.position);
-      this.flashlight.target.position.set(
-        camera.position.x + dir.x * 10,
-        camera.position.y + dir.y * 10,
-        camera.position.z + dir.z * 10
-      );
+    // Leg walking animation
+    if (this.isMoving) {
+      this.walkAnim += dt * 10;
+      this.leftLegMesh.rotation.x = Math.sin(this.walkAnim) * 0.6;
+      this.rightLegMesh.rotation.x = -Math.sin(this.walkAnim) * 0.6;
+    } else {
+      this.leftLegMesh.rotation.x *= 0.8;
+      this.rightLegMesh.rotation.x *= 0.8;
     }
 
     // Door opening animation
@@ -431,7 +489,7 @@ export class PsxGame {
     // Key hovering animation
     if (this.keyEntity && this.keyEntity.visible) {
       this.keyEntity.rotation.y += 0.03;
-      this.keyEntity.position.y = 1.2 + Math.sin(Date.now() * 0.003) * 0.08;
+      this.keyEntity.position.y = 1.3 + Math.sin(Date.now() * 0.003) * 0.08;
     }
   }
 

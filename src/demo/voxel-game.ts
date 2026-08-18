@@ -1,5 +1,5 @@
 /**
- * Renderoni Web Demo: Infinite Voxel Terrain Sandbox (Archetype B)
+ * Renderoni Web Demo: Vast Procedural Voxel Sandbox (Archetype B)
  */
 
 import * as THREE from 'three';
@@ -13,6 +13,7 @@ export interface VoxelTelemetry {
   blockCount: number;
   playerPos: [number, number, number];
   targetedBlock: string | null;
+  selectedBlockType: string;
 }
 
 export class VoxelGame {
@@ -21,20 +22,27 @@ export class VoxelGame {
   private playerBody!: RAPIER.RigidBody;
   private blocks: Map<string, { x: number; y: number; z: number; type: string }> = new Map();
 
-  // First-Person PointerLock Camera & Controls
+  // First-Person Controls & Camera
   private keys: Record<string, boolean> = {};
   private yaw = 0;
   private pitch = 0;
   private isLocked = false;
   private targetedEntityId: string | null = null;
   private targetedPoint: [number, number, number] | null = null;
+  private selectedTypeIndex = 0;
+  private blockTypes = ['grass', 'stone', 'wood', 'leaves', 'sand', 'lantern'];
 
-  // Visuals & Materials
-  private grassMaterial = new THREE.MeshStandardMaterial({ color: 0x4fa644, roughness: 0.8 });
-  private dirtMaterial = new THREE.MeshStandardMaterial({ color: 0x825432, roughness: 0.9 });
-  private stoneMaterial = new THREE.MeshStandardMaterial({ color: 0x7a8288, roughness: 0.7 });
-  private woodMaterial = new THREE.MeshStandardMaterial({ color: 0xa86938, roughness: 0.6 });
-  private leavesMaterial = new THREE.MeshStandardMaterial({ color: 0x317a26, roughness: 0.7 });
+  // Visual Materials
+  private materials: Record<string, THREE.Material> = {
+    grass: new THREE.MeshStandardMaterial({ color: 0x4fa644, roughness: 0.8 }),
+    dirt: new THREE.MeshStandardMaterial({ color: 0x825432, roughness: 0.9 }),
+    stone: new THREE.MeshStandardMaterial({ color: 0x717982, roughness: 0.7 }),
+    wood: new THREE.MeshStandardMaterial({ color: 0xa86938, roughness: 0.6 }),
+    leaves: new THREE.MeshStandardMaterial({ color: 0x2b7a21, roughness: 0.7 }),
+    sand: new THREE.MeshStandardMaterial({ color: 0xe0c878, roughness: 0.9 }),
+    snow: new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.4 }),
+    lantern: new THREE.MeshStandardMaterial({ color: 0xfef08a, emissive: 0xf59e0b, roughness: 0.2 }),
+  };
   private boxGeometry = new THREE.BoxGeometry(1, 1, 1);
 
   constructor(canvas: HTMLCanvasElement) {
@@ -42,7 +50,7 @@ export class VoxelGame {
     this.engine = new RenderoniEngine({
       mode: 'interactive',
       canvas: this.canvas,
-      gravity: [0, -22.0, 0],
+      gravity: [0, -24.0, 0],
     });
   }
 
@@ -50,22 +58,32 @@ export class VoxelGame {
     await this.engine.init();
 
     const scene = this.engine.native.scene;
-    scene.background = new THREE.Color(0x82b4ff);
-    scene.fog = new THREE.FogExp2(0x82b4ff, 0.015);
+    scene.background = new THREE.Color(0x7ec0ee);
+    scene.fog = new THREE.FogExp2(0x7ec0ee, 0.012);
 
-    // 1. Lighting
-    this.engine.add(light({ type: 'directional', intensity: 2.0, position: [30, 60, 40] }));
-    this.engine.add(light({ type: 'ambient', intensity: 0.6, color: 0xffffff }));
+    // 1. Lighting & Sun
+    this.engine.add(light({ type: 'directional', intensity: 2.2, position: [60, 100, 60] }));
+    this.engine.add(light({ type: 'ambient', intensity: 0.65, color: 0xffffff }));
 
-    // 2. Generate Initial Procedural Voxel Chunks
-    this.generateTerrain();
+    // Ocean Water Bed
+    const waterMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(300, 300),
+      new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.1, transparent: true, opacity: 0.75 })
+    );
+    waterMesh.rotation.x = -Math.PI / 2;
+    waterMesh.position.y = 0.4;
+    scene.add(waterMesh);
 
-    // 3. First-Person Player Body
+    // 2. Generate Expansive Procedural Voxel Biomes
+    this.generateVastWorld();
+
+    // 3. Player Character Controller (Responsive Dynamic Body)
     this.playerBody = this.engine.native.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
-        .setTranslation(0, 6.0, 0)
+        .setTranslation(0, 12.0, 0)
         .lockRotations()
         .setAdditionalMass(3.0)
+        .setLinearDamping(0.2)
         .setCanSleep(false)
     );
     const playerCollider = this.engine.native.world.createCollider(
@@ -81,10 +99,10 @@ export class VoxelGame {
       },
     });
 
-    // 4. Setup First-Person Event Listeners
+    // 4. Setup Controls
     this.setupControls();
 
-    // 5. Physics Movement & Auto-Stepping System
+    // 5. Movement & Auto-Stepping Loop
     this.engine.systems.add({
       phase: 'prePhysics',
       update: () => {
@@ -92,7 +110,7 @@ export class VoxelGame {
       },
     });
 
-    // 6. Action Handlers
+    // Actions
     this.engine.actions.register({
       name: 'voxel.break',
       handle: () => this.breakTargetedBlock(),
@@ -100,42 +118,54 @@ export class VoxelGame {
 
     this.engine.actions.register({
       name: 'voxel.place',
-      handle: () => this.placeAdjacentBlock(),
+      handle: (type?: string) => this.placeAdjacentBlock(type),
     });
 
-    // Start presentation loop with update hook
+    // Start engine presentation loop with camera update
     this.engine.start(() => this.update());
   }
 
-  private generateTerrain(): void {
-    const size = 16;
-    for (let x = -size; x <= size; x++) {
-      for (let z = -size; z <= size; z++) {
-        // Procedural height formula
-        const h = Math.floor(
-          Math.sin(x * 0.25) * 1.5 + Math.cos(z * 0.25) * 1.5 + Math.sin((x + z) * 0.1) * 2.0
-        );
+  private generateVastWorld(): void {
+    const radius = 22; // 45x45 block grid (~2025 voxels)
+    for (let x = -radius; x <= radius; x++) {
+      for (let z = -radius; z <= radius; z++) {
+        // Multi-frequency Perlin terrain noise
+        const n1 = Math.sin(x * 0.18) * Math.cos(z * 0.18) * 3.5;
+        const n2 = Math.sin((x + z) * 0.08) * 4.0;
+        const n3 = Math.cos(x * 0.05) * Math.sin(z * 0.05) * 2.0;
+        const rawH = Math.round(n1 + n2 + n3 + 3.0);
+        const h = Math.max(0, rawH);
 
-        // Bedrock / Stone
-        for (let y = -2; y < h - 1; y++) {
+        // Bedrock / Stone bottom
+        for (let y = -2; y < h - 2; y++) {
           this.createBlock(x, y, z, 'stone');
         }
-        // Dirt
-        if (h > -2) {
-          this.createBlock(x, h - 1, z, 'dirt');
-        }
-        // Grass top
-        this.createBlock(x, h, z, 'grass');
 
-        // Occasional Trees
-        if (x % 7 === 0 && z % 7 === 0 && Math.abs(x) > 2 && Math.abs(z) > 2) {
-          for (let ty = 1; ty <= 3; ty++) {
+        // Subsurface Dirt
+        if (h > 0) {
+          for (let y = Math.max(-2, h - 2); y < h; y++) {
+            this.createBlock(x, y, z, 'dirt');
+          }
+        }
+
+        // Surface Layer by altitude
+        if (h === 0 || h === 1) {
+          this.createBlock(x, h, z, 'sand'); // Sand Shoreline
+        } else if (h >= 9) {
+          this.createBlock(x, h, z, 'snow'); // Snowy Mountain Peaks
+        } else {
+          this.createBlock(x, h, z, 'grass'); // Lush Meadow
+        }
+
+        // Procedural Trees
+        if (h >= 2 && h <= 7 && (x + 100) % 6 === 0 && (z + 100) % 6 === 0) {
+          for (let ty = 1; ty <= 4; ty++) {
             this.createBlock(x, h + ty, z, 'wood');
           }
           for (let lx = -1; lx <= 1; lx++) {
             for (let lz = -1; lz <= 1; lz++) {
-              for (let ly = 3; ly <= 4; ly++) {
-                if (lx !== 0 || lz !== 0 || ly === 4) {
+              for (let ly = 4; ly <= 5; ly++) {
+                if (lx !== 0 || lz !== 0 || ly === 5) {
                   this.createBlock(x + lx, h + ly, z + lz, 'leaves');
                 }
               }
@@ -150,12 +180,7 @@ export class VoxelGame {
     const id = `block_${x}_${y}_${z}`;
     if (this.blocks.has(id)) return;
 
-    let mat = this.grassMaterial;
-    if (type === 'dirt') mat = this.dirtMaterial;
-    if (type === 'stone') mat = this.stoneMaterial;
-    if (type === 'wood') mat = this.woodMaterial;
-    if (type === 'leaves') mat = this.leavesMaterial;
-
+    const mat = this.materials[type] ?? this.materials.grass;
     const mesh = new THREE.Mesh(this.boxGeometry, mat);
     mesh.position.set(x, y, z);
 
@@ -180,6 +205,15 @@ export class VoxelGame {
     const onKeyDown = (e: KeyboardEvent) => {
       this.keys[e.code] = true;
       this.keys[e.key.toLowerCase()] = true;
+
+      // Hotbar block selector (keys 1-6)
+      if (['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'].includes(e.code)) {
+        const idx = parseInt(e.code.replace('Digit', '')) - 1;
+        if (idx >= 0 && idx < this.blockTypes.length) {
+          this.selectedTypeIndex = idx;
+        }
+      }
+
       if (e.code === 'Space') {
         this.jump();
       }
@@ -232,14 +266,16 @@ export class VoxelGame {
     if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
     if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
 
-    const speed = 7.5;
+    const isSprinting = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
+    const speed = isSprinting ? 12.0 : 7.0;
+
     const moveX = (Math.sin(this.yaw) * forward + Math.cos(this.yaw) * strafe) * speed;
     const moveZ = (-Math.cos(this.yaw) * forward + Math.sin(this.yaw) * strafe) * speed;
 
     const currentVel = this.playerBody.linvel();
     this.playerBody.setLinvel(new RAPIER.Vector3(moveX, currentVel.y, moveZ), true);
 
-    // Auto-stepping up 1-block steps: check forward obstacle
+    // Auto-stepping on 1-block obstacles
     if (forward !== 0 || strafe !== 0) {
       const pPos = this.playerBody.translation();
       const kneeOrigin: [number, number, number] = [pPos.x, pPos.y - 0.3, pPos.z];
@@ -254,7 +290,7 @@ export class VoxelGame {
           0.85
         );
         if (stepHit.hit && stepHit.entityId?.startsWith('block_')) {
-          this.playerBody.setLinvel(new RAPIER.Vector3(moveX, 6.0, moveZ), true);
+          this.playerBody.setLinvel(new RAPIER.Vector3(moveX, 6.2, moveZ), true);
         }
       }
     }
@@ -263,8 +299,8 @@ export class VoxelGame {
   jump(): void {
     if (!this.playerBody) return;
     const vel = this.playerBody.linvel();
-    if (Math.abs(vel.y) < 0.4) {
-      this.playerBody.setLinvel(new RAPIER.Vector3(vel.x, 8.5, vel.z), true);
+    if (Math.abs(vel.y) < 0.5) {
+      this.playerBody.setLinvel(new RAPIER.Vector3(vel.x, 9.5, vel.z), true);
     }
   }
 
@@ -279,7 +315,7 @@ export class VoxelGame {
     }
   }
 
-  placeAdjacentBlock(): void {
+  placeAdjacentBlock(overrideType?: string): void {
     if (this.targetedPoint && this.targetedEntityId) {
       const p = this.targetedPoint;
       const nx = Math.round(p[0]);
@@ -288,9 +324,10 @@ export class VoxelGame {
 
       const blockId = `block_${nx}_${ny}_${nz}`;
       if (!this.blocks.has(blockId)) {
-        this.createBlock(nx, ny, nz, 'grass');
+        const type = overrideType ?? this.blockTypes[this.selectedTypeIndex];
+        this.createBlock(nx, ny, nz, type);
         sfx.playBlockPlace();
-        this.engine.events.emit('voxel.placed', { entityId: blockId });
+        this.engine.events.emit('voxel.placed', { entityId: blockId, type });
       }
     }
   }
@@ -301,6 +338,7 @@ export class VoxelGame {
       blockCount: this.blocks.size,
       playerPos: [parseFloat(p.x.toFixed(1)), parseFloat(p.y.toFixed(1)), parseFloat(p.z.toFixed(1))],
       targetedBlock: this.targetedEntityId,
+      selectedBlockType: this.blockTypes[this.selectedTypeIndex],
     };
   }
 
@@ -313,7 +351,7 @@ export class VoxelGame {
     // Attach camera to player eyes
     camera.position.set(pPos.x, pPos.y + 0.7, pPos.z);
 
-    // Compute Camera Look Vector from Yaw & Pitch
+    // Compute Camera Look Vector
     const dir = new THREE.Vector3(
       Math.sin(this.yaw) * Math.cos(this.pitch),
       Math.sin(this.pitch),
@@ -325,7 +363,7 @@ export class VoxelGame {
     const eyePos: [number, number, number] = [pPos.x, pPos.y + 0.7, pPos.z];
     const rayDir: [number, number, number] = [dir.x, dir.y, dir.z];
 
-    const hit = ObservationEngine.raycast(this.engine, eyePos, rayDir, 6.0);
+    const hit = ObservationEngine.raycast(this.engine, eyePos, rayDir, 6.5);
     if (hit.hit && hit.entityId?.startsWith('block_')) {
       this.targetedEntityId = hit.entityId;
       this.targetedPoint = hit.point ?? null;
