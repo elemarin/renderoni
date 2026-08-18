@@ -1,48 +1,235 @@
 ---
 name: renderoni
 description: >-
-  Expert guide and workflows for building 3D simulations, games, and headless tests with Renderoni (Three.js + Rapier WASM physics).
+  Comprehensive guide and best practices for building high-performance 3D games, deterministic simulations, and headless test suites with Renderoni, Three.js, and Rapier WASM physics.
 ---
 
-# Renderoni Development Skill
+# 🍝 Renderoni: Master 3D Game Development & Optimization Guide
 
-This skill guides the creation of 3D games, deterministic simulations, and headless test suites using **Renderoni**.
+This skill provides comprehensive architectural guidelines, Three.js optimization patterns, Rapier WASM physics practices, and agent-native workflows for developing production-grade 3D web games with Renderoni.
 
 ---
 
-## 1. Quick Game Setup Template
+## 📑 Table of Contents
+1. [Core Architectural Principles & Determinism](#1-core-architectural-principles--determinism)
+2. [Three.js Performance & Optimization Mastery](#2-threejs-performance--optimization-mastery)
+3. [Rapier Physics & Character Controller Best Practices](#3-rapier-physics--character-controller-best-practices)
+4. [Game Architecture & Declarative Presets](#4-game-architecture--declarative-presets)
+5. [Camera, Input & Audio Systems](#5-camera-input--audio-systems)
+6. [VFX, Particles & Juice](#6-vfx-particles--juice)
+7. [Headless Testing & Agent Verification](#7-headless-testing--agent-verification)
+
+---
+
+## 1. Core Architectural Principles & Determinism
+
+Renderoni is built around a **strict 4-layer separation of concerns**:
+- **L0 (Deterministic Kernel)**: Integer clock (`clock.ts`), seeded PRNG (`prng.ts`), dual-buffer transform pipeline (`transform-buffer.ts`), XXH3 state hashing (`hashing.ts`), and resource ownership tracking (`ownership.ts`).
+- **L1 (Batteries & Subsystems)**: Declarative presets (`body`, `sensor`, `light`, `kccPlayer`, `dynamicPlayer`), spatial audio, animations, VFX, UI anchors.
+- **L2 (Tooling & Agents)**: MCP server, Vitest matchers, AST check engine, replay CLI.
+- **L3 (Application & Demos)**: Game content, shaders, game rules.
+
+### 🛡️ The 3 Golden Rules of Determinism:
+1. **Never use non-deterministic sources in gameplay logic**:
+   - ❌ `Math.random()`, `Date.now()`, `performance.now()`, `requestAnimationFrame()`.
+   - ✅ Always use `ctx.prng.next()`, `engine.prng`, and integer `engine.clock.tick`.
+2. **Never bypass the Dual-Buffer Transform Pipeline**:
+   - Physics writes transforms into canonical buffer slots (`transformPipeline.setTransform()`).
+   - Three.js meshes read interpolated transforms (`transformPipeline.getInterpolated()`) during rendering. Never mutate render matrices directly inside physics updates.
+3. **Quantized State Hashing**:
+   - Transform coordinates are quantized into fixed-point representations ($Q20.12$) before XXH3 hashing to prevent IEEE 754 floating-point divergence across platforms.
+
+---
+
+## 2. Three.js Performance & Optimization Mastery
+
+High frame rates ($60\text{--}120\text{ fps}$) in WebGL/WebGPU require minimizing CPU overhead and optimizing GPU memory bandwidth.
+
+### 🚀 A. Zero-Allocation Render Loop (Crucial)
+Never instantiate objects (`new THREE.Vector3()`, `new THREE.Matrix4()`, `new THREE.Raycaster()`, object literals `{}`) inside the update or render loop. Every allocation triggers garbage collection (GC) pauses.
 
 ```ts
-import { createRenderoni } from 'renderoni';
-import { body, kccPlayer, sensor, light } from 'renderoni/presets';
-import { audio } from 'renderoni/audio';
-import { vfx } from 'renderoni/vfx';
+// ❌ BAD: Allocates new Vector3 instances 60 times per second
+game.start((dt) => {
+  const target = new THREE.Vector3(player.position[0], player.position[1] + 2, player.position[2]);
+  camera.position.lerp(target, 0.1);
+});
 
-export async function createGame(canvas?: HTMLCanvasElement) {
-  const game = await createRenderoni({
-    mode: canvas ? 'interactive' : 'headless',
-    canvas,
-    gravity: [0, -18.0, 0],
-    subsystems: [
-      audio({ volume: 0.8 }),
-      vfx({ particles: true }),
-    ],
+// ✅ GOOD: Reuse module-level scratch objects (Zero GC pressure)
+const _scratchVecA = new THREE.Vector3();
+const _scratchVecB = new THREE.Vector3();
+
+game.start((dt) => {
+  _scratchVecA.set(player.position[0], player.position[1] + 2, player.position[2]);
+  camera.position.lerp(_scratchVecA, 0.1);
+});
+```
+
+### 📦 B. Draw Call Minimization & Batching
+Every distinct mesh material/geometry pair incurs a CPU draw call. Aim to keep total draw calls **under 100** per frame.
+
+1. **InstancedMesh for repeated objects** (grass, trees, coins, bullets, debris):
+   ```ts
+   // Render 2,000 trees in 1 single draw call
+   const treeGeometry = new THREE.ConeGeometry(1, 3, 5);
+   const treeMaterial = new THREE.MeshStandardMaterial({ color: 0x166534 });
+   const instancedTrees = new THREE.InstancedMesh(treeGeometry, treeMaterial, 2000);
+   
+   const dummy = new THREE.Object3D();
+   for (let i = 0; i < 2000; i++) {
+     dummy.position.set(prng.range(-100, 100), 0, prng.range(-100, 100));
+     dummy.scale.setScalar(prng.range(0.8, 1.3));
+     dummy.updateMatrix();
+     instancedTrees.setMatrixAt(i, dummy.matrix);
+   }
+   instancedTrees.instanceMatrix.needsUpdate = true;
+   scene.add(instancedTrees);
+   ```
+2. **BufferGeometry Merging**:
+   For static level geometry that does not move, merge multiple geometries into a single `BufferGeometry` using `BufferGeometryUtils.mergeGeometries()`.
+
+### 💡 C. Lighting & Shadow Map Optimization
+- **Limit shadow casters**: Typically use **1 Directional Light** (Sun) with shadow mapping enabled, plus lightweight ambient/hemisphere lighting.
+- **Tight Shadow Frustum**: Keep the shadow camera bounding box as small as possible around the player to maximize shadow resolution without bloating texture memory:
+  ```ts
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 1024;
+  dirLight.shadow.mapSize.height = 1024;
+  dirLight.shadow.camera.near = 0.5;
+  dirLight.shadow.camera.far = 100;
+  dirLight.shadow.camera.left = -30;
+  dirLight.shadow.camera.right = 30;
+  dirLight.shadow.camera.top = 30;
+  dirLight.shadow.camera.bottom = -30;
+  dirLight.shadow.bias = -0.0005; // Eliminates shadow acne
+  ```
+
+### 🧹 D. Resource Disposal & Memory Leak Prevention
+Always dispose of geometries, materials, and textures when entities are destroyed:
+```ts
+function disposeHierarchy(node: THREE.Object3D): void {
+  node.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry?.dispose();
+      if (Array.isArray(child.material)) {
+        child.material.forEach((m) => m.dispose());
+      } else if (child.material) {
+        child.material.dispose();
+      }
+    }
   });
-
-  // Add lights and floor
-  game.add(light({ type: 'directional', intensity: 2.0, position: [20, 40, 20] }));
-  game.add(body({ shape: 'box', type: 'fixed', size: [50, 1, 50], position: [0, -0.5, 0] }));
-
-  // Add player
-  const player = game.add(kccPlayer({ id: 'player', position: [0, 1.5, 0] }));
-
-  return game;
 }
+```
+*Note: Renderoni's `OwnershipMatrix` (`ctx.entity()`) tracks and automates this cleanup automatically when calling `entity.destroy()`.*
+
+---
+
+## 3. Rapier Physics & Character Controller Best Practices
+
+### 🏃 A. Kinematic Character Controller (KCC) vs Dynamic Rigidbody
+- **Player & Humanoid NPCs**: Use `kccPlayer` / Rapier Character Controller. Dynamic rigid bodies feel "floaty", stick to walls, and tip over on slopes. KCC provides crisp, responsive platformer controls, slope sliding, and step climbing.
+- **Physics Props & Debris**: Use `dynamicPlayer` or `body({ type: 'dynamic' })` with proper friction ($0.5$) and restitution ($0.2$).
+- **Fuselage / Vehicles**: Use flat horizontal cuboid colliders (`RAPIER.ColliderDesc.cuboid(x, y, z)`) with high angular damping ($3.0\text{--}5.0$) rather than vertical capsules to avoid tipping.
+
+### 🔍 B. Collision Groups & Interaction Filtering
+Use Rapier collision groups to prevent unnecessary collision checks (e.g. Player projectiles shouldn't collide with the player):
+
+```ts
+// Bitmasks: Membership (16 bits) | Filter (16 bits)
+const GROUP_TERRAIN    = 0x0001;
+const GROUP_PLAYER     = 0x0002;
+const GROUP_ENEMY      = 0x0004;
+const GROUP_PROJECTILE = 0x0008;
+
+// Player collides with Terrain and Enemy, but ignores Player Projectiles
+const playerFilter = (GROUP_PLAYER << 16) | (GROUP_TERRAIN | GROUP_ENEMY);
+colliderDesc.setCollisionGroups(playerFilter);
 ```
 
 ---
 
-## 2. Writing Headless Tests with Vitest
+## 4. Game Architecture & Declarative Presets
+
+Renderoni encourages the **Preset Pattern** using `definePreset`:
+
+```ts
+import { definePreset } from 'renderoni/presets';
+import * as THREE from 'three';
+import RAPIER from '@dimforge/rapier3d-compat';
+
+export interface TurretOptions {
+  id?: string;
+  position?: [number, number, number];
+  fireRateHz?: number;
+}
+
+export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
+  const pos = options.position ?? [0, 0, 0];
+  const fireIntervalTicks = Math.round(60 / (options.fireRateHz ?? 2));
+
+  // Visual
+  const group = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.2, 1, 16), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+  const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.8), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+  barrel.position.set(0, 0.6, -0.8);
+  group.add(base, barrel);
+  group.position.set(...pos);
+
+  // Physics
+  const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(...pos);
+  const body = ctx.native.world.createRigidBody(bodyDesc);
+  const collider = ctx.native.world.createCollider(RAPIER.ColliderDesc.cylinder(0.5, 1.2), body);
+
+  let lastFireTick = 0;
+
+  return ctx.entity({
+    tags: ['enemy', 'turret'],
+    state: { health: 100 },
+    native: {
+      three: { object: group },
+      rapier: { body, colliderHandles: [collider.handle] },
+    },
+    actions: {
+      shoot: () => {
+        ctx.events.emit('bullet.spawn', { origin: group.position, direction: [0, 0, -1] });
+      },
+      update: () => {
+        // Automatic periodic firing based on deterministic ticks
+        // ctx.prng used for seeded spread
+      },
+    },
+  });
+});
+```
+
+---
+
+## 5. Camera, Input & Audio Systems
+
+### 🎥 Camera Modes:
+- **Smooth 3rd-Person Chase**: Use spherical coordinates (`theta`, `phi`, `radius`) lerped smoothly towards the player's position + offset.
+- **Cockpit / First-Person**: Attach camera directly to the player's eye socket or cockpit anchor with zero rotational lag.
+- **Screen Shake**: Add high-frequency, decaying random displacement to camera target during explosions/hits using `ctx.prng`.
+
+### 🔊 Web Audio Best Practices:
+- Use procedural audio synthesis (OscillatorNode + GainNode envelope) for lightweight, zero-latency SFX without loading heavy MP3 assets.
+- Resume `AudioContext` automatically on the first user interaction (`pointerdown` or `keydown`).
+
+---
+
+## 6. VFX, Particles & Juice
+
+- **Particle Pools**: Maintain a pre-allocated pool of $100\text{--}500$ particle objects. Never create/destroy meshes during particle emission; activate and reset existing particles from the pool.
+- **Visual Feedback ("Juice")**:
+  - Hit stop / frame freeze ($50\text{ms}$).
+  - Squash & Stretch scale tweens on jump/land.
+  - Floating damage numbers projected via Renderoni UI anchors (`ui().anchor()`).
+
+---
+
+## 7. Headless Testing & Agent Verification
+
+Renderoni tests run in pure Node.js in $<10\text{ms}$ with Vitest:
 
 ```ts
 import { expect, test } from 'vitest';
@@ -50,56 +237,20 @@ import { createRenderoni } from 'renderoni';
 import { kccPlayer, sensor } from 'renderoni/presets';
 import 'renderoni/testing/matchers';
 
-test('simulation advances deterministically', async () => {
-  const game = await createRenderoni({ mode: 'headless', seed: 123 });
-  const player = game.add(kccPlayer({ id: 'player', position: [0, 1, 0] }));
+test('hero triggers sensor and verifies determinism hash', async () => {
+  const game = await createRenderoni({ mode: 'headless', seed: 42 });
   
-  player.actions.move({ x: 1, z: 0 });
-  game.step(60);
+  const hero = game.add(kccPlayer({ id: 'hero', position: [0, 1, 0] }));
+  const coin = game.add(sensor({ id: 'coin', position: [2, 1, 0] }));
 
-  expect(game).toHaveTick(60);
-  expect(player.position[0]).toBeGreaterThan(0.5);
+  let collected = false;
+  game.events.on('sensor.enter', () => { collected = true; });
+
+  hero.actions.move({ x: 1, z: 0 });
+  game.step(30);
+
+  expect(collected).toBe(true);
+  expect(game).toHaveTick(30);
   expect(game).toHavePassedDiagnostics();
-});
-```
-
----
-
-## 3. Creating Custom Declarative Presets
-
-```ts
-import { definePreset } from 'renderoni/presets';
-import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
-
-export const spinningObstacle = definePreset<{ speed?: number }>('spinning_obstacle', (options, ctx) => {
-  const speed = options.speed ?? 2.0;
-
-  // 1. Create Three.js Visual Mesh
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(4, 0.5, 0.5),
-    new THREE.MeshStandardMaterial({ color: 0xef4444 })
-  );
-
-  // 2. Create Rapier Kinematic Physics Body
-  const bodyDesc = RAPIER.RigidBodyDesc.kinematicVelocityBased().setTranslation(0, 1, 0);
-  const body = ctx.native.world.createRigidBody(bodyDesc);
-  const colliderDesc = RAPIER.ColliderDesc.cuboid(2, 0.25, 0.25);
-  const collider = ctx.native.world.createCollider(colliderDesc, body);
-
-  return ctx.entity({
-    tags: ['obstacle', 'hazard'],
-    native: {
-      three: { object: mesh },
-      rapier: { body, colliderHandles: [collider.handle] },
-    },
-    actions: {
-      update: () => {
-        body.setNextKinematicRotation(
-          new RAPIER.Quaternion(0, Math.sin(ctx.id.length * speed), 0, Math.cos(ctx.id.length * speed))
-        );
-      },
-    },
-  });
 });
 ```
