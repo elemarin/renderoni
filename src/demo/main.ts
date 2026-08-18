@@ -38,7 +38,7 @@ class PlaygroundApp {
     this.inspectorBytes = document.getElementById('inspector-bytes')!;
     this.actionInput = document.getElementById('action-input') as HTMLInputElement;
 
-    // Canvas click blurs any input and grabs focus
+    // Canvas click blurs any input and focuses the canvas
     this.canvas.addEventListener('click', () => {
       (document.activeElement as HTMLElement)?.blur();
       this.canvas.focus();
@@ -67,7 +67,7 @@ class PlaygroundApp {
       const chip = (e.target as HTMLElement).closest('.chip-btn') as HTMLElement;
       if (chip && chip.dataset.action && this.currentGame) {
         const actName = chip.dataset.action;
-        const payload = chip.dataset.payload ? parseFloat(chip.dataset.payload) : undefined;
+        const payload = chip.dataset.payload !== undefined ? parseFloat(chip.dataset.payload) : undefined;
         this.currentGame.engine.act({ name: actName, payload });
         (document.activeElement as HTMLElement)?.blur();
       }
@@ -140,7 +140,8 @@ class PlaygroundApp {
 
     if (mode === 'flight') {
       container.innerHTML = `
-        <button class="chip-btn" data-action="flight.throttle" data-payload="1.0">⚡ 100% Throttle</button>
+        <button class="chip-btn" data-action="flight.throttle" data-payload="1.0">⚡ Max Throttle (Z)</button>
+        <button class="chip-btn" data-action="flight.throttle" data-payload="0.0">🛑 Cut Throttle (X)</button>
         <button class="chip-btn" data-action="flight.toggleGear">🛞 Gear (G)</button>
         <button class="chip-btn" data-action="flight.toggleCamera">🎥 View (C)</button>
         <button class="chip-btn" data-action="flight.reset">🔄 Reset (R)</button>
@@ -162,27 +163,29 @@ class PlaygroundApp {
   private mountFlightHUD(): void {
     this.hudContainer.innerHTML = `
       <div class="hud-card flight-card">
-        <div class="hud-title">✈️ Aeroplane Flight Simulator</div>
+        <div class="hud-title">✈️ Aeroplane Flight Simulator (KSP Controls)</div>
         <div class="instructions-text">
-          <strong>W / S</strong>: Pitch Nose Down / Up (Pull S to climb)<br/>
-          <strong>A / D</strong>: Roll / Bank &bull; <strong>Q / E</strong>: Yaw<br/>
-          <strong>G</strong>: Retract Landing Gear &bull; <strong>C</strong>: Cockpit / Outside View &bull; <strong>R</strong>: Reset
+          <strong>Shift / Ctrl</strong>: Throttle Up / Down &bull; <strong>Z</strong>: Max Throttle &bull; <strong>X</strong>: Cut Throttle<br/>
+          <strong>W / S</strong>: Pitch Nose Down / Up &bull; <strong>A / D</strong>: Yaw / Turn Left / Right<br/>
+          <strong>Q / E</strong>: Roll / Bank (Rotation) &bull; <strong>G</strong>: Gear &bull; <strong>C</strong>: View &bull; <strong>R</strong>: Reset
         </div>
         <div class="telemetry-grid">
           <div class="metric"><span class="label">Airspeed:</span> <span id="flight-speed" class="val">0 km/h</span></div>
           <div class="metric"><span class="label">Altitude:</span> <span id="flight-alt" class="val">0 m</span></div>
-          <div class="metric"><span class="label">Status:</span> <span id="flight-state" class="val tag tag-green">Landed</span></div>
+          <div class="metric"><span class="label">Status:</span> <span id="flight-state" class="val tag tag-green">Parked</span></div>
           <div class="metric"><span class="label">Gear / View:</span> <span id="flight-gear-view" class="val">Down &bull; Outside</span></div>
         </div>
         <div class="controls-row">
-          <button id="btn-toggle-view" class="btn btn-secondary">🎥 View: Cockpit/Outside (C)</button>
-          <button id="btn-toggle-gear" class="btn btn-primary">🛞 Gear Up/Down (G)</button>
+          <button id="btn-toggle-view" class="btn btn-secondary">🎥 View (C)</button>
+          <button id="btn-toggle-gear" class="btn btn-primary">🛞 Gear (G)</button>
+          <button id="btn-throttle-max" class="btn" style="background:#2563eb; color:white;">⚡ Max (Z)</button>
+          <button id="btn-throttle-cut" class="btn" style="background:#dc2626; color:white;">🛑 Cut (X)</button>
           <button id="btn-reset-plane" class="btn" style="background:#475569; color:white;">🔄 Reset (R)</button>
         </div>
         <div class="throttle-row">
           <label for="flight-throttle">Throttle:</label>
-          <input id="flight-throttle" type="range" min="0" max="100" value="100" />
-          <span id="flight-throttle-val" class="val">100%</span>
+          <input id="flight-throttle" type="range" min="0" max="100" value="0" />
+          <span id="flight-throttle-val" class="val">0%</span>
         </div>
       </div>
     `;
@@ -203,6 +206,16 @@ class PlaygroundApp {
 
     document.getElementById('btn-toggle-gear')?.addEventListener('click', (e) => {
       (this.currentGame as FlightGame)?.toggleLandingGear();
+      (e.currentTarget as HTMLElement)?.blur();
+    });
+
+    document.getElementById('btn-throttle-max')?.addEventListener('click', (e) => {
+      (this.currentGame as FlightGame)?.setThrottle(1.0);
+      (e.currentTarget as HTMLElement)?.blur();
+    });
+
+    document.getElementById('btn-throttle-cut')?.addEventListener('click', (e) => {
+      (this.currentGame as FlightGame)?.setThrottle(0.0);
       (e.currentTarget as HTMLElement)?.blur();
     });
 

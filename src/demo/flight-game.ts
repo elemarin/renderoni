@@ -1,5 +1,13 @@
 /**
- * Renderoni Web Demo: High-Performance Flight Simulator
+ * Renderoni Web Demo: KSP-Style Smooth Aeroplane Flight Simulator
+ *
+ * KSP Flight Control Mapping:
+ * - W / S: Pitch Down / Pitch Up
+ * - A / D: Yaw / Turn Left / Right
+ * - Q / E: Roll Left / Right (Rotation)
+ * - Shift / Ctrl: Throttle Up / Down
+ * - Z: Max Throttle (100%) | X: Cut Throttle (0%)
+ * - G: Landing Gear | C: Camera View | R: Reset
  */
 
 import * as THREE from 'three';
@@ -38,8 +46,9 @@ export class FlightGame {
   private planeBody!: RAPIER.RigidBody;
   private engineSound = sfx.createFlightEngine();
 
-  // Flight Controls & State - Defaults to 100% Throttle for Instant Takeoff
-  private throttle = 1.0;
+  // Flight Controls & State - Starts parked with 0% throttle
+  private throttle = 0.0;
+  private smoothThrottle = 0.0;
   private pitchInput = 0;
   private rollInput = 0;
   private yawInput = 0;
@@ -87,7 +96,7 @@ export class FlightGame {
     // 5. Setup Controls
     this.setupControls();
 
-    // 6. Flight Dynamics System
+    // 6. Smooth Flight Dynamics System
     this.engine.systems.add({
       phase: 'prePhysics',
       update: () => {
@@ -98,7 +107,7 @@ export class FlightGame {
     // Actions
     this.engine.actions.register({
       name: 'flight.throttle',
-      handle: (val: any) => this.setThrottle(typeof val === 'number' ? val : (val?.value ?? 1.0)),
+      handle: (val: any) => this.setThrottle(typeof val === 'number' ? val : (val?.value ?? 0.0)),
     });
 
     this.engine.actions.register({
@@ -118,7 +127,7 @@ export class FlightGame {
 
     // Start Sound
     this.engineSound.start();
-    this.engineSound.setThrottle(this.throttle);
+    this.engineSound.setThrottle(0.0);
 
     // Start presentation loop
     this.engine.start((dt) => this.update(dt));
@@ -314,17 +323,16 @@ export class FlightGame {
     this.planeMesh.add(this.landingGearGroup);
     scene.add(this.planeMesh);
 
-    // Stable Horizontal Physics Body: Sits flat on runway without tipping
+    // Stable Horizontal Physics Body
     this.planeBody = this.engine.native.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(0, 6.7, 260.0)
-        .setAdditionalMass(5.0)
-        .setLinearDamping(0.02)
-        .setAngularDamping(2.5)
+        .setAdditionalMass(6.0)
+        .setLinearDamping(0.03)
+        .setAngularDamping(5.0) // Strong damping prevents crazy spinning
         .setCanSleep(false)
     );
 
-    // Horizontal cuboid collider: flat bottom prevents nose tipping on runway
     const planeCollider = this.engine.native.world.createCollider(
       RAPIER.ColliderDesc.cuboid(1.5, 0.35, 2.2).setDensity(0.01).setFriction(0.0).setRestitution(0.0),
       this.planeBody
@@ -378,14 +386,18 @@ export class FlightGame {
 
   private setupControls(): void {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Don't capture keys if typing inside input fields
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
 
       this.keys[e.code] = true;
       this.keys[e.key.toLowerCase()] = true;
 
-      if (e.code === 'KeyG' || e.key.toLowerCase() === 'g') {
+      // KSP Quick Throttle Shortcuts
+      if (e.code === 'KeyZ' || e.key.toLowerCase() === 'z') {
+        this.setThrottle(1.0);
+      } else if (e.code === 'KeyX' || e.key.toLowerCase() === 'x') {
+        this.setThrottle(0.0);
+      } else if (e.code === 'KeyG' || e.key.toLowerCase() === 'g') {
         this.toggleLandingGear();
       } else if (e.code === 'KeyC' || e.key.toLowerCase() === 'c') {
         this.toggleCameraView();
@@ -406,24 +418,23 @@ export class FlightGame {
   private updateFlightPhysics(): void {
     if (!this.planeBody) return;
 
-    // 1. Process Inputs
+    // 1. KSP-Style Controls:
+    // W / S: Pitch Down / Pitch Up
     this.pitchInput = 0;
-    this.rollInput = 0;
-    this.yawInput = 0;
-
-    // Pitch: W/Up = Pitch Down, S/Down = Pitch Up (Climb)
     if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) this.pitchInput += 1;
     if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) this.pitchInput -= 1;
 
-    // Roll: A/Left = Bank Left, D/Right = Bank Right
-    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) this.rollInput += 1;
-    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) this.rollInput -= 1;
+    // A / D: Yaw / Turn Left / Right
+    this.yawInput = 0;
+    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) this.yawInput += 1;
+    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) this.yawInput -= 1;
 
-    // Yaw: Q = Left, E = Right
-    if (this.keys['KeyQ'] || this.keys['q']) this.yawInput += 1;
-    if (this.keys['KeyE'] || this.keys['e']) this.yawInput -= 1;
+    // Q / E: Roll Left / Right (Rotation)
+    this.rollInput = 0;
+    if (this.keys['KeyQ'] || this.keys['q']) this.rollInput += 1;
+    if (this.keys['KeyE'] || this.keys['e']) this.rollInput -= 1;
 
-    // Throttle (+/- or Shift/Ctrl)
+    // Shift / Ctrl: Smooth Throttle adjustments
     if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) {
       this.setThrottle(this.throttle + 0.015);
     }
@@ -431,7 +442,11 @@ export class FlightGame {
       this.setThrottle(this.throttle - 0.015);
     }
 
-    // 2. Compute Orientation
+    // 2. Smooth Throttle Interpolation
+    this.smoothThrottle += (this.throttle - this.smoothThrottle) * 0.1;
+    this.engineSound.setThrottle(this.smoothThrottle);
+
+    // 3. Compute Airplane Orientation
     const rot = this.planeBody.rotation();
     const q = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
 
@@ -444,60 +459,66 @@ export class FlightGame {
     const velVec = new THREE.Vector3(vel.x, vel.y, vel.z);
     const forwardSpeed = Math.max(0, velVec.dot(forward));
     const pos = this.planeBody.translation();
-    const isLanded = pos.y <= 7.2 && Math.abs(pos.x) < 40;
+    const isLanded = pos.y <= 7.1 && Math.abs(pos.x) < 40;
 
-    // 3. Engine Thrust
-    const maxThrust = 1800.0;
-    const thrustForce = forward.clone().multiplyScalar(maxThrust * this.throttle);
+    // 4. Engine Forward Thrust
+    const maxThrust = 1600.0;
+    const thrustForce = forward.clone().multiplyScalar(maxThrust * this.smoothThrottle);
 
-    // 4. Dynamic Lift
-    // When rolling down runway, pulling S pitches up and provides immediate takeoff lift
+    // 5. Smooth Aerodynamic Lift
     let liftMagnitude = 0;
-    if (forwardSpeed > 4.0) {
-      const baseLift = Math.pow(forwardSpeed / 18.0, 1.8) * 90.0;
-      const pitchClimbBoost = this.pitchInput > 0 ? 160.0 : 0;
-      liftMagnitude = Math.min(800.0, baseLift + pitchClimbBoost);
+    if (forwardSpeed > 3.0) {
+      const baseLift = Math.pow(forwardSpeed / 16.0, 1.8) * 80.0;
+      const pitchClimbBoost = this.pitchInput > 0 ? 140.0 : 0;
+      liftMagnitude = Math.min(650.0, baseLift + pitchClimbBoost);
     }
     const liftForce = up.clone().multiplyScalar(liftMagnitude);
 
-    // 5. Drag
-    const dragFactor = this.gearDown ? -0.1 : -0.05;
-    const dragForce = velVec.clone().multiplyScalar(dragFactor * Math.max(1.0, forwardSpeed));
+    // 6. Aerodynamic Drag
+    const dragCoeff = this.gearDown ? -0.08 : -0.04;
+    const dragForce = velVec.clone().multiplyScalar(dragCoeff * Math.max(1.0, forwardSpeed));
 
-    // Runway Level Stabilization (Prevents tilting/flipping while on wheels)
+    // Ground Wheel Leveling (Prevent flipping on the runway)
+    let groundNormal = new THREE.Vector3(0, 0, 0);
     if (isLanded) {
-      // Force level pitch on runway unless pulling up
-      if (this.pitchInput <= 0 && pos.y < 6.8) {
-        this.planeBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
+      if (pos.y < 6.75 && vel.y < 0) {
+        groundNormal = new THREE.Vector3(0, -vel.y * 3.0, 0);
       }
     }
 
-    // Apply Linear Force Impulse
-    const totalForce = thrustForce.add(liftForce).add(dragForce);
+    // Apply Linear Forces
+    const totalForce = thrustForce.add(liftForce).add(dragForce).add(groundNormal);
     this.planeBody.applyImpulse(
       new RAPIER.Vector3(totalForce.x * 0.0166, totalForce.y * 0.0166, totalForce.z * 0.0166),
       true
     );
 
-    // 6. Control Torques
-    const controlAuthority = Math.min(1.0, Math.max(0.3, forwardSpeed / 8.0));
-    const pitchTorque = right.clone().multiplyScalar(this.pitchInput * 70.0 * controlAuthority);
-    const rollTorque = forward.clone().multiplyScalar(this.rollInput * 90.0 * controlAuthority);
-    const yawTorque = up.clone().multiplyScalar(this.yawInput * 35.0 * controlAuthority);
+    // 7. Smooth Control Torques (Scaled to prevent oversteer/snapping)
+    const controlScale = Math.min(1.0, Math.max(0.25, forwardSpeed / 10.0));
+    const pitchTorque = right.clone().multiplyScalar(this.pitchInput * 26.0 * controlScale);
+    const yawTorque = up.clone().multiplyScalar(this.yawInput * 18.0 * controlScale);
+    const rollTorque = forward.clone().multiplyScalar(this.rollInput * 28.0 * controlScale);
 
-    // Auto-level assist
-    let autoLevelTorque = new THREE.Vector3(0, 0, 0);
-    if (!isLanded && this.rollInput === 0 && Math.abs(right.y) > 0.05) {
-      autoLevelTorque = forward.clone().multiplyScalar(-right.y * 30.0);
+    // Aerodynamic self-leveling stability assist when controls are neutral
+    let stabilityTorque = new THREE.Vector3(0, 0, 0);
+    if (!isLanded) {
+      if (this.rollInput === 0 && Math.abs(right.y) > 0.08) {
+        stabilityTorque.add(forward.clone().multiplyScalar(-right.y * 14.0));
+      }
+    } else {
+      // Keep level on runway
+      if (this.pitchInput <= 0) {
+        this.planeBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
+      }
     }
 
-    const totalTorque = pitchTorque.add(rollTorque).add(yawTorque).add(autoLevelTorque);
+    const totalTorque = pitchTorque.add(yawTorque).add(rollTorque).add(stabilityTorque);
     this.planeBody.applyTorqueImpulse(
       new RAPIER.Vector3(totalTorque.x * 0.0166, totalTorque.y * 0.0166, totalTorque.z * 0.0166),
       true
     );
 
-    // Check Ring Collisions
+    // Check Ring Course
     this.checkRingCollection();
   }
 
@@ -522,7 +543,6 @@ export class FlightGame {
 
   setThrottle(val: number): void {
     this.throttle = Math.max(0.0, Math.min(1.0, val));
-    this.engineSound.setThrottle(this.throttle);
   }
 
   toggleLandingGear(): void {
@@ -541,10 +561,11 @@ export class FlightGame {
     this.planeBody.setRotation(new RAPIER.Quaternion(0, 0, 0, 1), true);
     this.planeBody.setLinvel(new RAPIER.Vector3(0, 0, 0), true);
     this.planeBody.setAngvel(new RAPIER.Vector3(0, 0, 0), true);
-    this.throttle = 1.0;
+    this.throttle = 0.0;
+    this.smoothThrottle = 0.0;
     this.gearDown = true;
     this.gearAnim = 1.0;
-    this.engineSound.setThrottle(1.0);
+    this.engineSound.setThrottle(0.0);
     this.ringsCollected = 0;
     this.rings.forEach((r) => {
       r.collected = false;
@@ -562,7 +583,7 @@ export class FlightGame {
         heading: 0,
         gearDown: this.gearDown,
         viewMode: this.viewMode,
-        flightState: 'Landed',
+        flightState: 'Parked',
         ringsCollected: 0,
         totalRings: 10,
       };
@@ -577,19 +598,19 @@ export class FlightGame {
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
     const heading = ((Math.atan2(forward.x, forward.z) * 180) / Math.PI + 360) % 360;
 
-    let flightState = 'Landed';
+    let flightState = 'Parked';
     if (pos.y > 8.0) {
       flightState = 'Airborne';
     } else if (speedKmh > 55.0) {
       flightState = 'Rotate (Pull S)';
-    } else if (this.throttle > 0.1) {
+    } else if (this.throttle > 0.05) {
       flightState = 'Takeoff Roll';
     }
 
     return {
       altitude: Math.max(0, parseFloat((pos.y - 6.0).toFixed(1))),
       speed: parseFloat(speedKmh.toFixed(1)),
-      throttle: this.throttle,
+      throttle: parseFloat(this.throttle.toFixed(2)),
       heading: Math.round(heading),
       gearDown: this.gearDown,
       viewMode: this.viewMode,
@@ -604,7 +625,7 @@ export class FlightGame {
 
     // Spin Propeller
     if (this.propellerMesh) {
-      this.propellerMesh.rotation.z += (20.0 + this.throttle * 80.0) * dt;
+      this.propellerMesh.rotation.z += (15.0 + this.smoothThrottle * 80.0) * dt;
     }
 
     // Smooth Gear Retraction
