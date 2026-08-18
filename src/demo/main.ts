@@ -27,6 +27,11 @@ class PlaygroundApp {
   private inspectBodyText!: HTMLElement;
   private interactionPrompt!: HTMLElement;
   private promptText!: HTMLElement;
+  private loopOverlay!: HTMLElement;
+  private loopKicker!: HTMLElement;
+  private loopTitle!: HTMLElement;
+  private loopBody!: HTMLElement;
+  private loopAction!: HTMLButtonElement;
 
   constructor() {
     this.canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
@@ -46,16 +51,26 @@ class PlaygroundApp {
     this.inspectBodyText = document.getElementById('inspect-body-text')!;
     this.interactionPrompt = document.getElementById('interaction-prompt')!;
     this.promptText = document.getElementById('prompt-text')!;
+    this.loopOverlay = document.getElementById('loop-overlay')!;
+    this.loopKicker = document.getElementById('loop-kicker')!;
+    this.loopTitle = document.getElementById('loop-title')!;
+    this.loopBody = document.getElementById('loop-body')!;
+    this.loopAction = document.getElementById('loop-action') as HTMLButtonElement;
+
+    this.loopAction.addEventListener('click', () => {
+      const loop = this.currentGame?.engine.loop;
+      if (!loop?.enabled) return;
+      if (loop.phase === 'ready') loop.start();
+      else loop.restart();
+      this.syncLoopOverlay();
+    });
 
     // Modal Close
-    document.getElementById('btn-close-inspect')?.addEventListener('click', () => {
-      this.inspectModal.style.display = 'none';
-    });
-    this.inspectModal?.addEventListener('click', (e) => {
-      if (e.target === this.inspectModal) {
-        this.inspectModal.style.display = 'none';
-      }
-    });
+    const dismissInspect = () => {
+      if (this.activeMode === 'psx') (this.currentGame as PsxGame | null)?.dismissInspect();
+    };
+    document.getElementById('btn-close-inspect')?.addEventListener('click', dismissInspect);
+    this.inspectModal?.addEventListener('click', dismissInspect);
 
     // Canvas click blurs any input and focuses the canvas
     this.canvas.addEventListener('click', () => {
@@ -157,6 +172,36 @@ class PlaygroundApp {
     }
 
     this.handleResize();
+    this.syncLoopOverlay();
+  }
+
+  private syncLoopOverlay(): void {
+    const loop = this.currentGame?.engine.loop;
+    if (!loop?.enabled) {
+      this.loopOverlay.hidden = true;
+      return;
+    }
+    if (loop.phase === 'playing') {
+      this.loopOverlay.hidden = true;
+      return;
+    }
+    this.loopOverlay.hidden = false;
+    this.loopOverlay.classList.toggle('won', loop.phase === 'won');
+    this.loopOverlay.classList.toggle('lost', loop.phase === 'lost');
+    this.loopKicker.textContent = loop.title || 'Renderoni';
+    if (loop.phase === 'ready') {
+      this.loopTitle.textContent = 'Play';
+      this.loopBody.textContent = loop.subtitle || 'Start the match.';
+      this.loopAction.textContent = 'Play';
+    } else if (loop.phase === 'won') {
+      this.loopTitle.textContent = 'Cleared';
+      this.loopBody.textContent = loop.outcome || 'You win.';
+      this.loopAction.textContent = 'Play again';
+    } else {
+      this.loopTitle.textContent = 'Ended';
+      this.loopBody.textContent = loop.outcome || 'Try again.';
+      this.loopAction.textContent = 'Restart';
+    }
   }
 
   private updateQuickActions(mode: GameMode): void {
@@ -239,14 +284,14 @@ class PlaygroundApp {
           <strong>Q / E</strong>: Roll Left / Right &bull; <strong>C</strong>: View Mode &bull; <strong>R</strong>: Reset
         </div>
         <div class="quest-box">
-          <div class="label">Mission Route:</div>
-          <div id="flight-quest" class="quest-status">Take off from Haven Island runway</div>
+          <div class="label">Free flight</div>
+          <div id="flight-quest" class="quest-status">Hold Z past 60% to lift off</div>
         </div>
         <div class="telemetry-grid">
           <div class="metric"><span class="label">Airspeed:</span> <span id="flight-speed" class="val">0 km/h</span></div>
           <div class="metric"><span class="label">Altitude:</span> <span id="flight-alt" class="val">0 m</span></div>
           <div class="metric"><span class="label">Flight State:</span> <span id="flight-state" class="val tag tag-green">Parked</span></div>
-          <div class="metric"><span class="label">Deliveries:</span> <span id="flight-parcels" class="val">0 / 3</span></div>
+          <div class="metric"><span class="label">Throttle:</span> <span id="flight-parcels" class="val">0%</span></div>
         </div>
         <div class="controls-row">
           <button id="btn-toggle-view" class="btn btn-secondary">🎥 View (C)</button>
@@ -422,7 +467,7 @@ class PlaygroundApp {
           if (spdEl) spdEl.textContent = `${t.speed} km/h`;
           if (altEl) altEl.textContent = `${t.altitude} m`;
           if (questEl) questEl.textContent = t.activeObjective;
-          if (parcelsEl) parcelsEl.textContent = `${t.parcelsDelivered} / ${t.totalParcels}`;
+          if (parcelsEl) parcelsEl.textContent = `${Math.round(t.throttle * 100)}%`;
           if (stateEl) {
             stateEl.textContent = t.flightState;
             stateEl.className = `val tag ${t.flightState === 'Airborne' ? 'tag-green' : t.flightState === 'Stall Warning' ? 'tag-red' : 'tag-orange'}`;
@@ -454,12 +499,18 @@ class PlaygroundApp {
         }
 
         // Live Agent Inspector Update
+        this.syncLoopOverlay();
+
         if (this.isInspectorOpen) {
-          const obs = ObservationEngine.generateTier0(this.currentGame.engine);
-          this.inspectorContent.textContent = obs.markdown;
-          this.inspectorHash.textContent = this.currentGame.engine.getStateHash().slice(0, 16);
-          this.inspectorTick.textContent = `Tick: ${this.currentGame.engine.tick}`;
-          this.inspectorBytes.textContent = `${obs.bytes}B / 500B`;
+          try {
+            const obs = ObservationEngine.generateTier0(this.currentGame.engine);
+            this.inspectorContent.textContent = obs.markdown;
+            this.inspectorHash.textContent = this.currentGame.engine.getStateHash().slice(0, 16);
+            this.inspectorTick.textContent = `Tick: ${this.currentGame.engine.tick}`;
+            this.inspectorBytes.textContent = `${obs.bytes}B / 500B`;
+          } catch {
+            this.inspectorTick.textContent = `Tick: ${this.currentGame.engine.tick}`;
+          }
         }
       }
 

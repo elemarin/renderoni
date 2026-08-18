@@ -17,7 +17,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { RenderoniEngine } from '../core/engine.js';
-import { body } from '../presets/index.js';
 import { sfx } from './audio-sfx.js';
 
 export interface PsxTelemetry {
@@ -78,6 +77,7 @@ export class PsxGame {
   private gateOpenProgress = 0;
   private inspectingText: string | null = null;
   private inspectCardTimeout: any = null;
+  private unbind: Array<() => void> = [];
 
   // Raycaster for object interaction
   private raycaster = new THREE.Raycaster();
@@ -94,11 +94,16 @@ export class PsxGame {
       mode: 'interactive',
       canvas: this.canvas,
       gravity: [0, -18.0, 0],
+      loop: {
+        enabled: true,
+        title: 'Echoes of Blackwood',
+        subtitle: 'Read the journal, wind the clock, take the crest, walk out the gate.',
+      },
     });
   }
 
   async init(): Promise<void> {
-    await this.engine.init();
+    await this.engine.init({ gravity: [0, -18.0, 0] });
 
     const scene = this.engine.native.scene;
     this.camera = this.engine.native.camera;
@@ -130,6 +135,7 @@ export class PsxGame {
 
     // 7. Input Event Listeners
     this.setupInput();
+    this.engine.loop.onReset(() => this.resetMatch());
 
     // Start presentation loop
     this.engine.start((dt) => this.update(dt));
@@ -139,13 +145,15 @@ export class PsxGame {
     const scene = this.engine.native.scene;
 
     // Start in Grand Foyer
-    const startPos = [0, 1.5, 8];
+    const startPos = [0, 1.7, 6];
 
     // Hierarchy: Scene -> YawObject -> PitchObject -> Camera
     this.yawObject.position.set(startPos[0], startPos[1], startPos[2]);
     this.yawObject.add(this.pitchObject);
     this.pitchObject.add(this.camera);
-    this.camera.position.set(0, 0.7, 0); // Eye height
+    this.camera.position.set(0, 0.7, 0);
+    this.camera.rotation.set(0, 0, 0);
+    this.camera.quaternion.identity();
     scene.add(this.yawObject);
 
     // Create Rapier Kinematic Position Body & Capsule Collider
@@ -159,18 +167,7 @@ export class PsxGame {
     this.characterController.enableAutostep(0.4, 0.2, true);
     this.characterController.enableSnapToGround(0.3);
     this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
-
-    // Register Player in Engine
-    this.engine.add(
-      body({
-        id: 'detective_hero',
-        shape: 'capsule',
-        type: 'kinematicPositionBased',
-        size: [0.35, 1.2],
-        position: [startPos[0], startPos[1], startPos[2]],
-        tags: ['player', 'detective'],
-      })
-    );
+    this.characterController.setApplyImpulsesToDynamicBodies(false);
   }
 
   private setupLighting(): void {
@@ -187,13 +184,14 @@ export class PsxGame {
 
     // Torch Sconces in Hallways
     const torchPositions: Array<[number, number, number]> = [
-      [-4.5, 2.4, 6],
-      [4.5, 2.4, 6],
-      [-4.5, 2.4, 0],
-      [4.5, 2.4, 0],
-      [-12, 2.4, -4],
-      [12, 2.4, -4],
-      [0, 2.4, -9],
+      [-2.2, 2.4, 6],
+      [2.2, 2.4, 6],
+      [-2.2, 2.4, -2],
+      [2.2, 2.4, -2],
+      [-2.2, 2.4, -12],
+      [2.2, 2.4, -12],
+      [-2.2, 2.4, -22],
+      [2.2, 2.4, -22],
     ];
 
     torchPositions.forEach((pos) => {
@@ -251,84 +249,76 @@ export class PsxGame {
     this.flashlightGroup.add(this.flashlightAmbient);
   }
 
-  private buildManor(): void {
+  private roomBox(cx: number, cz: number, w: number, d: number, floorMat: THREE.Material, ceilMat: THREE.Material): void {
     const scene = this.engine.native.scene;
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, d), floorMat);
+    floor.position.set(cx, -0.2, cz);
+    scene.add(floor);
+    const ceil = new THREE.Mesh(new THREE.BoxGeometry(w, 0.4, d), ceilMat);
+    ceil.position.set(cx, 5, cz);
+    scene.add(ceil);
+    this.addStaticCollider(cx, -0.2, cz, w / 2, 0.2, d / 2);
+    this.addStaticCollider(cx, 5, cz, w / 2, 0.2, d / 2);
+  }
 
-    // Materials
+  private buildManor(): void {
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.7 });
     const woodWallMat = new THREE.MeshStandardMaterial({ color: 0x292524, roughness: 0.85 });
     const rugMat = new THREE.MeshStandardMaterial({ color: 0x881337, roughness: 0.9 });
     const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x0c0a09, roughness: 0.95 });
+    const scene = this.engine.native.scene;
 
-    // 1. Grand Foyer Floor & Ceiling
-    const foyerFloor = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, 20), floorMat);
-    foyerFloor.position.set(0, -0.2, 0);
-    scene.add(foyerFloor);
+    // One hallway along -Z with alcove rooms. Walk forward from spawn.
+    this.roomBox(0, -10, 7, 40, floorMat, ceilingMat);
+    const rug = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.02, 36), rugMat);
+    rug.position.set(0, 0.02, -10);
+    scene.add(rug);
 
-    const foyerRug = new THREE.Mesh(new THREE.BoxGeometry(4, 0.02, 14), rugMat);
-    foyerRug.position.set(0, 0.02, 0);
-    scene.add(foyerRug);
+    this.buildWall(0, 2.5, 10.2, 7, 5, 0.4, woodWallMat);
+    this.buildWall(-3.5, 2.5, 6.7, 0.4, 5, 6.6, woodWallMat);
+    this.buildWall(-3.5, 2.5, -6.0, 0.4, 5, 13.2, woodWallMat);
+    this.buildWall(-3.5, 2.5, -22.7, 0.4, 5, 14.6, woodWallMat);
+    this.buildWall(3.5, 2.5, 2.7, 0.4, 5, 14.6, woodWallMat);
+    this.buildWall(3.5, 2.5, -14.0, 0.4, 5, 13.2, woodWallMat);
+    this.buildWall(3.5, 2.5, -26.7, 0.4, 5, 6.6, woodWallMat);
 
-    const foyerCeiling = new THREE.Mesh(new THREE.BoxGeometry(12, 0.4, 20), ceilingMat);
-    foyerCeiling.position.set(0, 5.0, 0);
-    scene.add(foyerCeiling);
+    // Room 1 — Study (left)
+    this.roomBox(-8, 2, 10, 8, floorMat, ceilingMat);
+    this.buildWall(-8, 2.5, 6, 10, 5, 0.4, woodWallMat);
+    this.buildWall(-8, 2.5, -2, 10, 5, 0.4, woodWallMat);
+    this.buildWall(-13, 2.5, 2, 0.4, 5, 8, woodWallMat);
+    this.buildWall(-3.5, 2.5, 4.6, 0.4, 5, 2.6, woodWallMat);
+    this.buildWall(-3.5, 2.5, -0.6, 0.4, 5, 2.6, woodWallMat);
+    this.buildBookshelf(-11.5, 0, 2);
+    this.buildStudyDesk(-8, 0, 2);
 
-    this.addStaticCollider(0, -0.2, 0, 6, 0.2, 10);
-    this.addStaticCollider(0, 5.0, 0, 6, 0.2, 10);
+    // Room 2 — Key (right)
+    this.roomBox(8, -6, 10, 8, floorMat, ceilingMat);
+    this.buildWall(8, 2.5, -2, 10, 5, 0.4, woodWallMat);
+    this.buildWall(8, 2.5, -10, 10, 5, 0.4, woodWallMat);
+    this.buildWall(13, 2.5, -6, 0.4, 5, 8, woodWallMat);
+    this.buildWall(3.5, 2.5, -3.4, 0.4, 5, 2.6, woodWallMat);
+    this.buildWall(3.5, 2.5, -8.6, 0.4, 5, 2.6, woodWallMat);
+    this.buildKeyTable(8, 0, -6);
 
-    // Foyer Perimeter Walls
-    this.buildWall(0, 2.5, 10, 12, 5, 0.4, woodWallMat); // South Wall
-    this.buildWall(-6, 2.5, 5, 0.4, 5, 10, woodWallMat); // West South
-    this.buildWall(6, 2.5, 5, 0.4, 5, 10, woodWallMat);  // East South
+    // Room 3 — Clock (left)
+    this.roomBox(-8, -14, 10, 8, floorMat, ceilingMat);
+    this.buildWall(-8, 2.5, -10, 10, 5, 0.4, woodWallMat);
+    this.buildWall(-8, 2.5, -18, 10, 5, 0.4, woodWallMat);
+    this.buildWall(-13, 2.5, -14, 0.4, 5, 8, woodWallMat);
+    this.buildWall(-3.5, 2.5, -11.4, 0.4, 5, 2.6, woodWallMat);
+    this.buildWall(-3.5, 2.5, -16.6, 0.4, 5, 2.6, woodWallMat);
+    this.buildGrandfatherClock(-8, 0, -14);
 
-    // 2. West Library Room (Left Wing)
-    const libFloor = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 12), floorMat);
-    libFloor.position.set(-13, -0.2, -4);
-    scene.add(libFloor);
-    this.addStaticCollider(-13, -0.2, -4, 7, 0.2, 6);
+    // Room 4 — Crest in the open (right, visible from hall)
+    this.roomBox(8, -22, 10, 8, floorMat, ceilingMat);
+    this.buildWall(8, 2.5, -18, 10, 5, 0.4, woodWallMat);
+    this.buildWall(8, 2.5, -26, 10, 5, 0.4, woodWallMat);
+    this.buildWall(13, 2.5, -22, 0.4, 5, 8, woodWallMat);
+    this.buildWall(3.5, 2.5, -19.4, 0.4, 5, 2.6, woodWallMat);
+    this.buildWall(3.5, 2.5, -24.6, 0.4, 5, 2.6, woodWallMat);
 
-    const libCeiling = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 12), ceilingMat);
-    libCeiling.position.set(-13, 5.0, -4);
-    scene.add(libCeiling);
-
-    this.buildWall(-20, 2.5, -4, 0.4, 5, 12, woodWallMat); // Far West
-    this.buildWall(-13, 2.5, 2, 14, 5, 0.4, woodWallMat);  // Library South
-    this.buildWall(-13, 2.5, -10, 14, 5, 0.4, woodWallMat); // Library North
-
-    // Bookshelves in Library
-    this.buildBookshelf(-18, 0, -8);
-    this.buildBookshelf(-18, 0, -4);
-    this.buildBookshelf(-18, 0, 0);
-
-    // Study Desk in Library
-    this.buildStudyDesk(-13, 0, -4);
-
-    // 3. East Gallery Room (Right Wing)
-    const galFloor = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 12), floorMat);
-    galFloor.position.set(13, -0.2, -4);
-    scene.add(galFloor);
-    this.addStaticCollider(13, -0.2, -4, 7, 0.2, 6);
-
-    const galCeiling = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 12), ceilingMat);
-    galCeiling.position.set(13, 5.0, -4);
-    scene.add(galCeiling);
-
-    this.buildWall(20, 2.5, -4, 0.4, 5, 12, woodWallMat); // Far East
-    this.buildWall(13, 2.5, 2, 14, 5, 0.4, woodWallMat);  // Gallery South
-    this.buildWall(13, 2.5, -10, 14, 5, 0.4, woodWallMat); // Gallery North
-
-    // Grandfather Clock in East Gallery
-    this.buildGrandfatherClock(18, 0, -4);
-
-    // Antique Table with Key in East Gallery
-    this.buildKeyTable(14, 0, -8);
-
-    // 4. North Corridor & Escape Gate
-    this.buildWall(-4, 2.5, -10, 4, 5, 0.4, woodWallMat);
-    this.buildWall(4, 2.5, -10, 4, 5, 0.4, woodWallMat);
-
-    // Grand Iron Exit Gate (North Center: 0, 0, -10)
-    this.buildGrandExitGate(0, 0, -10);
+    this.buildGrandExitGate(0, 0, -30);
   }
 
   private buildWall(x: number, y: number, z: number, w: number, h: number, d: number, mat: THREE.Material): void {
@@ -565,42 +555,28 @@ export class PsxGame {
 
   private setupPuzzles(): void {
     const scene = this.engine.native.scene;
-
-    // Secret Study behind West Library Bookcase (Hidden initially at -13, 0, -10)
-    this.secretBookcase = new THREE.Group();
-    const woodMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.7 });
-    const caseMesh = new THREE.Mesh(new THREE.BoxGeometry(3.5, 4.4, 0.8), woodMat);
-    caseMesh.position.set(0, 2.2, 0);
-    this.secretBookcase.add(caseMesh);
-    this.secretBookcase.position.set(-13, 0, -9.8);
-    scene.add(this.secretBookcase);
-
-    // Secret Room Pedestal & Blackwood Crest
     const altar = new THREE.Mesh(
       new THREE.CylinderGeometry(0.5, 0.6, 1.2, 8),
       new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 })
     );
-    altar.position.set(-13, 0.6, -13.5);
+    altar.position.set(8, 0.6, -22);
     scene.add(altar);
 
-    // Blackwood Crest (Golden Shield)
-    const crestMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9, roughness: 0.15, emissive: 0x78350f });
-    this.crestMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.35, 0), crestMat);
-    this.crestMesh.position.set(-13, 1.6, -13.5);
+    const crestMat = new THREE.MeshStandardMaterial({
+      color: 0xf59e0b,
+      metalness: 0.9,
+      roughness: 0.15,
+      emissive: 0x78350f,
+      emissiveIntensity: 0.7,
+    });
+    this.crestMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.4, 0), crestMat);
+    this.crestMesh.position.set(8, 1.7, -22);
     scene.add(this.crestMesh);
 
-    // Hidden Altar Light
-    const crestLight = new THREE.PointLight(0xf59e0b, 1.5, 6);
-    crestLight.position.set(-13, 2.0, -13.5);
+    const crestLight = new THREE.PointLight(0xf59e0b, 2.4, 9);
+    crestLight.position.set(8, 2.2, -22);
     scene.add(crestLight);
 
-    // Secret Room Walls
-    const wallMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-    this.buildWall(-13, 2.5, -15.5, 8, 5, 0.4, wallMat);
-    this.buildWall(-17, 2.5, -12.5, 0.4, 5, 6, wallMat);
-    this.buildWall(-9, 2.5, -12.5, 0.4, 5, 6, wallMat);
-
-    // Register Crest Interaction
     this.interactables.push({
       id: 'crest',
       object: this.crestMesh,
@@ -614,8 +590,8 @@ export class PsxGame {
   readJournal(): void {
     sfx.playPaperRustle();
     this.showInspectNote(
-      `"November 14, 1898 — The Manor is locked. The clockmaker sealed the study behind the library bookcase. Remember the cipher: 'When storm clouds gather, the serpent rests at eleven, and the hound points at nine (11:45).'"`,
-      8000
+      `"Walk the hallway. Left: this journal. Right: the winding key. Left again: the clock (11:45). Right again: the crest. The gate is at the far end."`,
+      7000
     );
   }
 
@@ -678,7 +654,36 @@ export class PsxGame {
     // Unlock Gate!
     this.gateUnlocked = true;
     sfx.playGateOpen();
-    this.showInspectNote(`🏆 The Crest fits! The grand iron gate swings open into the night air! You Escaped!`, 10000);
+    this.showInspectNote(`🏆 The Crest fits! The grand iron gate swings open into the night air! You Escaped!`, 4000);
+    this.engine.loop.win('You escaped Blackwood Manor');
+  }
+
+  private resetMatch(): void {
+    this.hasKey = false;
+    this.hasCrest = false;
+    this.clockSolved = false;
+    this.gateUnlocked = false;
+    this.bookcaseOpenProgress = 0;
+    this.gateOpenProgress = 0;
+    this.inspectingText = null;
+    this.isFlashlightOn = true;
+    if (this.flashlightSpot) this.flashlightSpot.intensity = 4.5;
+    if (this.flashlightAmbient) this.flashlightAmbient.intensity = 0.4;
+    if (this.keyMesh) this.keyMesh.visible = true;
+    if (this.crestMesh) this.crestMesh.visible = true;
+    if (this.secretBookcase) this.secretBookcase.visible = false;
+    if (this.gateLeftDoor) this.gateLeftDoor.rotation.y = 0;
+    if (this.gateRightDoor) this.gateRightDoor.rotation.y = 0;
+    if (this.clockHands) {
+      this.clockHands.hour.rotation.z = 0;
+      this.clockHands.minute.rotation.z = 0;
+    }
+    const start = { x: 0, y: 1.7, z: 6 };
+    this.playerBody.setNextKinematicTranslation(start);
+    this.yawObject.position.set(start.x, start.y, start.z);
+    this.yawObject.rotation.set(0, 0, 0);
+    this.pitchObject.rotation.set(0, 0, 0);
+    this.keys = {};
   }
 
   private showInspectNote(text: string, durationMs = 4000): void {
@@ -687,6 +692,16 @@ export class PsxGame {
     this.inspectCardTimeout = setTimeout(() => {
       this.inspectingText = null;
     }, durationMs);
+  }
+
+  dismissInspect(): boolean {
+    if (!this.inspectingText) return false;
+    this.inspectingText = null;
+    if (this.inspectCardTimeout) {
+      clearTimeout(this.inspectCardTimeout);
+      this.inspectCardTimeout = null;
+    }
+    return true;
   }
 
   toggleFlashlight(): void {
@@ -730,47 +745,58 @@ export class PsxGame {
   }
 
   private setupInput(): void {
-    this.canvas.addEventListener('click', () => {
+    const onClick = () => {
+      sfx.startManorAmbience();
+      if (this.engine.loop.enabled && this.engine.loop.phase === 'ready') {
+        this.engine.loop.start();
+      }
+      if (this.dismissInspect()) return;
       if (!this.isLocked) {
         this.canvas.requestPointerLock();
       } else {
-        // Left click also interacts
         this.checkInteract();
       }
-    });
-
-    document.addEventListener('pointerlockchange', () => {
+    };
+    const onLock = () => {
       this.isLocked = document.pointerLockElement === this.canvas;
-    });
-
-    window.addEventListener('mousemove', (e) => {
+    };
+    const onMove = (e: MouseEvent) => {
       if (!this.isLocked) return;
-
-      const movementX = e.movementX || 0;
-      const movementY = e.movementY || 0;
-
-      this.yawObject.rotation.y -= movementX * this.mouseSensitivity;
-      this.pitchObject.rotation.x -= movementY * this.mouseSensitivity;
+      this.yawObject.rotation.y -= (e.movementX || 0) * this.mouseSensitivity;
+      this.pitchObject.rotation.x -= (e.movementY || 0) * this.mouseSensitivity;
       this.pitchObject.rotation.x = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, this.pitchObject.rotation.x));
-    });
-
-    window.addEventListener('keydown', (e) => {
+    };
+    const onDown = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+      sfx.startManorAmbience();
+      if (this.engine.loop.enabled && this.engine.loop.phase === 'ready') {
+        this.engine.loop.start();
+      }
       this.keys[e.code] = true;
       this.keys[e.key.toLowerCase()] = true;
-
-      if (e.code === 'KeyF' || e.key.toLowerCase() === 'f') {
-        this.toggleFlashlight();
+      if (e.code === 'KeyF' || e.key.toLowerCase() === 'f') this.toggleFlashlight();
+      if (e.code === 'Escape' || e.code === 'KeyE' || e.key.toLowerCase() === 'e') {
+        if (this.dismissInspect()) return;
+        if (e.code === 'KeyE' || e.key.toLowerCase() === 'e') this.checkInteract();
       }
-
-      if (e.code === 'KeyE' || e.key.toLowerCase() === 'e') {
-        this.checkInteract();
-      }
-    });
-
-    window.addEventListener('keyup', (e) => {
+    };
+    const onUp = (e: KeyboardEvent) => {
       this.keys[e.code] = false;
       this.keys[e.key.toLowerCase()] = false;
-    });
+    };
+
+    this.canvas.addEventListener('click', onClick);
+    document.addEventListener('pointerlockchange', onLock);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    this.unbind.push(
+      () => this.canvas.removeEventListener('click', onClick),
+      () => document.removeEventListener('pointerlockchange', onLock),
+      () => window.removeEventListener('mousemove', onMove),
+      () => window.removeEventListener('keydown', onDown),
+      () => window.removeEventListener('keyup', onUp)
+    );
   }
 
   private checkInteract(): void {
@@ -806,11 +832,12 @@ export class PsxGame {
 
   getTelemetry(): PsxTelemetry {
     const p = this.yawObject.position;
-    let quest = 'Search the Library for the Clockmaker\'s Journal';
-    if (this.gateUnlocked) quest = '🎉 Manor Escaped! Victory!';
-    else if (this.hasCrest) quest = 'Bring the Blackwood Crest to the Sealed North Gate';
-    else if (this.clockSolved) quest = 'Enter the Secret Study and claim the Blackwood Crest';
-    else if (this.hasKey) quest = 'Set the Grandfather Clock in East Gallery to 11:45';
+    let quest = 'Walk the hall. First left: journal on the desk';
+    if (this.gateUnlocked) quest = 'Escaped the manor';
+    else if (this.hasCrest) quest = 'Keep walking to the gate at the end';
+    else if (this.clockSolved) quest = 'Next right: glowing crest on the pedestal';
+    else if (this.hasKey) quest = 'Next left: wind the clock to 11:45';
+    else if (this.inspectingText) quest = quest;
 
     return {
       playerPos: [parseFloat(p.x.toFixed(1)), parseFloat(p.y.toFixed(1)), parseFloat(p.z.toFixed(1))],
@@ -829,10 +856,12 @@ export class PsxGame {
     let forward = 0;
     let strafe = 0;
 
-    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) forward += 1;
-    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) forward -= 1;
-    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
-    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
+    if (this.engine.loop.playing) {
+      if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) forward += 1;
+      if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) forward -= 1;
+      if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
+      if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
+    }
 
     const isMoving = forward !== 0 || strafe !== 0;
     const speed = (this.keys['ShiftLeft'] || this.keys['ShiftRight']) ? 6.5 : 4.0;
@@ -936,6 +965,12 @@ export class PsxGame {
 
   dispose(): void {
     if (this.inspectCardTimeout) clearTimeout(this.inspectCardTimeout);
+    for (const fn of this.unbind) fn();
+    this.unbind.length = 0;
+    if (document.pointerLockElement === this.canvas) {
+      document.exitPointerLock();
+    }
+    sfx.stopManorAmbience();
     this.engine.dispose();
   }
 }

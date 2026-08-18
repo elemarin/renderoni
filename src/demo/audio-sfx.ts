@@ -20,6 +20,12 @@ class SoundSynthesizer {
   private engineOsc1: OscillatorNode | null = null;
   private engineOsc2: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
+  private rainSource: AudioBufferSourceNode | null = null;
+  private rainGain: GainNode | null = null;
+  private droneOsc: OscillatorNode | null = null;
+  private droneGain: GainNode | null = null;
+  private windSource: AudioBufferSourceNode | null = null;
+  private windGain: GainNode | null = null;
 
   constructor() {
     // AudioContext will be initialized on first user gesture
@@ -60,8 +66,8 @@ class SoundSynthesizer {
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(450, t);
 
-      gain.gain.setValueAtTime(0.25, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+      gain.gain.setValueAtTime(0.16, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
     } else if (surface === 'stone') {
       // Crisp stone click
       osc.type = 'sine';
@@ -147,8 +153,8 @@ class SoundSynthesizer {
     filter.frequency.setValueAtTime(isTock ? 600 : 800, t);
     filter.Q.setValueAtTime(3.0, t);
 
-    gain.gain.setValueAtTime(0.3, t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
 
     osc.connect(filter);
     filter.connect(gain);
@@ -381,6 +387,65 @@ class SoundSynthesizer {
 
   playDecouple(): void {
     this.playFootstep('wood');
+  }
+
+  startManorAmbience(): void {
+    const ctx = this.initCtx();
+    if (!ctx || !this.masterGain || this.rainSource) return;
+
+    const rainBuf = ctx.createBuffer(1, ctx.sampleRate * 3, ctx.sampleRate);
+    const rainData = rainBuf.getChannelData(0);
+    for (let i = 0; i < rainData.length; i++) rainData[i] = Math.random() * 2 - 1;
+    this.rainSource = ctx.createBufferSource();
+    this.rainSource.buffer = rainBuf;
+    this.rainSource.loop = true;
+    const rainFilter = ctx.createBiquadFilter();
+    rainFilter.type = 'bandpass';
+    rainFilter.frequency.value = 1800;
+    rainFilter.Q.value = 0.55;
+    this.rainGain = ctx.createGain();
+    this.rainGain.gain.value = this.isMuted ? 0 : 0.035;
+    this.rainSource.connect(rainFilter);
+    rainFilter.connect(this.rainGain);
+    this.rainGain.connect(this.masterGain);
+    this.rainSource.start();
+
+    this.droneOsc = ctx.createOscillator();
+    this.droneGain = ctx.createGain();
+    this.droneOsc.type = 'sine';
+    this.droneOsc.frequency.value = 46;
+    this.droneGain.gain.value = this.isMuted ? 0 : 0.028;
+    this.droneOsc.connect(this.droneGain);
+    this.droneGain.connect(this.masterGain);
+    this.droneOsc.start();
+
+    const windBuf = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+    const windData = windBuf.getChannelData(0);
+    for (let i = 0; i < windData.length; i++) windData[i] = Math.random() * 2 - 1;
+    this.windSource = ctx.createBufferSource();
+    this.windSource.buffer = windBuf;
+    this.windSource.loop = true;
+    const windFilter = ctx.createBiquadFilter();
+    windFilter.type = 'lowpass';
+    windFilter.frequency.value = 280;
+    this.windGain = ctx.createGain();
+    this.windGain.gain.value = this.isMuted ? 0 : 0.04;
+    this.windSource.connect(windFilter);
+    windFilter.connect(this.windGain);
+    this.windGain.connect(this.masterGain);
+    this.windSource.start();
+  }
+
+  stopManorAmbience(): void {
+    try { this.rainSource?.stop(); this.rainSource?.disconnect(); } catch (_) {}
+    try { this.droneOsc?.stop(); this.droneOsc?.disconnect(); } catch (_) {}
+    try { this.windSource?.stop(); this.windSource?.disconnect(); } catch (_) {}
+    this.rainSource = null;
+    this.droneOsc = null;
+    this.windSource = null;
+    this.rainGain = null;
+    this.droneGain = null;
+    this.windGain = null;
   }
 }
 

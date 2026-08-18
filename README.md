@@ -74,6 +74,7 @@ import { vfx } from 'renderoni/vfx';
 const game = await createRenderoni({
   mode: 'interactive', // or 'headless'
   seed: 42,
+  loop: { enabled: true, title: 'My Game', subtitle: 'Press Play' },
   subsystems: [
     audio({ volume: 0.8 }),
     vfx({ particles: true }),

@@ -24,6 +24,7 @@ import {
   type PresetInstance,
 } from '../presets/define-preset.js';
 import { evaluateCheck, type AssertionOp, type CheckResult } from '../testing/check.js';
+import { GameLoop, type GameLoopOptions } from './loop.js';
 
 export type EngineMode = 'interactive' | 'headless';
 
@@ -34,6 +35,8 @@ export interface RenderoniConfig {
   clock?: SimulationClockOptions;
   gravity?: [number, number, number];
   subsystems?: Array<(engine: RenderoniEngine) => void>;
+  /** Opt-in play / win / lose / restart match loop. */
+  loop?: boolean | GameLoopOptions;
 }
 
 export class EventEmitter {
@@ -119,6 +122,7 @@ export class RenderoniEngine {
   readonly systems: SystemManager;
   readonly input: InputManager;
   readonly actions: ActionRegistry;
+  readonly loop: GameLoop;
 
   // Native 3D Presentation Objects
   readonly native: {
@@ -149,6 +153,20 @@ export class RenderoniEngine {
     this.systems = new SystemManager();
     this.input = new InputManager();
     this.actions = new ActionRegistry();
+    this.loop = new GameLoop(config.loop);
+
+    if (this.loop.enabled) {
+      this.actions.register({ name: 'loop.start', handle: () => this.loop.start() });
+      this.actions.register({ name: 'loop.restart', handle: () => this.loop.restart() });
+      this.actions.register({
+        name: 'loop.win',
+        handle: (reason?: string) => this.loop.win(typeof reason === 'string' ? reason : 'You win'),
+      });
+      this.actions.register({
+        name: 'loop.lose',
+        handle: (reason?: string) => this.loop.lose(typeof reason === 'string' ? reason : 'You lose'),
+      });
+    }
 
     // 3D Scene & Camera
     const scene = new THREE.Scene();

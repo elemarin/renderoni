@@ -35,6 +35,62 @@ html, body {
   outline: none;
 }
 
+.loop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(8, 12, 24, 0.35), rgba(4, 6, 12, 0.78));
+  pointer-events: auto;
+}
+.loop-overlay[hidden] { display: none; }
+
+.loop-card {
+  width: min(440px, calc(100vw - 40px));
+  padding: 28px 28px 24px;
+  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  text-align: center;
+}
+
+.loop-kicker {
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.loop-title {
+  font-size: 1.7rem;
+  font-weight: 750;
+  margin-bottom: 10px;
+}
+
+.loop-body {
+  color: #cbd5e1;
+  line-height: 1.45;
+  margin-bottom: 20px;
+}
+
+.loop-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 28px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  background: #f8fafc;
+  cursor: pointer;
+}
+.loop-btn:hover { filter: brightness(0.95); }
+.loop-overlay.won .loop-btn { background: #34d399; }
+.loop-overlay.lost .loop-btn { background: #fb7185; }
+
 /* Top Navigation Bar */
 .top-nav {
   position: absolute;

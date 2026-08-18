@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { RenderoniEngine } from '../core/engine.js';
-import { body, light } from '../presets/index.js';
+import { light } from '../presets/index.js';
 import { sfx } from './audio-sfx.js';
 
 export interface FlightTelemetry {
@@ -53,24 +53,16 @@ export class FlightGame {
   private throttle = 0.0; // 0.0 to 1.0
   private airspeed = 0.0; // m/s
   private isAirborne = false;
+  private yaw = -Math.PI / 2;
+  private pitch = 0;
+  private roll = 0;
   private viewMode: 'cockpit' | 'outside' = 'outside';
 
-  // Mission & Delivery Objectives
-  private parcelsDelivered = 0;
-  private totalParcels = 3;
-  private currentObjective = 'Increase throttle (Shift or Z) to take off from Haven Island';
-
-  // Interactive Rings & Delivery Hoppers
-  private rings: Array<{
-    id: string;
-    pos: THREE.Vector3;
-    mesh: THREE.Group;
-    collected: boolean;
-    type: 'mail' | 'thermal' | 'lighthouse';
-  }> = [];
+  private currentObjective = 'Hold Z until ~70% — then you leave the grass';
 
   // Controls
   private keys: Record<string, boolean> = {};
+  private unbind: Array<() => void> = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -78,15 +70,22 @@ export class FlightGame {
       mode: 'interactive',
       canvas: this.canvas,
       gravity: [0, -14.0, 0],
+      loop: {
+        enabled: true,
+        title: 'Skyward Courier',
+        subtitle: 'Hold Z to take off. Below half throttle you sink. Fly the islands.',
+      },
     });
   }
 
   async init(): Promise<void> {
-    await this.engine.init();
+    await this.engine.init({ gravity: [0, -14.0, 0] });
 
     const scene = this.engine.native.scene;
-    scene.background = new THREE.Color(0x38bdf8); // Vibrant azure sky
-    scene.fog = new THREE.FogExp2(0x38bdf8, 0.0035);
+    scene.background = new THREE.Color(0x38bdf8);
+    scene.fog = new THREE.Fog(0x7dd3fc, 180, 900);
+    this.engine.native.camera.far = 1200;
+    this.engine.native.camera.updateProjectionMatrix();
 
     // 1. Setup Sun & Ambient Lighting
     this.setupLighting();
@@ -97,14 +96,12 @@ export class FlightGame {
     // 3. Build Handcrafted Vintage Biplane
     this.buildBiplane();
 
-    // 4. Setup Delivery Missions & Wind Tunnels
-    this.setupDeliveryRings();
-
-    // 5. Setup Action Handlers
+    // 4. Setup Action Handlers
     this.setupActions();
 
     // 6. Setup Controls
     this.setupControls();
+    this.engine.loop.onReset(() => this.resetPlane());
 
     // Start engine sound
     sfx.startEngineDrone();
@@ -221,35 +218,21 @@ export class FlightGame {
     pontoonR.position.set(1.3, -0.9, -0.2);
     this.planeRoot.add(pontoonL, pontoonR);
 
-    // Spawn on Haven Island Runway (Facing North: -Z)
-    const startPos = [0, 1.4, 40];
+    // On the runway, yawed toward +X (open water) so takeoff is not a canyon wall.
+    const startPos = [0, 3.1, 40];
     this.planeRoot.position.set(startPos[0], startPos[1], startPos[2]);
+    this.planeRoot.quaternion.set(0, -0.7071, 0, 0.7071);
     scene.add(this.planeRoot);
 
-    // Rapier Flat Cuboid Collider (Eliminates tipping)
-    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
       .setTranslation(startPos[0], startPos[1], startPos[2])
-      .setLinearDamping(0.8)
-      .setAngularDamping(4.5)
-      .setCanSleep(false);
+      .setRotation({ x: 0, y: -0.7071, z: 0, w: 0.7071 });
     this.planeBody = this.engine.native.world.createRigidBody(bodyDesc);
 
     const colliderDesc = RAPIER.ColliderDesc.cuboid(1.6, 0.45, 2.2);
     colliderDesc.setFriction(0.15);
     colliderDesc.setRestitution(0.1);
     this.engine.native.world.createCollider(colliderDesc, this.planeBody);
-
-    // Register in Engine
-    this.engine.add(
-      body({
-        id: 'skyward_plane',
-        shape: 'box',
-        type: 'dynamic',
-        size: [3.2, 0.9, 4.4],
-        position: [startPos[0], startPos[1], startPos[2]],
-        tags: ['airplane', 'player'],
-      })
-    );
   }
 
   private buildArchipelago(): void {
@@ -261,43 +244,67 @@ export class FlightGame {
       roughness: 0.15,
       metalness: 0.8,
     });
-    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), waterMat);
+    const ocean = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), waterMat);
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.y = 0.0;
     scene.add(ocean);
 
-    // Water Surface Collider (So pontoons can land on water!)
-    this.addStaticBox(0, -0.5, 0, 800, 0.5, 800);
-
-    // 1. Haven Island (Takeoff Runway Island)
-    this.buildIsland(0, 0, 20, 28, 80, 2.5, 0x15803d);
-
-    // Wooden Runway Strip
-    const runwayMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
-    const runway = new THREE.Mesh(new THREE.BoxGeometry(10, 0.2, 70), runwayMat);
-    runway.position.set(0, 1.25, 25);
+    this.buildIsland(20, 0, 40, 55, 40, 2.2, 0x16a34a, true);
+    const runwayMat = new THREE.MeshStandardMaterial({ color: 0x78716c, roughness: 0.85 });
+    const runway = new THREE.Mesh(new THREE.BoxGeometry(70, 0.18, 7), runwayMat);
+    runway.position.set(18, 2.32, 40);
     scene.add(runway);
-    this.addStaticBox(0, 1.15, 25, 5, 0.1, 35);
 
-    // 2. Windmill Valley Island (Northeast: 120, 25, -90)
-    this.buildIsland(120, 25, -90, 70, 70, 20, 0x16a34a);
-    this.buildWindmill(120, 45, -90);
+    this.buildIsland(180, 2, -40, 50, 50, 16, 0x4d7c0f, false);
+    this.buildWindmill(180, 18, -40);
+    this.buildIsland(-160, 6, -120, 42, 42, 22, 0x365314, false);
+    this.buildLighthouse(-160, 28, -120);
+    this.buildIsland(140, 1, 220, 48, 48, 12, 0x15803d, false);
+    this.buildIsland(-90, 4, 180, 36, 36, 14, 0x3f6212, false);
+    this.buildIsland(260, 8, 80, 30, 30, 18, 0x166534, false);
+    this.buildIsland(-40, 10, -240, 44, 44, 20, 0x4d7c0f, false);
+    this.buildIsland(80, 3, -180, 26, 26, 11, 0x3f6212, false);
 
-    // 3. Sky Lighthouse Island (Northwest Spire: -130, 45, -160)
-    this.buildIsland(-130, 45, -160, 45, 45, 45, 0x334155);
-    this.buildLighthouse(-130, 90, -160);
+    const cloudMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 1, transparent: true, opacity: 0.88 });
+    for (const [x, y, z, s] of [
+      [40, 48, 10, 10],
+      [160, 55, 60, 14],
+      [-80, 50, -40, 11],
+      [240, 62, 20, 16],
+      [10, 52, 160, 12],
+      [-140, 58, 90, 13],
+      [100, 70, -200, 15],
+    ] as Array<[number, number, number, number]>) {
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 10, 8), cloudMat);
+      puff.scale.set(1.6, 0.55, 1.1);
+      puff.position.set(x, y, z);
+      scene.add(puff);
+    }
 
-    // 4. Canyon Archways (Between Islands: 0, 30, -80)
-    this.buildIsland(0, 20, -80, 40, 30, 25, 0x475569);
+    const sun = new THREE.Mesh(
+      new THREE.SphereGeometry(8, 16, 16),
+      new THREE.MeshBasicMaterial({ color: 0xfef08a })
+    );
+    sun.position.set(80, 70, -40);
+    scene.add(sun);
   }
 
-  private buildIsland(x: number, y: number, z: number, w: number, d: number, h: number, color: number): void {
+  private buildIsland(
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    d: number,
+    h: number,
+    color: number,
+    solid = false
+  ): void {
     const scene = this.engine.native.scene;
     const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.8 });
     const island = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.7, w, h, 16), mat);
     island.position.set(x, y + h / 2, z);
     scene.add(island);
-    this.addStaticBox(x, y + h / 2, z, w * 0.7, h / 2, d * 0.7);
+    if (solid) this.addStaticBox(x, y + h / 2, z, w * 0.7, h / 2, d * 0.7);
   }
 
   private buildWindmill(x: number, y: number, z: number): void {
@@ -334,43 +341,6 @@ export class FlightGame {
     this.engine.native.world.createCollider(colliderDesc, body);
   }
 
-  private setupDeliveryRings(): void {
-    const scene = this.engine.native.scene;
-
-    const ringDefs = [
-      { id: 'ring_takeoff', pos: new THREE.Vector3(0, 18, -10), type: 'mail' as const, label: 'Takeoff Mail Drop' },
-      { id: 'ring_thermal', pos: new THREE.Vector3(50, 40, -50), type: 'thermal' as const, label: 'Canyon Thermal Updraft' },
-      { id: 'ring_windmill', pos: new THREE.Vector3(120, 60, -90), type: 'mail' as const, label: 'Windmill Valley Delivery' },
-      { id: 'ring_lighthouse', pos: new THREE.Vector3(-130, 115, -160), type: 'lighthouse' as const, label: 'Sky Lighthouse Beacon' },
-    ];
-
-    ringDefs.forEach((def) => {
-      const ringGroup = new THREE.Group();
-      ringGroup.position.copy(def.pos);
-
-      const color = def.type === 'thermal' ? 0x38bdf8 : def.type === 'lighthouse' ? 0xf59e0b : 0x10b981;
-      const ringMat = new THREE.MeshStandardMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 0.6,
-        metalness: 0.8,
-        roughness: 0.2,
-      });
-
-      const ringMesh = new THREE.Mesh(new THREE.TorusGeometry(4.5, 0.4, 12, 24), ringMat);
-      ringGroup.add(ringMesh);
-
-      scene.add(ringGroup);
-      this.rings.push({
-        id: def.id,
-        pos: def.pos,
-        mesh: ringGroup,
-        collected: false,
-        type: def.type,
-      });
-    });
-  }
-
   private setupActions(): void {
     this.engine.actions.register({
       name: 'flight.throttle',
@@ -387,21 +357,28 @@ export class FlightGame {
   }
 
   private setupControls(): void {
-    window.addEventListener('keydown', (e) => {
+    const onDown = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
+      if (this.engine.loop.enabled && this.engine.loop.phase === 'ready') {
+        this.engine.loop.start();
+      }
       this.keys[e.code] = true;
       this.keys[e.key.toLowerCase()] = true;
-
-      // Quick throttle shortcuts
       if (e.code === 'KeyZ' || e.key.toLowerCase() === 'z') this.setThrottle(1.0);
       if (e.code === 'KeyX' || e.key.toLowerCase() === 'x') this.setThrottle(0.0);
       if (e.code === 'KeyC' || e.key.toLowerCase() === 'c') this.toggleCameraView();
       if (e.code === 'KeyR' || e.key.toLowerCase() === 'r') this.resetPlane();
-    });
-
-    window.addEventListener('keyup', (e) => {
+    };
+    const onUp = (e: KeyboardEvent) => {
       this.keys[e.code] = false;
       this.keys[e.key.toLowerCase()] = false;
-    });
+    };
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+    this.unbind.push(
+      () => window.removeEventListener('keydown', onDown),
+      () => window.removeEventListener('keyup', onUp)
+    );
   }
 
   setThrottle(val: number): void {
@@ -413,19 +390,15 @@ export class FlightGame {
   }
 
   resetPlane(): void {
-    this.planeBody.setTranslation({ x: 0, y: 1.4, z: 40 }, true);
-    this.planeBody.setRotation({ x: 0, y: 0, z: 0, w: 1 }, true);
-    this.planeBody.setLinvel({ x: 0, y: 0, z: 0 }, true);
-    this.planeBody.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    this.yaw = -Math.PI / 2;
+    this.pitch = 0;
+    this.roll = 0;
     this.throttle = 0.0;
     this.airspeed = 0.0;
     this.isAirborne = false;
-    this.parcelsDelivered = 0;
-    this.currentObjective = 'Increase throttle (Shift or Z) to take off from Haven Island';
-    this.rings.forEach((r) => {
-      r.collected = false;
-      r.mesh.visible = true;
-    });
+    this.planeBody.setNextKinematicTranslation({ x: 0, y: 3.1, z: 40 });
+    this.planeBody.setNextKinematicRotation({ x: 0, y: -0.7071, z: 0, w: 0.7071 });
+    this.currentObjective = 'Hold Z until ~70% — then you leave the grass';
   }
 
   getTelemetry(): FlightTelemetry {
@@ -444,156 +417,132 @@ export class FlightGame {
       altitude: alt,
       throttle: this.throttle,
       flightState: state,
-      parcelsDelivered: this.parcelsDelivered,
-      totalParcels: this.totalParcels,
+      parcelsDelivered: 0,
+      totalParcels: 0,
       viewMode: this.viewMode,
       activeObjective: this.currentObjective,
     };
   }
 
   update(dt: number): void {
-    // 1. Process Progressive Throttle (Shift / Ctrl)
-    if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) {
-      this.throttle = Math.min(1.0, this.throttle + dt * 0.5);
-    }
-    if (this.keys['ControlLeft'] || this.keys['ControlRight']) {
-      this.throttle = Math.max(0.0, this.throttle - dt * 0.5);
+    if (!this.engine.loop.playing) {
+      this.syncPlaneVisual();
+      this.updateCamera();
+      return;
     }
 
-    // 2. Compute Orientation & Vectors
+    if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) this.throttle = Math.min(1, this.throttle + dt * 0.85);
+    if (this.keys['ControlLeft'] || this.keys['ControlRight']) this.throttle = Math.max(0, this.throttle - dt * 0.95);
+
+    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) this.yaw += 1.5 * dt;
+    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) this.yaw -= 1.5 * dt;
+    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) this.pitch += 1.15 * dt;
+    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) this.pitch -= 1.15 * dt;
+    if (this.keys['KeyQ'] || this.keys['q']) this.roll += 1.8 * dt;
+    if (this.keys['KeyE'] || this.keys['e']) this.roll -= 1.8 * dt;
+    this.pitch = Math.max(-0.55, Math.min(0.5, this.pitch));
+    this.roll = Math.max(-0.7, Math.min(0.7, this.roll));
+    if (!this.keys['KeyQ'] && !this.keys['q'] && !this.keys['KeyE'] && !this.keys['e']) {
+      this.roll *= Math.max(0, 1 - dt * 3);
+    }
+
+    const p = this.planeBody.translation();
+    const floor = this.groundHeight(p.x, p.z);
+    const grounded = p.y <= floor + 0.08;
+
+    const power = this.throttle * this.throttle;
+    this.airspeed = grounded && this.throttle < 0.62 ? this.throttle * 10 : 4 + power * 42;
+    if (grounded && (this.keys['ControlLeft'] || this.keys['ControlRight'])) this.airspeed *= 0.3;
+
+    const vx = -Math.sin(this.yaw) * this.airspeed;
+    const vz = -Math.cos(this.yaw) * this.airspeed;
+    let vy = 0;
+    if (!grounded || this.throttle >= 0.62) {
+      vy = (this.throttle - 0.7) * 16 - this.pitch * 18;
+      if (this.throttle < 0.5) vy -= (0.5 - this.throttle) * 28;
+    }
+
+    let nextY = p.y + vy * dt;
+    if (nextY <= floor) {
+      nextY = floor;
+      this.pitch *= 0.4;
+      this.roll *= 0.3;
+    }
+
+    const next = {
+      x: p.x + vx * dt,
+      y: Math.min(220, nextY),
+      z: p.z + vz * dt,
+    };
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, this.roll, 'YXZ'));
+    this.planeBody.setNextKinematicTranslation(next);
+    this.planeBody.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
+
+    this.isAirborne = next.y > 3.4;
+    const speedKmh = Math.round(this.airspeed * 3.6);
+    this.planeRoot.position.set(next.x, next.y, next.z);
+    this.planeRoot.quaternion.copy(q);
+
+    const propSpeed = 2 + this.throttle * 35;
+    this.propMeshLeft.rotation.z += propSpeed * dt;
+    this.propMeshRight.rotation.z -= propSpeed * dt;
+    this.blurDiscLeft.visible = this.throttle > 0.45;
+    this.blurDiscRight.visible = this.throttle > 0.45;
+    this.rudderMesh.rotation.y = (this.keys['KeyA'] ? 0.3 : 0) + (this.keys['KeyD'] ? -0.3 : 0);
+    this.leftAileron.rotation.x = this.roll * 0.6;
+    this.rightAileron.rotation.x = -this.roll * 0.6;
+    this.elevatorMesh.rotation.x = this.pitch;
+
+    sfx.updateEngineDrone(this.throttle, speedKmh);
+    this.currentObjective = this.isAirborne
+      ? 'Shift faster · Ctrl slower · Q/E roll · cut throttle to land'
+      : 'Taxi with Shift. Hold past 60% to take off';
+
+    // 11. Camera System
+    this.updateCamera();
+  }
+
+  private groundHeight(x: number, z: number): number {
+    const dx = x - 20;
+    const dz = z - 40;
+    if (dx * dx + dz * dz < 48 * 48) return 3.1;
+    return 1.2;
+  }
+
+  private syncPlaneVisual(): void {
+    const p = this.planeBody.translation();
+    const rot = this.planeBody.rotation();
+    this.planeRoot.position.set(p.x, p.y, p.z);
+    this.planeRoot.quaternion.set(rot.x, rot.y, rot.z, rot.w);
+  }
+
+  private updateCamera(): void {
+    const camera = this.engine.native.camera;
+    const p = this.planeBody.translation();
     const rot = this.planeBody.rotation();
     const planeQuat = new THREE.Quaternion(rot.x, rot.y, rot.z, rot.w);
     const forwardVec = new THREE.Vector3(0, 0, -1).applyQuaternion(planeQuat);
     const upVec = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
-    const rightVec = new THREE.Vector3(1, 0, 0).applyQuaternion(planeQuat);
-
-    // Current linear velocity
-    const linvel = this.planeBody.linvel();
-    const velVec = new THREE.Vector3(linvel.x, linvel.y, linvel.z);
-    this.airspeed = velVec.dot(forwardVec); // Forward speed projection
-    const speedKmh = Math.max(0, this.airspeed * 3.6);
-    const currentAlt = this.planeBody.translation().y;
-    this.isAirborne = currentAlt > 3.5;
-
-    // 3. Engine Thrust ($1,800\text{ N}$)
-    const maxThrust = 1800.0;
-    const thrustForce = forwardVec.clone().multiplyScalar(this.throttle * maxThrust);
-
-    // 4. Aerodynamic Lift: Scales with $v^2$ and angle of attack
-    let liftMag = 0;
-    if (this.airspeed > 3.0) {
-      liftMag = Math.min(18.0, 0.45 * this.airspeed * this.airspeed);
-    }
-    const liftForce = upVec.clone().multiplyScalar(liftMag);
-
-    // 5. Aerodynamic Drag
-    const dragForce = velVec.clone().multiplyScalar(-0.06 * this.airspeed);
-
-    // Apply combined forces
-    const totalForce = thrustForce.add(liftForce).add(dragForce);
-    this.planeBody.applyImpulse({ x: totalForce.x * dt, y: totalForce.y * dt, z: totalForce.z * dt }, true);
-
-    // 6. Control Torques (Pitch, Yaw, Roll)
-    // Authority scales with forward airspeed so control feels realistic
-    const speedAuthority = Math.min(1.0, this.airspeed / 16.0);
-
-    let pitchTorque = 0;
-    let yawTorque = 0;
-    let rollTorque = 0;
-
-    // W / S: Pitch Down / Up
-    if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) pitchTorque -= 24.0 * speedAuthority;
-    if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) pitchTorque += 24.0 * speedAuthority;
-
-    // A / D: Yaw Left / Right
-    if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) yawTorque += 18.0 * speedAuthority;
-    if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) yawTorque -= 18.0 * speedAuthority;
-
-    // Q / E: Roll Left / Right
-    if (this.keys['KeyQ'] || this.keys['q']) rollTorque += 28.0 * speedAuthority;
-    if (this.keys['KeyE'] || this.keys['e']) rollTorque -= 28.0 * speedAuthority;
-
-    // Aerodynamic self-leveling stability torque
-    if (this.isAirborne && pitchTorque === 0 && rollTorque === 0) {
-      const rollAngle = planeQuat.z;
-      rollTorque += -rollAngle * 12.0;
-    }
-
-    const appliedTorque = rightVec
-      .clone()
-      .multiplyScalar(pitchTorque)
-      .add(upVec.clone().multiplyScalar(yawTorque))
-      .add(forwardVec.clone().multiplyScalar(rollTorque));
-
-    this.planeBody.applyTorqueImpulse(
-      { x: appliedTorque.x * dt, y: appliedTorque.y * dt, z: appliedTorque.z * dt },
-      true
-    );
-
-    // 7. Synchronize Visual Mesh with Physics
-    const p = this.planeBody.translation();
-    this.planeRoot.position.set(p.x, p.y, p.z);
-    this.planeRoot.quaternion.set(rot.x, rot.y, rot.z, rot.w);
-
-    // 8. Animate Propellers & Control Surfaces
-    const propSpeed = 2.0 + this.throttle * 35.0;
-    this.propMeshLeft.rotation.z += propSpeed * dt;
-    this.propMeshRight.rotation.z -= propSpeed * dt;
-    this.blurDiscLeft.visible = this.throttle > 0.3;
-    this.blurDiscRight.visible = this.throttle > 0.3;
-
-    // Ailerons & Rudder deflection
-    this.leftAileron.rotation.x = (rollTorque !== 0 ? 0.4 : 0);
-    this.rightAileron.rotation.x = (rollTorque !== 0 ? -0.4 : 0);
-    this.rudderMesh.rotation.y = (yawTorque !== 0 ? Math.sign(yawTorque) * 0.35 : 0);
-    this.elevatorMesh.rotation.x = (pitchTorque !== 0 ? Math.sign(pitchTorque) * 0.3 : 0);
-
-    // 9. Audio Engine Modulation
-    sfx.updateEngineDrone(this.throttle, speedKmh);
-
-    // 10. Ring Collection & Missions
     const planePos = new THREE.Vector3(p.x, p.y, p.z);
-    this.rings.forEach((ring) => {
-      if (!ring.collected && planePos.distanceTo(ring.pos) < 6.5) {
-        ring.collected = true;
-        ring.mesh.visible = false;
-        sfx.playRingChime();
-
-        if (ring.type === 'thermal') {
-          // Instant Thermal Updraft boost!
-          this.planeBody.applyImpulse({ x: forwardVec.x * 200, y: 350, z: forwardVec.z * 200 }, true);
-          this.currentObjective = 'Thermal boost acquired! Fly to Windmill Valley';
-        } else if (ring.type === 'mail') {
-          this.parcelsDelivered++;
-          this.currentObjective = `Parcel Delivered! (${this.parcelsDelivered}/${this.totalParcels}) Next: Sky Lighthouse`;
-        } else if (ring.type === 'lighthouse') {
-          this.parcelsDelivered++;
-          this.currentObjective = '🏆 Lighthouse Beacon Activated! Land gently on the sea to finish.';
-        }
-      }
-    });
-
-    // 11. Camera System
-    const camera = this.engine.native.camera;
     if (this.viewMode === 'cockpit') {
       const eyePos = forwardVec.clone().multiplyScalar(0.4).add(upVec.clone().multiplyScalar(0.55));
       camera.position.copy(planePos).add(eyePos);
       const lookTarget = planePos.clone().add(forwardVec.clone().multiplyScalar(100));
       camera.lookAt(lookTarget);
     } else {
-      // Smooth Dynamic Chase Camera
-      const chaseOffset = forwardVec
+      const chase = planePos
         .clone()
-        .multiplyScalar(-10.5)
-        .add(upVec.clone().multiplyScalar(3.6));
-      const targetCamPos = planePos.clone().add(chaseOffset);
-      camera.position.lerp(targetCamPos, 0.12);
-      camera.lookAt(planePos.clone().add(forwardVec.clone().multiplyScalar(4)));
+        .add(forwardVec.clone().multiplyScalar(-9))
+        .add(new THREE.Vector3(0, 7.5, 0));
+      camera.position.lerp(chase, 0.16);
+      camera.lookAt(planePos);
     }
   }
 
   dispose(): void {
     sfx.stopEngineDrone();
+    for (const fn of this.unbind) fn();
+    this.unbind.length = 0;
     this.engine.dispose();
   }
 }

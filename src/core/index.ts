@@ -7,6 +7,7 @@ export * from './hashing.js';
 export * from './ownership.js';
 export * from './diagnostics.js';
 export * from './observations.js';
+export * from './loop.js';
 
 export interface EntityRecord {
   id: string;
