@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Renderoni — Batteries-Included, Agent-Native 3D Playground</title>
+    <script type="module" crossorigin src="./assets/index-Bb8TMkOF.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BPzf_0sg.css">
+  </head>
+  <body>
+    <!-- 3D WebGL Canvas -->
+    <canvas id="render-canvas" tabindex="0"></canvas>
+
+    <!-- Top Navigation / Archetype Selector -->
+    <nav class="top-nav">
+      <div class="brand-badge">🍝 Renderoni</div>
+      <button class="tab-btn active" data-mode="quickstart">🪙 Quickstart Demo</button>
+      <button class="tab-btn" data-mode="flight">✈️ Flight Simulator</button>
+      <button class="tab-btn" data-mode="voxel">🧱 Vast Voxel Sandbox</button>
+      <button class="tab-btn" data-mode="psx">🔦 PSX 3rd-Person</button>
+    </nav>
+
+    <!-- Contextual Game HUD -->
+    <div id="game-hud"></div>
+
+    <!-- Live Agent Inspector HUD (Bottom Right) -->
+    <div class="inspector-panel">
+      <div class="inspector-header">
+        <div class="title">
+          <span>🤖</span> Agent Inspector
+        </div>
+        <div class="meta">
+          <span id="inspector-tick" class="badge">Tick: 0</span>
+          <span id="inspector-hash" class="badge">Hash: ...</span>
+          <span id="inspector-bytes" class="badge success">0B / 500B</span>
+          <button id="toggle-inspector" class="btn-icon" title="Toggle Inspector">▼</button>
+        </div>
+      </div>
+      <div id="inspector-body">
+        <div id="inspector-content" class="inspector-terminal"># Initializing Renderoni Engine...</div>
+        <div class="quick-actions-row" id="quick-actions">
+          <button class="chip-btn" data-action="quickstart.respawnCoin">🪙 Respawn Coin</button>
+        </div>
+        <div class="action-bar">
+          <input id="action-input" type="text" placeholder="Dispatch action (e.g. hero.move or JSON)" />
+          <button id="btn-dispatch-action">Act</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Entry Script -->
+  </body>
+</html>

@@ -5,9 +5,14 @@
 > *Deterministic WebAssembly physics, declarative presets, and built-in Model Context Protocol (MCP) for AI pair programming.*
 
 [![CI](https://github.com/elemarin/renderoni/actions/workflows/ci.yml/badge.svg)](https://github.com/elemarin/renderoni/actions)
+[![Deploy Pages](https://github.com/elemarin/renderoni/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/elemarin/renderoni/actions/workflows/deploy-pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
+
+<p align="center">
+  <a href="https://elemarin.github.io/renderoni/"><strong>🎮 Play Live Web Demos &rarr;</strong></a>
+</p>
 
 ---
 
@@ -25,15 +30,11 @@ At the same time, **AI coding agents** (Claude, Gemini, Cursor) struggle with 3D
 
 ## 🎮 Live Demos
 
-Run the local Vite playground with `npm run dev`:
-
-```bash
-npm run dev
-# ➜ Open http://localhost:5173/
-```
+Try the interactive playground live in your browser: **[elemarin.github.io/renderoni](https://elemarin.github.io/renderoni/)** (or run `npm run dev` locally).
 
 | Demo | What It Does | Controls |
 | :--- | :--- | :--- |
+| **🪙 Quickstart Demo** | Live interactive browser implementation of the README quickstart: hero character, spinning gold coin sensor, audio chime, and particle burst VFX. | `WASD` / Arrows (Move Hero), `Space` (Jump), `🪙 Respawn Coin` Button |
 | **✈️ Flight Simulator** | Aerodynamic flight physics with lift, drag, runway takeoff & landing, retractable landing gear, and ring course. | `W`/`S` (Pitch), `A`/`D` (Yaw), `Q`/`E` (Roll), `Shift`/`Ctrl` (Throttle), `Z`/`X` (Max/Cut), `G` (Gear), `C` (Cockpit/Chase View), `R` (Reset) |
 | **🧱 Vast Voxel Sandbox** | Multi-biome procedural world (~2,000+ blocks) with ocean water, sandy beaches, rolling hills, snowy peaks, and trees. | `WASD` (Walk & Auto-step), `Shift` (Sprint), `Space` (Jump), `1`-`6` (Hotbar), `Left/Right Click` (Break/Place) |
 | **🔦 PSX 3rd-Person Horror** | Retro PSX survival horror with 3rd-person chase camera, gothic manor corridor, flashlight, key puzzle, and animated iron gate. | `WASD` (Walk Detective), Mouse (Orbit Camera), `E` (Pickup Key & Unlock Gate) |
@@ -107,8 +108,9 @@ game.events.on('sensor.enter', ({ sensor, target }) => {
   }
 });
 
-// 6. Step headlessly (CI) or start render loop (Browser)
-game.step(60); // 60 deterministic fixed ticks in ~1ms
+// 6. Run headlessly (CI/Tests) or start interactive render loop (Browser)
+game.step(60);   // Step 60 fixed ticks in ~1ms (Headless CI)
+// game.start(); // Start 60fps presentation loop (Browser)
 ```
 
 ---
