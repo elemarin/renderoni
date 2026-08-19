@@ -162,6 +162,7 @@ class PlaygroundApp {
 
   // Inspector Elements
   private inspectorDockPill!: HTMLElement;
+  private dockPillFps!: HTMLElement;
   private dockPillTick!: HTMLElement;
   private dockPillHash!: HTMLElement;
   private inspectorDrawer!: HTMLElement;
@@ -215,6 +216,7 @@ class PlaygroundApp {
 
     // Inspector
     this.inspectorDockPill = document.getElementById('inspector-dock-pill')!;
+    this.dockPillFps = document.getElementById('dock-pill-fps')!;
     this.dockPillTick = document.getElementById('dock-pill-tick')!;
     this.dockPillHash = document.getElementById('dock-pill-hash')!;
     this.inspectorDrawer = document.getElementById('inspector-drawer')!;
@@ -762,65 +764,73 @@ class PlaygroundApp {
 
   private mountPsxHUD(): void {
     this.hudContainer.innerHTML = `
-      <div class="hud-card">
-        <div class="hud-header-bar">
-          <div class="hud-title">ECHOES</div>
-          <button class="btn-return-home">HOME</button>
+      <div class="game-hud-layout">
+        <div class="hud-top-bar">
+          <div class="hud-objective-pill">
+            <span class="hud-obj-icon">📜</span>
+            <span id="psx-quest" class="hud-obj-text">Walk the hall. First room on left: Read Journal</span>
+          </div>
+          <div class="hud-inventory-bar">
+            <div class="inv-slot" id="chip-flash"><span class="inv-icon">🔦</span> <span id="psx-flash" class="inv-badge active">ON</span></div>
+            <div class="inv-slot" id="chip-key"><span class="inv-icon">🗝️</span> <span id="psx-key" class="inv-badge">—</span></div>
+            <div class="inv-slot" id="chip-crest"><span class="inv-icon">🛡️</span> <span id="psx-crest" class="inv-badge">—</span></div>
+            <div class="inv-slot" id="chip-gate"><span class="inv-icon">🚪</span> <span id="psx-gate" class="inv-badge locked">SEALED</span></div>
+            <button class="btn-pause-chip" id="btn-pause-psx" title="Pause Menu (ESC)">⚙️ ESC</button>
+          </div>
         </div>
-        <div id="psx-quest" class="quest-status">Left door: journal</div>
-        <div id="psx-interact" class="interact-line">WASD look · F lamp · E use</div>
-        <div class="telemetry-grid compact">
-          <div class="metric"><span class="label">Lamp</span> <span id="psx-flash" class="val tag tag-green">ON</span></div>
-          <div class="metric"><span class="label">Key</span> <span id="psx-key" class="val tag tag-red">—</span></div>
-          <div class="metric"><span class="label">Crest</span> <span id="psx-crest" class="val tag tag-red">—</span></div>
-          <div class="metric"><span class="label">Gate</span> <span id="psx-gate" class="val tag tag-orange">LOCK</span></div>
+        <div class="hud-reticle-dot"></div>
+        <div id="psx-controls-banner" class="hud-controls-banner">
+          <span><kbd>WASD</kbd> Walk</span>
+          <span><kbd>Mouse</kbd> Look</span>
+          <span><kbd>F</kbd> Flashlight</span>
+          <span><kbd>E</kbd> Interact</span>
+          <span><kbd>ESC</kbd> Menu</span>
         </div>
       </div>
     `;
 
-    document.querySelector('.btn-return-home')?.addEventListener('click', () => {
-      sfx.playMenuSelect();
-      this.switchGame('home');
+    document.getElementById('btn-pause-psx')?.addEventListener('click', () => {
+      this.setPaused(true);
     });
-
   }
 
   private mountFlightHUD(): void {
     this.hudContainer.innerHTML = `
-      <div class="hud-card">
-        <div class="hud-header-bar">
-          <div class="hud-title">SKYWARD</div>
-          <button class="btn-return-home">HOME</button>
+      <div class="game-hud-layout">
+        <div class="hud-top-bar">
+          <div class="hud-objective-pill">
+            <span class="hud-obj-icon">✈️</span>
+            <span id="flight-quest" class="hud-obj-text">Press [I] to Start Engine, then hold [Shift] for Takeoff power</span>
+          </div>
+          <div class="hud-inventory-bar">
+            <div class="flight-inst"><span class="inst-lbl">SPD</span> <span id="flight-speed" class="inst-val">0 km/h</span></div>
+            <div class="flight-inst"><span class="inst-lbl">ALT</span> <span id="flight-alt" class="inst-val">0 m</span></div>
+            <div class="flight-inst"><span class="inst-lbl">VS</span> <span id="flight-vs" class="inst-val">0.0 m/s</span></div>
+            <div class="flight-inst"><span class="inst-lbl">THR</span> <span id="flight-throttle-val" class="inst-val">0%</span></div>
+            <div class="flight-inst"><span class="inst-lbl">PHASE</span> <span id="flight-state" class="inst-val tag tag-green">PARKED</span></div>
+            <div class="flight-inst"><span class="inst-lbl">RINGS</span> <span id="flight-rings" class="inst-val tag tag-blue">0 / 6</span></div>
+            <button class="btn-pause-chip" id="btn-pause-flight" title="Pause Menu (ESC)">⚙️ ESC</button>
+          </div>
         </div>
-        <div id="flight-quest" class="quest-status">I start · Shift throttle · W/S pitch</div>
-        <div class="telemetry-grid compact">
-          <div class="metric"><span class="label">SPD</span> <span id="flight-speed" class="val">0</span></div>
-          <div class="metric"><span class="label">ALT</span> <span id="flight-alt" class="val">0</span></div>
-          <div class="metric"><span class="label">VS</span> <span id="flight-vs" class="val">0</span></div>
-          <div class="metric"><span class="label">THR</span> <span id="flight-throttle-val" class="val">0%</span></div>
-          <div class="metric"><span class="label">PHASE</span> <span id="flight-state" class="val tag tag-green">PARK</span></div>
-          <div class="metric"><span class="label">RINGS</span> <span id="flight-rings" class="val">0/6</span></div>
+        <div class="hud-reticle-dot"></div>
+        <div id="flight-controls-banner" class="hud-controls-banner">
+          <span><kbd>I</kbd> Start Engine</span>
+          <span><kbd>Shift/Ctrl</kbd> Throttle</span>
+          <span><kbd>W/S</kbd> Pitch</span>
+          <span><kbd>A/D</kbd> Bank/Steer</span>
+          <span><kbd>B</kbd> Brakes</span>
+          <span><kbd>C</kbd> View</span>
+          <span><kbd>ESC</kbd> Menu</span>
         </div>
-        <input id="flight-throttle" type="range" min="0" max="100" value="0" />
+        <div class="flight-bottom-slider-bar">
+          <label for="flight-throttle">THR:</label>
+          <input id="flight-throttle" type="range" min="0" max="100" value="0" class="flight-slider" />
+        </div>
       </div>
     `;
 
-    document.querySelector('.btn-return-home')?.addEventListener('click', () => {
-      sfx.playMenuSelect();
-      this.switchGame('home');
-    });
-
-    document.getElementById('btn-start-engine')?.addEventListener('click', (e) => {
-      (this.currentGame as FlightGame)?.startEngine();
-      (e.currentTarget as HTMLElement)?.blur();
-    });
-
-    const brakesBtn = document.getElementById('btn-hold-brakes');
-    brakesBtn?.addEventListener('mousedown', () => {
-      if (this.currentGame) this.currentGame.engine.act({ name: 'flight.brakes', payload: true });
-    });
-    brakesBtn?.addEventListener('mouseup', () => {
-      if (this.currentGame) this.currentGame.engine.act({ name: 'flight.brakes', payload: false });
+    document.getElementById('btn-pause-flight')?.addEventListener('click', () => {
+      this.setPaused(true);
     });
 
     const throttleInput = document.getElementById('flight-throttle') as HTMLInputElement;
@@ -831,75 +841,37 @@ class PlaygroundApp {
       if (label) label.textContent = `${Math.round(val * 100)}%`;
       (document.activeElement as HTMLElement)?.blur();
     });
-
-    document.getElementById('btn-toggle-view')?.addEventListener('click', (e) => {
-      (this.currentGame as FlightGame)?.toggleCameraView();
-      (e.currentTarget as HTMLElement)?.blur();
-    });
-
-    document.getElementById('btn-throttle-max')?.addEventListener('click', (e) => {
-      (this.currentGame as FlightGame)?.setThrottle(1.0);
-      (e.currentTarget as HTMLElement)?.blur();
-    });
-
-    document.getElementById('btn-reset-plane')?.addEventListener('click', (e) => {
-      (this.currentGame as FlightGame)?.resetPlane();
-      (e.currentTarget as HTMLElement)?.blur();
-    });
   }
 
   private mountQuickstartHUD(): void {
     this.hudContainer.innerHTML = `
-      <div class="hud-card">
-        <div class="hud-header-bar">
-          <div class="hud-title">🪙 Golden Quickstart: Physics Arena</div>
-          <button class="btn-return-home" title="Return to Dashboard (Esc)">🏠 Home</button>
+      <div class="game-hud-layout">
+        <div class="hud-top-bar">
+          <div class="hud-objective-pill">
+            <span class="hud-obj-icon">🪙</span>
+            <span id="qs-quest" class="hud-obj-text">Physics sandbox: push crates, bounce on trampolines, collect coins!</span>
+          </div>
+          <div class="hud-inventory-bar">
+            <div class="qs-stat"><span class="stat-lbl">COINS</span> <span id="qs-coins" class="stat-val tag-green">0 / 8</span></div>
+            <div class="qs-stat"><span class="stat-lbl">BODIES</span> <span id="qs-bodies" class="stat-val">0</span></div>
+            <button class="btn-pause-chip" id="btn-pause-qs" title="Pause Menu (ESC)">⚙️ ESC</button>
+          </div>
         </div>
-        <div class="instructions-text">
-          <strong>WASD / Arrow Keys</strong>: Move Hero Character &bull; <strong>Space</strong>: Jump &bull; <strong>Shift</strong>: Sprint<br/>
-          Push stacks of dynamic wooden crates, bounce on trampolines, and collect all 8 golden coins!
-        </div>
-        <div class="quest-box">
-          <div class="label">Physics Action Status:</div>
-          <div id="qs-quest" class="quest-status">Explore and push physics boxes!</div>
-        </div>
-        <div class="telemetry-grid">
-          <div class="metric"><span class="label">Hero Position:</span> <span id="qs-pos" class="val">0.0, 1.2, 10.0</span></div>
-          <div class="metric"><span class="label">Coins Collected:</span> <span id="qs-coins" class="val tag tag-green">🪙 0 / 8</span></div>
-          <div class="metric"><span class="label">Dynamic Bodies:</span> <span id="qs-bodies" class="val">14 active</span></div>
-        </div>
-        <div class="controls-row">
-          <button id="btn-qs-blast" class="btn btn-primary" style="background:#dc2626;">💥 Radial Blast (E)</button>
-          <button id="btn-qs-boxes" class="btn btn-secondary">📦 Spawn Crates (B)</button>
-          <button id="btn-qs-spheres" class="btn btn-secondary">🎲 Spawn Balls (N)</button>
-          <button id="btn-qs-respawn" class="btn btn-secondary">🪙 Respawn Coins</button>
+        <div class="hud-reticle-dot"></div>
+        <div id="qs-controls-banner" class="hud-controls-banner">
+          <span><kbd>WASD</kbd> Move</span>
+          <span><kbd>Space</kbd> Jump</span>
+          <span><kbd>Shift</kbd> Sprint</span>
+          <span><kbd>E</kbd> Blast</span>
+          <span><kbd>B</kbd> Boxes</span>
+          <span><kbd>N</kbd> Spheres</span>
+          <span><kbd>ESC</kbd> Pause</span>
         </div>
       </div>
     `;
 
-    document.querySelector('.btn-return-home')?.addEventListener('click', () => {
-      sfx.playMenuSelect();
-      this.switchGame('home');
-    });
-
-    document.getElementById('btn-qs-blast')?.addEventListener('click', (e) => {
-      (this.currentGame as QuickstartGame)?.explode();
-      (e.currentTarget as HTMLElement)?.blur();
-    });
-
-    document.getElementById('btn-qs-boxes')?.addEventListener('click', (e) => {
-      (this.currentGame as QuickstartGame)?.spawnBoxes(10);
-      (e.currentTarget as HTMLElement)?.blur();
-    });
-
-    document.getElementById('btn-qs-spheres')?.addEventListener('click', (e) => {
-      (this.currentGame as QuickstartGame)?.spawnSpheres(8);
-      (e.currentTarget as HTMLElement)?.blur();
-    });
-
-    document.getElementById('btn-qs-respawn')?.addEventListener('click', (e) => {
-      (this.currentGame as QuickstartGame)?.respawnCoins();
-      (e.currentTarget as HTMLElement)?.blur();
+    document.getElementById('btn-pause-qs')?.addEventListener('click', () => {
+      this.setPaused(true);
     });
   }
 
@@ -955,6 +927,7 @@ class PlaygroundApp {
         this.frameCount = 0;
         this.lastFpsTime = now;
         if (this.inspectorFps) this.inspectorFps.textContent = `${this.currentFps} FPS`;
+        if (this.dockPillFps) this.dockPillFps.textContent = `${this.currentFps} FPS`;
       }
 
       // 2. Update Dock Pill Stats
@@ -982,34 +955,37 @@ class PlaygroundApp {
           const t = (this.currentGame as PsxGame).getTelemetry();
           const questEl = document.getElementById('psx-quest');
           const flashEl = document.getElementById('psx-flash');
+          const chipFlash = document.getElementById('chip-flash');
           const keyEl = document.getElementById('psx-key');
+          const chipKey = document.getElementById('chip-key');
           const crestEl = document.getElementById('psx-crest');
+          const chipCrest = document.getElementById('chip-crest');
           const gateEl = document.getElementById('psx-gate');
+          const chipGate = document.getElementById('chip-gate');
 
           if (questEl) questEl.textContent = t.questStatus;
           if (flashEl) {
             flashEl.textContent = t.flashlightOn ? 'ON' : 'OFF';
-            flashEl.className = `val tag ${t.flashlightOn ? 'tag-green' : 'tag-red'}`;
+            chipFlash?.classList.toggle('active', t.flashlightOn);
           }
           if (keyEl) {
-            keyEl.textContent = t.hasKey ? 'OK' : '—';
-            keyEl.className = `val tag ${t.hasKey ? 'tag-green' : 'tag-red'}`;
+            keyEl.textContent = t.hasKey ? 'KEY' : '—';
+            chipKey?.classList.toggle('active', t.hasKey);
           }
           if (crestEl) {
-            crestEl.textContent = t.hasCrest ? 'OK' : '—';
-            crestEl.className = `val tag ${t.hasCrest ? 'tag-green' : 'tag-red'}`;
+            crestEl.textContent = t.hasCrest ? 'CREST' : '—';
+            chipCrest?.classList.toggle('active', t.hasCrest);
           }
           if (gateEl) {
-            gateEl.textContent = t.gateUnlocked ? 'OPEN' : 'LOCK';
-            gateEl.className = `val tag ${t.gateUnlocked ? 'tag-green' : 'tag-orange'}`;
+            gateEl.textContent = t.gateUnlocked ? 'OPEN' : 'LOCKED';
+            chipGate?.classList.toggle('active', t.gateUnlocked);
+            chipGate?.classList.toggle('locked', !t.gateUnlocked);
           }
 
           const prompt = (this.currentGame as PsxGame).getHoverPrompt();
-          const interactEl = document.getElementById('psx-interact');
-          if (interactEl) interactEl.textContent = prompt && !t.inspectingText ? prompt : 'WASD look · F lamp · E use';
           if (this.interactionPrompt && this.promptText) {
             if (prompt && !t.inspectingText) {
-              this.interactionPrompt.style.display = 'block';
+              this.interactionPrompt.style.display = 'flex';
               this.promptText.textContent = prompt;
             } else {
               this.interactionPrompt.style.display = 'none';

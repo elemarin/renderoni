@@ -43,6 +43,11 @@ export function buildQuestItems(engine: RenderoniEngine): QuestItemsResult {
     })
   );
 
+  // Desk Lamp Glow
+  const deskLamp = new THREE.PointLight(0xf59e0b, 2.2, 8, 1.5);
+  deskLamp.position.set(-8, 1.5, 2);
+  engine.native.scene.add(deskLamp);
+
   engine.add(
     mesh({
       id: 'study_bookshelf',
@@ -119,6 +124,11 @@ export function buildQuestItems(engine: RenderoniEngine): QuestItemsResult {
       state: { acquired: false },
     })
   );
+
+  // Crest Pedestal Glow
+  const crestGlow = new THREE.PointLight(0xf59e0b, 2.4, 8, 1.5);
+  crestGlow.position.set(8, 1.8, -22);
+  engine.native.scene.add(crestGlow);
 
   // 4. Escape Iron Gate (Z = -29)
   engine.add(mesh({ geometry: 'box', size: [0.4, 4.4, 0.4], position: [-1.8, 2.2, -29], color: 0x1e293b, physics: 'static', tags: ['gate'] }));

@@ -1685,3 +1685,201 @@ body:not(.in-game) .inspector-drawer { display: none !important; }
   height: 100%;
 }
 .shelf-art .card-title { display: none; }
+
+/* ==========================================================================
+   Modern Retro Game HUD & Reticle
+   ========================================================================== */
+#game-hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.game-hud-layout {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud-top-bar {
+  position: absolute;
+  top: 16px;
+  left: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  pointer-events: auto;
+}
+
+.hud-objective-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(12, 12, 12, 0.92);
+  border: 2px solid #fafaf9;
+  box-shadow: var(--pixel-shadow);
+  padding: 8px 16px;
+  color: #facc15;
+  font-size: 1.15rem;
+  letter-spacing: 0.05em;
+  max-width: 600px;
+}
+.hud-obj-icon { font-size: 1.2rem; }
+.hud-obj-text {
+  color: #fafaf9;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.hud-inventory-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inv-slot, .psx-inv-slot, .flight-inst, .qs-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(12, 12, 12, 0.92);
+  border: 2px solid #44403c;
+  box-shadow: 2px 2px 0 #000;
+  padding: 6px 12px;
+  font-size: 1rem;
+  color: #a8a29e;
+}
+.inv-slot.active, .psx-inv-slot.active {
+  border-color: #facc15;
+  color: #facc15;
+  box-shadow: 0 0 0 1px #facc15, 2px 2px 0 #000;
+}
+.inv-badge.active { color: #4ade80; font-weight: 700; }
+.inv-badge.locked { color: #f87171; }
+
+.btn-pause-chip, .btn-pause-menu-trigger {
+  font-family: inherit;
+  font-size: 1rem;
+  background: #292524;
+  color: #fafaf9;
+  border: 2px solid #fafaf9;
+  box-shadow: 2px 2px 0 #000;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.btn-pause-chip:hover {
+  background: #facc15;
+  color: #111;
+}
+
+/* Center Crosshair Dot */
+.hud-reticle-dot, .hud-center-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.9);
+}
+
+/* Floating Interaction Prompt */
+.interaction-prompt {
+  position: fixed !important;
+  top: 58% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  background: rgba(12, 12, 12, 0.96) !important;
+  border: 3px solid #facc15 !important;
+  box-shadow: 4px 4px 0 #000, 0 0 20px rgba(250, 204, 21, 0.4) !important;
+  padding: 10px 22px !important;
+  color: #facc15 !important;
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  z-index: 85 !important;
+  pointer-events: none;
+  animation: promptPulse 1.4s infinite alternate ease-in-out;
+}
+@keyframes promptPulse {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  100% { transform: translate(-50%, -50%) scale(1.04); }
+}
+
+/* Startup Controls Banner */
+.hud-controls-banner, .flight-controls-banner, .qs-controls-banner {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(12, 12, 12, 0.88);
+  border: 2px solid #78716c;
+  box-shadow: var(--pixel-shadow);
+  padding: 8px 18px;
+  color: #e7e5e4;
+  font-size: 1rem;
+  pointer-events: none;
+  animation: bannerFadeOut 1s forwards ease-out 8s;
+}
+@keyframes bannerFadeOut {
+  to { opacity: 0; pointer-events: none; }
+}
+
+/* Flight slider */
+.flight-bottom-slider-bar {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(12, 12, 12, 0.9);
+  border: 2px solid #fafaf9;
+  box-shadow: var(--pixel-shadow);
+  padding: 8px 14px;
+  pointer-events: auto;
+}
+.flight-slider {
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+/* Dock Pill Always Visible */
+.inspector-dock-pill {
+  position: fixed !important;
+  bottom: 14px !important;
+  right: 14px !important;
+  z-index: 92 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: rgba(12, 12, 12, 0.94) !important;
+  border: 2px solid #57534e !important;
+  box-shadow: 3px 3px 0 #000 !important;
+  padding: 6px 12px !important;
+  border-radius: 0 !important;
+  cursor: pointer !important;
+  font-family: inherit !important;
+}
+.inspector-dock-pill:hover {
+  border-color: #38bdf8 !important;
+}
+.dock-pill-badge.fps {
+  color: #4ade80 !important;
+  font-weight: 700 !important;
+}
+.dock-pill-badge.hash {
+  color: #38bdf8 !important;
+}

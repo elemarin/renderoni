@@ -99,7 +99,7 @@ export function buildManorArchitecture(engine: RenderoniEngine): void {
     [-2.9, 2.2, -12],
     [-7.5, 2.2, 2],
     [7.5, 2.2, -6],
-    [-7.5, 2.2, -14],
+    [-6.0, 2.4, -12.5],
     [7.5, 2.2, -22],
   ];
 

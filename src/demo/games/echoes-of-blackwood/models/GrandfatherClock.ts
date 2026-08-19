@@ -34,25 +34,32 @@ export function buildGrandfatherClockModel(engine: RenderoniEngine, x: number, y
   const dial = new THREE.Mesh(new THREE.CircleGeometry(0.38, 24), new THREE.MeshStandardMaterial({ color: 0xfef9c3, roughness: 0.4 }));
   faceGroup.add(dial);
 
-  // Hour and Minute Hands
+  // Hour and Minute Hands (Starts at 3:00 so player winds it to 11:45)
   const hourHand = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.02), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
   hourHand.position.set(0, 0.09, 0.02);
+  hourHand.rotation.z = -(3 / 12) * Math.PI * 2;
+
   const minuteHand = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.32, 0.02), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
   minuteHand.position.set(0, 0.14, 0.03);
+  minuteHand.rotation.z = 0;
 
   faceGroup.add(hourHand, minuteHand);
-  faceGroup.position.set(x, y + 2.8, z + 0.41);
 
   engine.add(
     model({
       id: 'prop_clock_face',
       object: faceGroup,
-      position: [0, 0, 0],
+      position: [x, y + 2.8, z + 0.41],
       physics: 'none',
       tags: ['interactive', 'puzzle', 'clock_face'],
       state: { solved: false },
     })
   );
+
+  // Soft warm illumination on the clock face
+  const clockLight = new THREE.PointLight(0xfef08a, 1.2, 6, 1.5);
+  clockLight.position.set(x, y + 2.8, z + 0.8);
+  engine.native.scene.add(clockLight);
 
   // Secret Hidden Bookcase Door
   const bookcaseObj = new THREE.Group();

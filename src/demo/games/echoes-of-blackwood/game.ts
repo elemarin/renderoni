@@ -242,11 +242,16 @@ export class EchoesOfBlackwoodGame {
       return;
     }
     const prompt = s.hoverPrompt;
-    if (prompt?.includes('Read Journal')) this.engine.act({ name: 'quest.readJournal' });
-    else if (prompt?.includes('Pickup Clock Key')) this.engine.act({ name: 'quest.pickupKey' });
+    if (prompt?.includes('Journal')) this.engine.act({ name: 'quest.readJournal' });
+    else if (prompt?.includes('Key')) this.engine.act({ name: 'quest.pickupKey' });
     else if (prompt?.includes('Wind Clock')) this.engine.act({ name: 'quest.solveClock' });
-    else if (prompt?.includes('Retrieve Crest')) this.engine.act({ name: 'quest.pickupCrest' });
-    else if (prompt?.includes('Unlock Gate')) this.engine.act({ name: 'quest.unlockGate' });
+    else if (prompt?.includes('Crest')) {
+      if (s.clockSolved) this.engine.act({ name: 'quest.pickupCrest' });
+      else horrorSfx.playFlashlightClick();
+    } else if (prompt?.includes('Gate')) {
+      if (s.hasCrest) this.engine.act({ name: 'quest.unlockGate' });
+      else horrorSfx.playFlashlightClick();
+    }
   }
 
   private updateProximityInteractions(): void {
@@ -256,31 +261,35 @@ export class EchoesOfBlackwoodGame {
 
     // Study Desk Journal ([-8, 2])
     if (Math.hypot(px - (-8), pz - 2) < 5.5) {
-      s.setHoverPrompt('Press [E] to Read Journal');
+      s.setHoverPrompt('[ E ] Read Clockmaker\'s Journal');
       return;
     }
 
     // Key Pedestal ([8, -6])
     if (!s.hasKey && Math.hypot(px - 8, pz - (-6)) < 5.5) {
-      s.setHoverPrompt('Press [E] to Pickup Clock Key');
+      s.setHoverPrompt('[ E ] Take Clock Key');
       return;
     }
 
     // Grandfather Clock ([-8, -14])
     if (!s.clockSolved && Math.hypot(px - (-8), pz - (-14)) < 5.5) {
-      s.setHoverPrompt(s.hasKey ? 'Press [E] to Wind Clock (11:45)' : 'Clock is locked. Requires Key.');
+      s.setHoverPrompt(s.hasKey ? '[ E ] Wind Clock to 11:45' : 'Grandfather Clock is locked. (Requires Winding Key)');
       return;
     }
 
     // Blackwood Crest ([8, -22])
-    if (!s.hasCrest && s.clockSolved && Math.hypot(px - 8, pz - (-22)) < 5.5) {
-      s.setHoverPrompt('Press [E] to Retrieve Crest');
+    if (!s.hasCrest && Math.hypot(px - 8, pz - (-22)) < 5.5) {
+      if (s.clockSolved) {
+        s.setHoverPrompt('[ E ] Take Blackwood Crest');
+      } else {
+        s.setHoverPrompt('The Crest is sealed by the Clock mechanism.');
+      }
       return;
     }
 
     // Escape Gate ([0, -28])
     if (Math.hypot(px - 0, pz - (-28)) < 6.0) {
-      s.setHoverPrompt(s.hasCrest ? 'Press [E] to Unlock Gate with Crest' : 'Gate is sealed. Requires Blackwood Crest.');
+      s.setHoverPrompt(s.hasCrest ? '[ E ] Unlock Manor Gate with Crest' : 'Manor Gate is sealed. (Requires Blackwood Crest)');
       return;
     }
 
