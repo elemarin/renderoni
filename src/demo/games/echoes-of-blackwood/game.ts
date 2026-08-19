@@ -36,13 +36,15 @@ export class EchoesOfBlackwoodGame {
   private items: QuestItemsResult | null = null;
 
   // First-Person Camera & Movement State
-  private playerPos = new THREE.Vector3(0, 1.6, 6);
+  private playerPos = new THREE.Vector3(0, 1.55, 6);
   private yawAngle = 0.0;
   private pitchAngle = 0.0;
   private isLocked = false;
   private isMouseDown = false;
   private keys: Record<string, boolean> = {};
   private unbindInput: Array<() => void> = [];
+  private _camForward = new THREE.Vector3();
+  private _toTarget = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -72,17 +74,18 @@ export class EchoesOfBlackwoodGame {
     scene.background = new THREE.Color(0x06080d);
     scene.fog = new THREE.FogExp2(0x06080d, 0.035);
 
-    // 1. Spawn First-Person KCC Character Controller Entity (Invisible Capsule in 1st-person)
-    const startPos: [number, number, number] = [0, 1.6, 6];
+    // 1. Spawn First-Person KCC Character Controller Entity
+    const startPos: [number, number, number] = [0, 0.9, 6];
     this.playerEntity = this.engine.add(
       kccPlayer({
         id: 'hero_player',
         position: startPos,
-        height: 1.6,
+        height: 1.4,
         radius: 0.35,
-        moveSpeed: 4.2,
+        moveSpeed: 4.0,
         jumpSpeed: 0,
-        gravity: 0,
+        gravity: 15.0,
+        state: { flashlightOn: true },
       })
     );
 
@@ -111,7 +114,8 @@ export class EchoesOfBlackwoodGame {
     // 7. Bind Controls
     this.bindControls();
 
-    // 8. Start Engine Simulation Loop
+    // 8. Start Match Loop & Presentation Loop
+    this.engine.loop.start();
     this.engine.start((dt) => this.update(dt));
   }
 
@@ -131,6 +135,7 @@ export class EchoesOfBlackwoodGame {
         useHorrorStore.getState().pickupKey();
         const keyObj = this.items?.keyEntity.native.three?.object;
         if (keyObj) keyObj.visible = false;
+        if (this.playerEntity) this.playerEntity.state.hasKey = true;
       },
     });
 
@@ -143,8 +148,12 @@ export class EchoesOfBlackwoodGame {
           this.clockModel.hourHand.rotation.z = (11 / 12) * Math.PI * 2;
           this.clockModel.minuteHand.rotation.z = (45 / 60) * Math.PI * 2;
           const bcObj = this.clockModel.secretBookcase.native.three?.object;
-          if (bcObj) bcObj.position.z += 1.6;
+          if (bcObj) {
+            bcObj.position.x += 1.8;
+            bcObj.position.z += 0.8;
+          }
         }
+        if (this.playerEntity) this.playerEntity.state.clockSolved = true;
       },
     });
 
@@ -155,6 +164,7 @@ export class EchoesOfBlackwoodGame {
         useHorrorStore.getState().pickupCrest();
         const crestObj = this.items?.crestEntity.native.three?.object;
         if (crestObj) crestObj.visible = false;
+        if (this.playerEntity) this.playerEntity.state.hasCrest = true;
       },
     });
 
@@ -165,6 +175,7 @@ export class EchoesOfBlackwoodGame {
         useHorrorStore.getState().unlockGate();
         const gateObj = this.items?.gateEntity.native.three?.object;
         if (gateObj) gateObj.position.y += 4.0;
+        if (this.playerEntity) this.playerEntity.state.gateUnlocked = true;
         this.engine.loop.win('You escaped Blackwood Manor!');
       },
     });
@@ -175,6 +186,9 @@ export class EchoesOfBlackwoodGame {
         horrorSfx.playFlashlightClick();
         useHorrorStore.getState().toggleFlashlight();
         const isOn = useHorrorStore.getState().flashlightOn;
+        if (this.playerEntity) {
+          this.playerEntity.state.flashlightOn = isOn;
+        }
         this.flashlightRig?.setVisible(isOn);
       },
     });
@@ -184,42 +198,44 @@ export class EchoesOfBlackwoodGame {
     if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused) return;
     const keys = this.keys;
 
-    // 1. Smooth Keyboard Turning (ArrowLeft / ArrowRight ONLY — NOT Q/E)
+    // 1. Smooth Keyboard Turning (ArrowLeft / ArrowRight)
     const turnSpeed = 2.4;
     if (keys['ArrowLeft']) this.yawAngle += turnSpeed * dt;
     if (keys['ArrowRight']) this.yawAngle -= turnSpeed * dt;
 
-    // 2. 1st-Person Movement (WASD)
-    const moveSpeed = (keys['ShiftLeft'] || keys['ShiftRight'] ? 6.5 : 3.8) * dt;
-    const forward = new THREE.Vector3(-Math.sin(this.yawAngle), 0, -Math.cos(this.yawAngle));
-    const right = new THREE.Vector3(Math.cos(this.yawAngle), 0, -Math.sin(this.yawAngle));
+    // 2. 1st-Person Movement through Rapier KCC (WASD)
+    const forwardX = -Math.sin(this.yawAngle);
+    const forwardZ = -Math.cos(this.yawAngle);
+    const rightX = Math.cos(this.yawAngle);
+    const rightZ = -Math.sin(this.yawAngle);
 
-    const moveDir = new THREE.Vector3();
-    if (keys['KeyW'] || keys['ArrowUp']) moveDir.add(forward);
-    if (keys['KeyS'] || keys['ArrowDown']) moveDir.sub(forward);
-    if (keys['KeyD']) moveDir.add(right);
-    if (keys['KeyA']) moveDir.sub(right);
+    let dirX = 0;
+    let dirZ = 0;
+    if (keys['KeyW'] || keys['ArrowUp']) { dirX += forwardX; dirZ += forwardZ; }
+    if (keys['KeyS'] || keys['ArrowDown']) { dirX -= forwardX; dirZ -= forwardZ; }
+    if (keys['KeyD']) { dirX += rightX; dirZ += rightZ; }
+    if (keys['KeyA']) { dirX -= rightX; dirZ -= rightZ; }
 
-    if (moveDir.lengthSq() > 0) {
-      moveDir.normalize().multiplyScalar(moveSpeed);
-      this.playerPos.add(moveDir);
-
-      // Keep inside manor boundary walls
-      this.playerPos.x = Math.max(-12.5, Math.min(12.5, this.playerPos.x));
-      this.playerPos.z = Math.max(-28.5, Math.min(9.5, this.playerPos.z));
+    const len = Math.hypot(dirX, dirZ);
+    if (len > 0.001) {
+      dirX /= len;
+      dirZ /= len;
     }
-    this.playerPos.y = 1.6;
 
-    // 3. Update Camera Position and Free Rotation
+    const isSprinting = keys['ShiftLeft'] || keys['ShiftRight'];
+    const speed = isSprinting ? 6.2 : 3.8;
+    this.playerEntity?.actions.move({ x: dirX, z: dirZ, speed });
+
+    // 3. Update Camera Position from Physics Entity with eye level
+    if (this.playerEntity) {
+      const p = this.playerEntity.position;
+      this.playerPos.set(p[0], p[1] + 0.65, p[2]);
+    }
+
     const camera = this.engine.native.camera;
     if (camera) {
       camera.position.copy(this.playerPos);
       camera.quaternion.setFromEuler(new THREE.Euler(this.pitchAngle, this.yawAngle, 0, 'YXZ'));
-    }
-
-    const playerObj = this.playerEntity?.native.three?.object;
-    if (playerObj) {
-      playerObj.position.copy(this.playerPos);
     }
 
     // 4. Animate Key & Crest Idle Spins
@@ -242,54 +258,105 @@ export class EchoesOfBlackwoodGame {
       return;
     }
     const prompt = s.hoverPrompt;
-    if (prompt?.includes('Journal')) this.engine.act({ name: 'quest.readJournal' });
-    else if (prompt?.includes('Key')) this.engine.act({ name: 'quest.pickupKey' });
-    else if (prompt?.includes('Wind Clock')) this.engine.act({ name: 'quest.solveClock' });
-    else if (prompt?.includes('Crest')) {
-      if (s.clockSolved) this.engine.act({ name: 'quest.pickupCrest' });
-      else horrorSfx.playFlashlightClick();
-    } else if (prompt?.includes('Gate')) {
-      if (s.hasCrest) this.engine.act({ name: 'quest.unlockGate' });
-      else horrorSfx.playFlashlightClick();
+    if (!prompt) return;
+
+    if (prompt.includes('Journal')) {
+      this.engine.act({ name: 'quest.readJournal' });
+    } else if (prompt.includes('Take Clock Key') || prompt.includes('Key')) {
+      if (!s.hasKey) {
+        this.engine.act({ name: 'quest.pickupKey' });
+      }
+    } else if (prompt.includes('Wind Clock')) {
+      if (s.hasKey && !s.clockSolved) {
+        this.engine.act({ name: 'quest.solveClock' });
+      } else {
+        horrorSfx.playFlashlightClick();
+      }
+    } else if (prompt.includes('Take Blackwood Crest') || prompt.includes('Crest')) {
+      if (s.clockSolved && !s.hasCrest) {
+        this.engine.act({ name: 'quest.pickupCrest' });
+      } else {
+        horrorSfx.playFlashlightClick();
+      }
+    } else if (prompt.includes('Unlock Manor Gate') || prompt.includes('Gate')) {
+      if (s.hasCrest && !s.gateUnlocked) {
+        this.engine.act({ name: 'quest.unlockGate' });
+      } else {
+        horrorSfx.playFlashlightClick();
+      }
     }
   }
 
   private updateProximityInteractions(): void {
-    const px = this.playerPos.x;
-    const pz = this.playerPos.z;
     const s = useHorrorStore.getState();
+    const camera = this.engine.native.camera;
+    if (!camera) return;
 
-    // Study Desk Journal ([-8, 2])
-    if (Math.hypot(px - (-8), pz - 2) < 5.5) {
+    camera.getWorldDirection(this._camForward);
+    const px = camera.position.x;
+    const py = camera.position.y;
+    const pz = camera.position.z;
+
+    const isFacing = (tx: number, ty: number, tz: number, maxDist = 6.0): boolean => {
+      this._toTarget.set(tx - px, ty - py, tz - pz);
+      const dist = this._toTarget.length();
+      if (dist > maxDist) return false;
+      this._toTarget.normalize();
+      const dot = this._camForward.dot(this._toTarget);
+      return dot > 0.25 || dist < 2.5;
+    };
+
+    // 1. Study Desk Journal (Room 1: [-8, 0.92, 2])
+    if (isFacing(-8, 0.92, 2, 6.0)) {
       s.setHoverPrompt('[ E ] Read Clockmaker\'s Journal');
       return;
     }
 
-    // Key Pedestal ([8, -6])
-    if (!s.hasKey && Math.hypot(px - 8, pz - (-6)) < 5.5) {
-      s.setHoverPrompt('[ E ] Take Clock Key');
-      return;
-    }
-
-    // Grandfather Clock ([-8, -14])
-    if (!s.clockSolved && Math.hypot(px - (-8), pz - (-14)) < 5.5) {
-      s.setHoverPrompt(s.hasKey ? '[ E ] Wind Clock to 11:45' : 'Grandfather Clock is locked. (Requires Winding Key)');
-      return;
-    }
-
-    // Blackwood Crest ([8, -22])
-    if (!s.hasCrest && Math.hypot(px - 8, pz - (-22)) < 5.5) {
-      if (s.clockSolved) {
-        s.setHoverPrompt('[ E ] Take Blackwood Crest');
+    // 2. Key Pedestal (Room 2: [8, 1.35, -6])
+    if (isFacing(8, 1.35, -6, 6.0)) {
+      if (!s.hasKey) {
+        s.setHoverPrompt('[ E ] Take Clock Key');
       } else {
-        s.setHoverPrompt('The Crest is sealed by the Clock mechanism.');
+        s.setHoverPrompt('Key Pedestal (Empty)');
       }
       return;
     }
 
-    // Escape Gate ([0, -28])
-    if (Math.hypot(px - 0, pz - (-28)) < 6.0) {
-      s.setHoverPrompt(s.hasCrest ? '[ E ] Unlock Manor Gate with Crest' : 'Manor Gate is sealed. (Requires Blackwood Crest)');
+    // 3. Grandfather Clock (Room 3: [-8, 2.5, -14])
+    if (isFacing(-8, 2.5, -14, 6.0)) {
+      if (s.clockSolved) {
+        s.setHoverPrompt('Grandfather Clock (Set to 11:45 — Passage Open)');
+      } else if (s.hasKey) {
+        s.setHoverPrompt('[ E ] Wind Clock to 11:45');
+      } else {
+        s.setHoverPrompt('Grandfather Clock (Locked — Requires Winding Key)');
+      }
+      return;
+    }
+
+    // 4. Blackwood Crest (Room 4: [8, 1.45, -22])
+    if (isFacing(8, 1.45, -22, 6.0)) {
+      if (!s.hasCrest) {
+        if (s.clockSolved) {
+          s.setHoverPrompt('[ E ] Take Blackwood Crest');
+        } else {
+          s.setHoverPrompt('Blackwood Crest (Sealed by Clock Mechanism)');
+        }
+      } else {
+        s.setHoverPrompt('Crest Altar (Empty)');
+      }
+      return;
+    }
+
+    // 5. Escape Gate ([0, 2.0, -29])
+    if (isFacing(0, 2.0, -29, 6.5)) {
+      if (s.gateUnlocked) {
+        s.setHoverPrompt('Iron Gate (Unlocked — Escaped!)');
+      } else if (s.hasCrest) {
+        s.setHoverPrompt('[ E ] Unlock Manor Gate with Crest');
+      } else {
+        s.setHoverPrompt('Iron Gate (Locked — Requires Blackwood Crest)');
+      }
       return;
     }
 

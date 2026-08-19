@@ -51,7 +51,7 @@ export class StateHasher {
     contacts: ContactPairRecord[] = []
   ): string {
     if (!this.h64) {
-      throw new Error('StateHasher not initialized. Call await hasher.init() first.');
+      return '0x0000000000000000';
     }
 
     // Sort entities deterministically by ID

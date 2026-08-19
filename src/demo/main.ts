@@ -161,16 +161,6 @@ class PlaygroundApp {
   private btnAudioToggle!: HTMLElement;
 
   // Inspector Elements
-  private inspectorDockPill!: HTMLElement;
-  private dockPillFps!: HTMLElement;
-  private dockPillTick!: HTMLElement;
-  private dockPillHash!: HTMLElement;
-  private inspectorDrawer!: HTMLElement;
-  private inspectorFps!: HTMLElement;
-  private inspectorContent!: HTMLElement;
-  private inspectorHash!: HTMLElement;
-  private inspectorTick!: HTMLElement;
-  private inspectorBytes!: HTMLElement;
   private actionInput!: HTMLInputElement;
   private entitySearchInput!: HTMLInputElement;
   private entitiesTreeContainer!: HTMLElement;
@@ -181,8 +171,6 @@ class PlaygroundApp {
   // In-Game Overlays
   private inspectModal!: HTMLElement;
   private inspectBodyText!: HTMLElement;
-  private interactionPrompt!: HTMLElement;
-  private promptText!: HTMLElement;
   private loopOverlay!: HTMLElement;
   private loopKicker!: HTMLElement;
   private loopTitle!: HTMLElement;
@@ -214,73 +202,8 @@ class PlaygroundApp {
     this.systemClock = document.getElementById('system-clock')!;
     this.btnAudioToggle = document.getElementById('btn-audio-toggle')!;
 
-    // Inspector
-    this.inspectorDockPill = document.getElementById('inspector-dock-pill')!;
-    this.dockPillFps = document.getElementById('dock-pill-fps')!;
-    this.dockPillTick = document.getElementById('dock-pill-tick')!;
-    this.dockPillHash = document.getElementById('dock-pill-hash')!;
-    this.inspectorDrawer = document.getElementById('inspector-drawer')!;
-    this.inspectorFps = document.getElementById('inspector-fps')!;
-    this.inspectorContent = document.getElementById('inspector-content')!;
-    this.inspectorHash = document.getElementById('inspector-hash')!;
-    this.inspectorTick = document.getElementById('inspector-tick')!;
-    this.inspectorBytes = document.getElementById('inspector-bytes')!;
-    this.actionInput = document.getElementById('action-input') as HTMLInputElement;
-    this.entitySearchInput = document.getElementById('entity-search-input') as HTMLInputElement;
-    this.entitiesTreeContainer = document.getElementById('entities-tree-container')!;
-    this.entityCountBadge = document.getElementById('entity-count-badge')!;
-    this.stateJsonView = document.getElementById('state-json-view')!;
-    this.actionHistoryList = document.getElementById('action-history-list')!;
-
-    // Overlays
-    this.inspectModal = document.getElementById('inspect-modal')!;
-    this.inspectBodyText = document.getElementById('inspect-body-text')!;
-    this.interactionPrompt = document.getElementById('interaction-prompt')!;
-    this.promptText = document.getElementById('prompt-text')!;
-    this.loopOverlay = document.getElementById('loop-overlay')!;
-    this.loopKicker = document.getElementById('loop-kicker')!;
-    this.loopTitle = document.getElementById('loop-title')!;
-    this.loopBody = document.getElementById('loop-body')!;
-    this.loopAction = document.getElementById('loop-action') as HTMLButtonElement;
-
-    // Setup Top Navigation Tabs
-    document.querySelectorAll('.tab-btn').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        const target = (e.currentTarget as HTMLElement).dataset.mode as GameMode;
-        if (target) {
-          sfx.playMenuSelect();
-          this.switchGame(target);
-        }
-      });
-    });
-
-    // Audio Toggle
-    this.btnAudioToggle?.addEventListener('click', () => {
-      const muted = sfx.toggleMute();
-      this.btnAudioToggle.textContent = muted ? '🔇' : '🔊';
-      this.btnAudioToggle.setAttribute('title', muted ? 'Audio Muted (Press M)' : 'Audio Enabled (Press M)');
-    });
-
-    // Fullscreen Toggle
-    document.getElementById('btn-fullscreen-toggle')?.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      } else {
-        document.exitFullscreen().catch(() => {});
-      }
-    });
-
-    // Carousel Arrows
-    document.getElementById('btn-prev-card')?.addEventListener('click', () => {
-      this.selectAlbumCard(Math.max(0, this.selectedAlbumIndex - 1));
-    });
-
-    document.getElementById('btn-next-card')?.addEventListener('click', () => {
-      this.selectAlbumCard(Math.min(GAME_ORDER.length - 1, this.selectedAlbumIndex + 1));
-    });
-
     // Inspector Floating Dock Pill & Close Button
-    this.inspectorDockPill?.addEventListener('click', () => {
+    document.getElementById('inspector-dock-pill')?.addEventListener('click', () => {
       this.toggleInspector(true);
     });
 
@@ -298,7 +221,7 @@ class PlaygroundApp {
 
     // Tab 1 Actions: Copy MCP Observation, Step Ticks
     document.getElementById('btn-copy-mcp')?.addEventListener('click', (e) => {
-      const text = this.inspectorContent?.textContent || '';
+      const text = document.getElementById('inspector-content')?.textContent || '';
       this.copyToClipboard(text, e.currentTarget as HTMLElement);
     });
 
@@ -365,11 +288,13 @@ class PlaygroundApp {
     });
 
     // Close Note Modal
-    document.getElementById('btn-close-note')?.addEventListener('click', () => {
+    const handleCloseInspect = () => {
       if (this.activeMode === 'psx' && this.currentGame) {
         (this.currentGame as PsxGame).dismissInspect();
       }
-    });
+    };
+    document.getElementById('btn-close-inspect')?.addEventListener('click', handleCloseInspect);
+    document.getElementById('btn-close-note')?.addEventListener('click', handleCloseInspect);
 
     document.getElementById('pause-resume')?.addEventListener('click', () => this.setPaused(false));
     document.getElementById('pause-home')?.addEventListener('click', () => {
@@ -398,13 +323,15 @@ class PlaygroundApp {
   private toggleInspector(open?: boolean): void {
     this.isInspectorOpen = open !== undefined ? open : !this.isInspectorOpen;
     sfx.playMenuSelect();
+    const drawer = document.getElementById('inspector-drawer');
+    const dockPill = document.getElementById('inspector-dock-pill');
     if (this.isInspectorOpen) {
-      if (this.inspectorDrawer) this.inspectorDrawer.style.display = 'flex';
-      if (this.inspectorDockPill) this.inspectorDockPill.style.display = 'none';
+      if (drawer) drawer.style.display = 'flex';
+      if (dockPill) dockPill.style.display = 'none';
       this.switchInspectorTab(this.activeInspectorTab);
     } else {
-      if (this.inspectorDrawer) this.inspectorDrawer.style.display = 'none';
-      if (this.inspectorDockPill) this.inspectorDockPill.style.display = 'flex';
+      if (drawer) drawer.style.display = 'none';
+      if (dockPill) dockPill.style.display = 'flex';
     }
   }
 
@@ -771,7 +698,7 @@ class PlaygroundApp {
             <span id="psx-quest" class="hud-obj-text">Walk the hall. First room on left: Read Journal</span>
           </div>
           <div class="hud-inventory-bar">
-            <div class="inv-slot" id="chip-flash"><span class="inv-icon">🔦</span> <span id="psx-flash" class="inv-badge active">ON</span></div>
+            <div class="inv-slot active" id="chip-flash" style="cursor: pointer;" title="Toggle Flashlight (F)"><span class="inv-icon">🔦</span> <span id="psx-flash" class="inv-badge active">ON</span></div>
             <div class="inv-slot" id="chip-key"><span class="inv-icon">🗝️</span> <span id="psx-key" class="inv-badge">—</span></div>
             <div class="inv-slot" id="chip-crest"><span class="inv-icon">🛡️</span> <span id="psx-crest" class="inv-badge">—</span></div>
             <div class="inv-slot" id="chip-gate"><span class="inv-icon">🚪</span> <span id="psx-gate" class="inv-badge locked">SEALED</span></div>
@@ -782,12 +709,17 @@ class PlaygroundApp {
         <div id="psx-controls-banner" class="hud-controls-banner">
           <span><kbd>WASD</kbd> Walk</span>
           <span><kbd>Mouse</kbd> Look</span>
+          <span><kbd>Shift</kbd> Run</span>
           <span><kbd>F</kbd> Flashlight</span>
           <span><kbd>E</kbd> Interact</span>
           <span><kbd>ESC</kbd> Menu</span>
         </div>
       </div>
     `;
+
+    document.getElementById('chip-flash')?.addEventListener('click', () => {
+      (this.currentGame as PsxGame)?.toggleFlashlight();
+    });
 
     document.getElementById('btn-pause-psx')?.addEventListener('click', () => {
       this.setPaused(true);
@@ -919,145 +851,178 @@ class PlaygroundApp {
 
   private startHUDUpdateLoop(): void {
     const updateHUD = () => {
-      // 1. Calculate FPS
-      this.frameCount++;
-      const now = performance.now();
-      if (now - this.lastFpsTime >= 500) {
-        this.currentFps = Math.round((this.frameCount * 1000) / (now - this.lastFpsTime));
-        this.frameCount = 0;
-        this.lastFpsTime = now;
-        if (this.inspectorFps) this.inspectorFps.textContent = `${this.currentFps} FPS`;
-        if (this.dockPillFps) this.dockPillFps.textContent = `${this.currentFps} FPS`;
-      }
+      try {
+        // 1. Calculate FPS
+        this.frameCount++;
+        const now = performance.now();
+        if (now - this.lastFpsTime >= 500) {
+          this.currentFps = Math.round((this.frameCount * 1000) / (now - this.lastFpsTime));
+          this.frameCount = 0;
+          this.lastFpsTime = now;
+          const fpsBadge = document.getElementById('inspector-fps');
+          const dockFps = document.getElementById('dock-pill-fps');
+          if (fpsBadge) fpsBadge.textContent = `${this.currentFps} FPS`;
+          if (dockFps) dockFps.textContent = `${this.currentFps} FPS`;
+        }
 
-      // 2. Update Dock Pill Stats
-      const currentTick = this.currentGame ? this.currentGame.engine.tick : 0;
-      const currentHash = this.currentGame ? this.currentGame.engine.getStateHash() : 'CONSOLE_OS';
-      if (this.dockPillTick) this.dockPillTick.textContent = `Tick: ${currentTick}`;
-      if (this.dockPillHash) this.dockPillHash.textContent = `#${currentHash.slice(0, 6)}`;
+        // 2. Update Dock Pill Stats
+        const currentTick = this.currentGame ? this.currentGame.engine.tick : 0;
+        let currentHash = 'CONSOLE_OS';
+        if (this.currentGame) {
+          try {
+            currentHash = this.currentGame.engine.getStateHash();
+          } catch (_) {}
+        }
+        const dockTick = document.getElementById('dock-pill-tick');
+        const dockHash = document.getElementById('dock-pill-hash');
+        if (dockTick) dockTick.textContent = `Tick: ${currentTick}`;
+        if (dockHash) dockHash.textContent = currentHash.startsWith('0x') ? currentHash.slice(0, 8) : `#${currentHash.slice(0, 6)}`;
 
-      if (this.activeMode === 'home') {
-        if (this.isInspectorOpen) {
-          const activeGameMeta = GAMES_METADATA[GAME_ORDER[this.selectedAlbumIndex]];
-          if (this.activeInspectorTab === 'telemetry') {
-            this.inspectorContent.textContent = `# Renderoni Console OS [v0.1.0]
+        if (this.activeMode === 'home') {
+          if (this.isInspectorOpen) {
+            const activeGameMeta = GAMES_METADATA[GAME_ORDER[this.selectedAlbumIndex]];
+            const inspContent = document.getElementById('inspector-content');
+            if (inspContent && this.activeInspectorTab === 'telemetry') {
+              inspContent.textContent = `# Renderoni Console OS [v0.1.0]
 # Active View: Home Dashboard
 # Selected Album Card: ${activeGameMeta?.title ?? 'None'} (${activeGameMeta?.genre ?? ''})
 # Engine Subsystems: Deterministic L0 Kernel, Rapier WASM 3D, Three.js WebGL
 # State: Standby • 60 FPS Fixed Timestep • Press Enter or Click to Launch`;
-          }
-          this.inspectorHash.textContent = 'CONSOLE_OS';
-          this.inspectorTick.textContent = `Tick: 0`;
-          this.inspectorBytes.textContent = `128B / 500B`;
-        }
-      } else if (this.currentGame) {
-        if (this.activeMode === 'psx') {
-          const t = (this.currentGame as PsxGame).getTelemetry();
-          const questEl = document.getElementById('psx-quest');
-          const flashEl = document.getElementById('psx-flash');
-          const chipFlash = document.getElementById('chip-flash');
-          const keyEl = document.getElementById('psx-key');
-          const chipKey = document.getElementById('chip-key');
-          const crestEl = document.getElementById('psx-crest');
-          const chipCrest = document.getElementById('chip-crest');
-          const gateEl = document.getElementById('psx-gate');
-          const chipGate = document.getElementById('chip-gate');
-
-          if (questEl) questEl.textContent = t.questStatus;
-          if (flashEl) {
-            flashEl.textContent = t.flashlightOn ? 'ON' : 'OFF';
-            chipFlash?.classList.toggle('active', t.flashlightOn);
-          }
-          if (keyEl) {
-            keyEl.textContent = t.hasKey ? 'KEY' : '—';
-            chipKey?.classList.toggle('active', t.hasKey);
-          }
-          if (crestEl) {
-            crestEl.textContent = t.hasCrest ? 'CREST' : '—';
-            chipCrest?.classList.toggle('active', t.hasCrest);
-          }
-          if (gateEl) {
-            gateEl.textContent = t.gateUnlocked ? 'OPEN' : 'LOCKED';
-            chipGate?.classList.toggle('active', t.gateUnlocked);
-            chipGate?.classList.toggle('locked', !t.gateUnlocked);
-          }
-
-          const prompt = (this.currentGame as PsxGame).getHoverPrompt();
-          if (this.interactionPrompt && this.promptText) {
-            if (prompt && !t.inspectingText) {
-              this.interactionPrompt.style.display = 'flex';
-              this.promptText.textContent = prompt;
-            } else {
-              this.interactionPrompt.style.display = 'none';
             }
+            const inspHash = document.getElementById('inspector-hash');
+            const inspTick = document.getElementById('inspector-tick');
+            const inspBytes = document.getElementById('inspector-bytes');
+            if (inspHash) inspHash.textContent = 'CONSOLE_OS';
+            if (inspTick) inspTick.textContent = `Tick: 0`;
+            if (inspBytes) inspBytes.textContent = `128B / 500B`;
           }
+        } else if (this.currentGame) {
+          if (this.activeMode === 'psx') {
+            const t = (this.currentGame as PsxGame).getTelemetry();
+            const questEl = document.getElementById('psx-quest');
+            const flashEl = document.getElementById('psx-flash');
+            const chipFlash = document.getElementById('chip-flash');
+            const keyEl = document.getElementById('psx-key');
+            const chipKey = document.getElementById('chip-key');
+            const crestEl = document.getElementById('psx-crest');
+            const chipCrest = document.getElementById('chip-crest');
+            const gateEl = document.getElementById('psx-gate');
+            const chipGate = document.getElementById('chip-gate');
 
-          if (t.inspectingText) {
-            this.inspectModal.style.display = 'flex';
-            this.inspectBodyText.textContent = t.inspectingText;
-          } else {
-            this.inspectModal.style.display = 'none';
-          }
-        } else if (this.activeMode === 'flight') {
-          const t = (this.currentGame as FlightGame).getTelemetry();
-          const spdEl = document.getElementById('flight-speed');
-          const altEl = document.getElementById('flight-alt');
-          const vsEl = document.getElementById('flight-vs');
-          const stateEl = document.getElementById('flight-state');
-          const ringsEl = document.getElementById('flight-rings');
-          const questEl = document.getElementById('flight-quest');
-          const throttleSlider = document.getElementById('flight-throttle') as HTMLInputElement;
-          const throttleVal = document.getElementById('flight-throttle-val');
+            if (questEl) questEl.textContent = t.questStatus;
+            if (flashEl) {
+              flashEl.textContent = t.flashlightOn ? 'ON' : 'OFF';
+              flashEl.className = `inv-badge ${t.flashlightOn ? 'active' : ''}`;
+              chipFlash?.classList.toggle('active', t.flashlightOn);
+            }
+            if (keyEl) {
+              keyEl.textContent = t.hasKey ? 'KEY' : '—';
+              keyEl.className = `inv-badge ${t.hasKey ? 'active' : ''}`;
+              chipKey?.classList.toggle('active', t.hasKey);
+            }
+            if (crestEl) {
+              crestEl.textContent = t.hasCrest ? 'CREST' : '—';
+              crestEl.className = `inv-badge ${t.hasCrest ? 'active' : ''}`;
+              chipCrest?.classList.toggle('active', t.hasCrest);
+            }
+            if (gateEl) {
+              gateEl.textContent = t.gateUnlocked ? 'OPEN' : 'LOCKED';
+              gateEl.className = `inv-badge ${t.gateUnlocked ? 'active' : 'locked'}`;
+              chipGate?.classList.toggle('active', t.gateUnlocked);
+              chipGate?.classList.toggle('locked', !t.gateUnlocked);
+            }
 
-          if (spdEl) spdEl.textContent = `${t.speedKmh} km/h`;
-          if (altEl) altEl.textContent = `${t.altitudeM} m`;
-          if (vsEl) vsEl.textContent = `${t.verticalSpeedMs > 0 ? '+' : ''}${t.verticalSpeedMs} m/s`;
-          if (questEl) questEl.textContent = t.objective;
-          if (ringsEl) ringsEl.textContent = `${t.ringsCleared} / ${t.totalRings}`;
-          if (stateEl) {
-            stateEl.textContent = t.phaseLabel;
-            stateEl.className = `val tag ${t.flightPhase === 'airborne' ? 'tag-green' : t.flightPhase === 'touchdown' ? 'tag-orange' : 'tag-blue'}`;
-          }
-          if (throttleSlider && document.activeElement !== throttleSlider) {
-            throttleSlider.value = t.throttlePercent.toString();
-          }
-          if (throttleVal) throttleVal.textContent = `${t.throttlePercent}%`;
-        } else if (this.activeMode === 'quickstart') {
-          const t = (this.currentGame as QuickstartGame).getTelemetry();
-          const posEl = document.getElementById('qs-pos');
-          const coinsEl = document.getElementById('qs-coins');
-          const bodiesEl = document.getElementById('qs-bodies');
-          const questEl = document.getElementById('qs-quest');
+            const prompt = (this.currentGame as PsxGame).getHoverPrompt();
+            const promptEl = document.getElementById('interaction-prompt');
+            const promptTextEl = document.getElementById('prompt-text');
+            if (promptEl && promptTextEl) {
+              if (prompt && !t.inspectingText) {
+                promptEl.classList.add('visible');
+                promptEl.style.display = 'flex';
+                promptTextEl.textContent = prompt;
+              } else {
+                promptEl.classList.remove('visible');
+                promptEl.style.display = 'none';
+              }
+            }
 
-          if (posEl) posEl.textContent = `${t.playerPos[0]}, ${t.playerPos[1]}, ${t.playerPos[2]}`;
-          if (coinsEl) coinsEl.textContent = `🪙 ${t.coinsCollected} / ${t.totalCoins}`;
-          if (bodiesEl) bodiesEl.textContent = `${t.dynamicBodyCount} active`;
-          if (questEl) questEl.textContent = t.lastAction;
-        }
+            if (this.inspectModal && this.inspectBodyText) {
+              if (t.inspectingText) {
+                this.inspectModal.style.display = 'flex';
+                this.inspectBodyText.textContent = t.inspectingText;
+              } else {
+                this.inspectModal.style.display = 'none';
+              }
+            }
+          } else if (this.activeMode === 'flight') {
+            const t = (this.currentGame as FlightGame).getTelemetry();
+            const spdEl = document.getElementById('flight-speed');
+            const altEl = document.getElementById('flight-alt');
+            const vsEl = document.getElementById('flight-vs');
+            const stateEl = document.getElementById('flight-state');
+            const ringsEl = document.getElementById('flight-rings');
+            const questEl = document.getElementById('flight-quest');
+            const throttleSlider = document.getElementById('flight-throttle') as HTMLInputElement;
+            const throttleVal = document.getElementById('flight-throttle-val');
 
-        // Live Agent Inspector Update
-        this.syncLoopOverlay();
-
-        if (this.isInspectorOpen) {
-          const obs = ObservationEngine.generateTier0(this.currentGame.engine);
-          if (this.activeInspectorTab === 'telemetry') {
-            this.inspectorContent.textContent = obs.markdown;
-          } else if (this.activeInspectorTab === 'entities') {
-            this.renderEntityTree();
-          } else if (this.activeInspectorTab === 'state') {
-            const snap = this.getEngineStateSnapshot();
-            const stateEl = document.getElementById('inspector-state-content');
+            if (spdEl) spdEl.textContent = `${t.speedKmh} km/h`;
+            if (altEl) altEl.textContent = `${t.altitudeM} m`;
+            if (vsEl) vsEl.textContent = `${t.verticalSpeedMs >= 0 ? '+' : ''}${t.verticalSpeedMs} m/s`;
+            if (questEl) questEl.textContent = t.objective;
+            if (ringsEl) ringsEl.textContent = `${t.ringsCleared} / ${t.totalRings}`;
             if (stateEl) {
-              stateEl.textContent = JSON.stringify(snap, null, 2);
+              stateEl.textContent = t.phaseLabel;
+              stateEl.className = `val tag ${t.flightPhase === 'airborne' ? 'tag-green' : t.flightPhase === 'touchdown' ? 'tag-orange' : 'tag-blue'}`;
             }
-          }
-          this.inspectorHash.textContent = `#${this.currentGame.engine.getStateHash().slice(0, 8)}`;
-          this.inspectorTick.textContent = `Tick: ${this.currentGame.engine.tick}`;
-          this.inspectorBytes.textContent = `${obs.bytes}B / 500B`;
-        }
-      }
+            if (throttleSlider && document.activeElement !== throttleSlider) {
+              throttleSlider.value = t.throttlePercent.toString();
+            }
+            if (throttleVal) throttleVal.textContent = `${t.throttlePercent}%`;
+          } else if (this.activeMode === 'quickstart') {
+            const t = (this.currentGame as QuickstartGame).getTelemetry();
+            const posEl = document.getElementById('qs-pos');
+            const coinsEl = document.getElementById('qs-coins');
+            const bodiesEl = document.getElementById('qs-bodies');
+            const questEl = document.getElementById('qs-quest');
 
-      requestAnimationFrame(updateHUD);
+            if (posEl) posEl.textContent = `${t.playerPos[0]}, ${t.playerPos[1]}, ${t.playerPos[2]}`;
+            if (coinsEl) coinsEl.textContent = `🪙 ${t.coinsCollected} / ${t.totalCoins}`;
+            if (bodiesEl) bodiesEl.textContent = `${t.dynamicBodyCount} active`;
+            if (questEl) questEl.textContent = t.lastAction;
+          }
+
+          // Live Agent Inspector Update
+          this.syncLoopOverlay();
+
+          if (this.isInspectorOpen) {
+            try {
+              const obs = ObservationEngine.generateTier0(this.currentGame.engine);
+              const inspContent = document.getElementById('inspector-content');
+              if (inspContent && this.activeInspectorTab === 'telemetry') {
+                inspContent.textContent = obs.markdown;
+              } else if (this.activeInspectorTab === 'entities') {
+                this.renderEntityTree();
+              } else if (this.activeInspectorTab === 'state') {
+                const snap = this.getEngineStateSnapshot();
+                const stateEl = document.getElementById('inspector-state-content');
+                if (stateEl) {
+                  stateEl.textContent = JSON.stringify(snap, null, 2);
+                }
+              }
+              const inspHash = document.getElementById('inspector-hash');
+              const inspTick = document.getElementById('inspector-tick');
+              const inspBytes = document.getElementById('inspector-bytes');
+              if (inspHash) inspHash.textContent = currentHash.startsWith('0x') ? currentHash.slice(0, 10) : `#${currentHash.slice(0, 8)}`;
+              if (inspTick) inspTick.textContent = `Tick: ${currentTick}`;
+              if (inspBytes) inspBytes.textContent = `${obs.bytes}B / 500B`;
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        console.error('HUD update error:', err);
+      } finally {
+        requestAnimationFrame(updateHUD);
+      }
     };
 
     requestAnimationFrame(updateHUD);

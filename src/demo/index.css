@@ -839,30 +839,6 @@ kbd {
 }
 .telemetry-grid.compact { grid-template-columns: 1fr 1fr; gap: 6px; }
 
-.interaction-prompt {
-  position: absolute;
-  top: 55%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: #111;
-  backdrop-filter: none;
-  padding: 8px 16px;
-  border-radius: 0;
-  border: 3px solid var(--accent-gold);
-  color: var(--text-main);
-  font-size: 0.92rem;
-  font-weight: 600;
-  pointer-events: none;
-  z-index: 60;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
-  animation: pulsePrompt 1.5s infinite;
-}
-
-@keyframes pulsePrompt {
-  0%, 100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
-}
-
 /* Retro Note Inspect Modal */
 .inspect-modal {
   position: absolute;
@@ -1589,7 +1565,6 @@ kbd {
 body.home-open .tab-btn[data-mode="home"] { opacity: 0.7; }
 
 body.in-game .top-nav.home-only { display: none !important; }
-body.in-game .inspector-dock-pill { display: none; }
 
 .game-shelf {
   position: absolute;
@@ -1663,9 +1638,6 @@ body.in-game .inspector-dock-pill { display: none; }
   cursor: pointer;
 }
 .pause-card #pause-home { background: #111; color: #fafaf9; }
-
-body:not(.in-game) .inspector-dock-pill,
-body:not(.in-game) .inspector-drawer { display: none !important; }
 
 .album-card > .card-title { bottom: 168px !important; }
 .game-shelf {
@@ -1794,7 +1766,7 @@ body:not(.in-game) .inspector-drawer { display: none !important; }
   top: 58% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
-  display: flex !important;
+  display: none !important;
   align-items: center;
   gap: 10px;
   background: rgba(12, 12, 12, 0.96) !important;
@@ -1809,6 +1781,9 @@ body:not(.in-game) .inspector-drawer { display: none !important; }
   z-index: 85 !important;
   pointer-events: none;
   animation: promptPulse 1.4s infinite alternate ease-in-out;
+}
+.interaction-prompt.visible {
+  display: flex !important;
 }
 @keyframes promptPulse {
   0% { transform: translate(-50%, -50%) scale(1); }

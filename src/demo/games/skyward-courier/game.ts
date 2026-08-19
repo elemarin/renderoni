@@ -109,6 +109,7 @@ export class SkywardCourierGame {
     this.bindControls();
 
     // 6. Start Simulation Loop
+    this.engine.loop.start();
     this.engine.start((dt) => this.update(dt));
   }
 
