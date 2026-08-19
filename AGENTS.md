@@ -10,7 +10,7 @@ Renderoni is structured in 4 strict hierarchical layers:
 - **L0: Deterministic Kernel (`src/core/`)**: Integer tick clock (`clock.ts`), seeded PRNG streams (`prng.ts`), dual-buffer transform pipeline (`transform-buffer.ts`), XXH3 state hashing (`hashing.ts`), resource ownership matrix (`ownership.ts`), and diagnostics (`diagnostics.ts`).
   - **Rule 1**: NEVER call `Math.random()`, `Date.now()`, `performance.now()`, or `requestAnimationFrame()` inside simulation logic or entity updates. Always use `engine.prng` and `engine.clock.tick`.
   - **Rule 2**: NEVER bypass the dual-buffer transform pipeline. Write physics transforms into canonical buffer slots, never directly into render scene graphs.
-- **L1: Batteries & Subsystems (`src/presets/`, `src/animation/`, `src/audio/`, `src/vfx/`, `src/ui/`)**: High-level declarative presets (`body`, `sensor`, `light`, `kccPlayer`, `dynamicPlayer`).
+- **L1: Batteries & Subsystems (`src/presets/`, `src/animation/`, `src/audio/`, `src/vfx/`, `src/ui/`, `src/scene/`)**: High-level declarative presets (`body`, `sensor`, `light`, `kccPlayer`, `dynamicPlayer`, `proceduralModel`) and compact scene inventories for prompt → img2threejs factories.
 - **L2: Agent Tooling & MCP (`src/mcp/`, `src/testing/`)**: Stdio/SSE Model Context Protocol server, custom Vitest matchers, and headless CLI verification.
 - **L3: Web Application & Demos (`src/demo/`, `index.html`)**: Interactive playground and multi-archetype web showcases.
 
@@ -22,7 +22,8 @@ Always use subpath imports rather than deep file path hacks:
 
 ```ts
 import { createRenderoni, RenderoniEngine } from 'renderoni';
-import { body, kccPlayer, sensor, light, definePreset } from 'renderoni/presets';
+import { body, kccPlayer, sensor, light, definePreset, proceduralModel } from 'renderoni/presets';
+import { mountSceneInventory, parseSceneInventory } from 'renderoni/scene';
 import { audio } from 'renderoni/audio';
 import { animation } from 'renderoni/animation';
 import { vfx } from 'renderoni/vfx';

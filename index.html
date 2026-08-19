@@ -3,24 +3,229 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Renderoni — High-Performance 3D Game Engine & Demos</title>
+    <title>Renderoni OS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./src/demo/index.css" />
   </head>
   <body>
     <!-- 3D WebGL Canvas -->
     <canvas id="render-canvas" tabindex="0"></canvas>
 
-    <!-- Top Navigation / Archetype Selector -->
-    <nav class="top-nav">
-      <div class="brand-badge">🍝 Renderoni</div>
-      <button class="tab-btn active" data-mode="psx">🔦 Echoes of Blackwood (PSX 1st-Person)</button>
-      <button class="tab-btn" data-mode="flight">✈️ Skyward Courier (Flight)</button>
-      <button class="tab-btn" data-mode="voxel">🧱 Monolith: Voxel Ruins</button>
-      <button class="tab-btn" data-mode="quickstart">🪙 Quickstart</button>
+    <!-- Top Navigation / Archetype Selector Bar -->
+    <nav class="top-nav home-only">
+      <div class="brand-badge" id="btn-brand-home">Renderoni</div>
+      <div class="nav-right-tools">
+        <span id="system-clock" class="clock-badge">12:00</span>
+        <button id="btn-audio-toggle" class="icon-tool-btn" title="Mute">🔊</button>
+      </div>
     </nav>
 
-    <!-- Contextual Game HUD -->
-    <div id="game-hud"></div>
+    <!-- Console Home Screen: Cover Album & Spotlight -->
+    <main id="console-home" class="console-home-view">
+      <div class="home-glow-backdrop"></div>
+      
+      <header class="home-header"></header>
+
+      <!-- Cover Album Carousel -->
+      <section class="album-section" aria-label="Game Library Carousel">
+        <button id="btn-prev-card" class="carousel-arrow prev" title="Previous Game (Left Arrow)">‹</button>
+        
+        <div class="carousel-viewport">
+          <div id="album-track" class="album-track">
+            <!-- Card 0: PSX Horror -->
+            <article class="album-card" data-index="0" data-game="psx">
+              <div class="card-artwork psx-art">
+                <svg viewBox="0 0 400 240" class="art-svg" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <linearGradient id="psxBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#18040a" />
+                      <stop offset="60%" stop-color="#450a1b" />
+                      <stop offset="100%" stop-color="#881337" />
+                    </linearGradient>
+                    <radialGradient id="moonGlow" cx="75%" cy="30%" r="50%">
+                      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.9" />
+                      <stop offset="40%" stop-color="#f59e0b" stop-opacity="0.4" />
+                      <stop offset="100%" stop-color="#78350f" stop-opacity="0" />
+                    </radialGradient>
+                    <linearGradient id="flashCone" x1="0%" y1="100%" x2="70%" y2="20%">
+                      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+                      <stop offset="40%" stop-color="#fef08a" stop-opacity="0.6" />
+                      <stop offset="100%" stop-color="#ca8a04" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <!-- Background -->
+                  <rect width="400" height="240" fill="url(#psxBg)" />
+                  <!-- Moon -->
+                  <circle cx="300" cy="70" r="50" fill="url(#moonGlow)" />
+                  <circle cx="300" cy="70" r="28" fill="#fef9c3" />
+                  <!-- Victorian Manor Silhouette -->
+                  <path d="M40 240 L40 130 L70 100 L100 130 L100 110 L130 80 L160 110 L160 240 Z" fill="#090306" />
+                  <path d="M150 240 L150 140 L190 100 L230 140 L230 240 Z" fill="#0f050b" />
+                  <path d="M220 240 L220 90 L260 50 L300 90 L300 240 Z" fill="#090306" />
+                  <!-- Clock Tower Spire -->
+                  <path d="M250 50 L260 10 L270 50 Z" fill="#090306" />
+                  <circle cx="260" cy="75" r="14" fill="#fbbf24" fill-opacity="0.9" />
+                  <!-- Clock Hands (11:45) -->
+                  <line x1="260" y1="75" x2="253" y2="67" stroke="#000" stroke-width="2.5" stroke-linecap="round" />
+                  <line x1="260" y1="75" x2="248" y2="75" stroke="#000" stroke-width="2" stroke-linecap="round" />
+                  <!-- Glowing Windows -->
+                  <rect x="60" y="140" width="18" height="28" rx="8" fill="#f59e0b" fill-opacity="0.8" />
+                  <rect x="180" y="150" width="20" height="32" rx="9" fill="#f59e0b" fill-opacity="0.7" />
+                  <!-- Flashlight Beam -->
+                  <polygon points="0,240 220,110 320,190 40,240" fill="url(#flashCone)" />
+                  <!-- Fog / Scanlines -->
+                  <path d="M0 200 Q100 170 200 210 T400 190 L400 240 L0 240 Z" fill="#4c0519" fill-opacity="0.4" />
+                </svg>
+              </div>
+              <h2 class="card-title">Echoes of Blackwood</h2>
+            </article>
+
+            <!-- Card 1: Flight -->
+            <article class="album-card" data-index="1" data-game="flight">
+              <div class="card-artwork flight-art">
+                <svg viewBox="0 0 400 240" class="art-svg" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <linearGradient id="flightBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#0369a1" />
+                      <stop offset="50%" stop-color="#38bdf8" />
+                      <stop offset="100%" stop-color="#fbbf24" />
+                    </linearGradient>
+                    <linearGradient id="sunRay" x1="0%" y1="100%" x2="100%" y2="0%">
+                      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.7" />
+                      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <!-- Sky & Sunset -->
+                  <rect width="400" height="240" fill="url(#flightBg)" />
+                  <circle cx="200" cy="180" r="90" fill="#fef08a" fill-opacity="0.5" />
+                  <!-- Sun Rays -->
+                  <polygon points="200,180 50,0 120,0" fill="url(#sunRay)" />
+                  <polygon points="200,180 280,0 350,0" fill="url(#sunRay)" />
+                  <!-- Distant Islands -->
+                  <path d="M0 210 Q60 180 140 210 T280 200 Q340 175 400 210 L400 240 L0 240 Z" fill="#047857" />
+                  <path d="M80 240 Q130 195 200 225 T320 215 L400 240 L0 240 Z" fill="#065f46" />
+                  <rect y="225" width="400" height="15" fill="#0284c7" />
+                  <!-- Clouds -->
+                  <ellipse cx="60" cy="90" rx="45" ry="18" fill="#ffffff" fill-opacity="0.8" />
+                  <ellipse cx="90" cy="80" rx="35" ry="22" fill="#ffffff" fill-opacity="0.9" />
+                  <ellipse cx="330" cy="110" rx="55" ry="20" fill="#ffffff" fill-opacity="0.7" />
+                  <!-- Airplane Silhouette Banking -->
+                  <g transform="translate(180, 85) rotate(-18) scale(1.1)">
+                    <!-- Fuselage -->
+                    <ellipse cx="0" cy="0" rx="42" ry="9" fill="#0f172a" />
+                    <circle cx="42" cy="0" r="3" fill="#f59e0b" />
+                    <!-- Wings -->
+                    <path d="M-6 -3 L-24 -48 L6 -48 L10 -3 Z" fill="#1e293b" />
+                    <path d="M-6 3 L-24 48 L6 48 L10 3 Z" fill="#1e293b" />
+                    <!-- Tail -->
+                    <path d="M-36 0 L-48 -20 L-38 -20 L-30 0 Z" fill="#b91c1c" />
+                    <path d="M-36 0 L-46 -12 L-40 -12 L-32 0 Z" fill="#0f172a" />
+                    <!-- Propeller blur -->
+                    <ellipse cx="44" cy="0" rx="2" ry="24" fill="#ffffff" fill-opacity="0.6" />
+                    <!-- Wingtip Trails -->
+                    <path d="M-24 -48 Q-70 -54 -120 -60" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7" />
+                    <path d="M-24 48 Q-70 54 -120 60" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7" />
+                  </g>
+                </svg>
+              </div>
+              <h2 class="card-title">Skyward Courier</h2>
+            </article>
+            <!-- Card 2 was Monolith; removed -->
+            <!-- Card 4: Quickstart -->
+            <article class="album-card" data-index="2" data-game="quickstart">
+              <div class="card-artwork quickstart-art">
+                <svg viewBox="0 0 400 240" class="art-svg" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <linearGradient id="qsBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#0f172a" />
+                      <stop offset="60%" stop-color="#1e1b4b" />
+                      <stop offset="100%" stop-color="#78350f" />
+                    </linearGradient>
+                    <radialGradient id="coinGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stop-color="#fef08a" />
+                      <stop offset="60%" stop-color="#f59e0b" />
+                      <stop offset="100%" stop-color="#b45309" stop-opacity="0" />
+                    </radialGradient>
+                  </defs>
+                  <!-- Cyber Arena Background -->
+                  <rect width="400" height="240" fill="url(#qsBg)" />
+                  <!-- Perspective Grid Lines -->
+                  <line x1="0" y1="200" x2="400" y2="200" stroke="#38bdf8" stroke-width="1.5" opacity="0.4" />
+                  <line x1="0" y1="220" x2="400" y2="220" stroke="#38bdf8" stroke-width="1.5" opacity="0.6" />
+                  <line x1="200" y1="160" x2="50" y2="240" stroke="#38bdf8" stroke-width="1" opacity="0.5" />
+                  <line x1="200" y1="160" x2="150" y2="240" stroke="#38bdf8" stroke-width="1" opacity="0.5" />
+                  <line x1="200" y1="160" x2="250" y2="240" stroke="#38bdf8" stroke-width="1" opacity="0.5" />
+                  <line x1="200" y1="160" x2="350" y2="240" stroke="#38bdf8" stroke-width="1" opacity="0.5" />
+                  <!-- Dynamic Physics Crates & Bouncy Spheres -->
+                  <rect x="80" y="160" width="30" height="30" rx="3" fill="#d97706" />
+                  <rect x="95" y="132" width="26" height="26" rx="3" fill="#b45309" />
+                  <circle cx="280" cy="170" r="16" fill="#3b82f6" />
+                  <circle cx="315" cy="180" r="12" fill="#ef4444" />
+                  <!-- Hero Character -->
+                  <rect x="188" y="145" width="24" height="42" rx="10" fill="#3b82f6" />
+                  <rect x="194" y="152" width="12" height="6" rx="2" fill="#fef08a" />
+                  <!-- Floating Golden Coin -->
+                  <circle cx="200" cy="90" r="42" fill="url(#coinGlow)" />
+                  <circle cx="200" cy="90" r="22" fill="#fbbf24" stroke="#f59e0b" stroke-width="3" />
+                  <text x="200" y="98" font-size="24" font-weight="bold" fill="#78350f" text-anchor="middle" font-family="sans-serif">🪙</text>
+                </svg>
+              </div>
+              <h2 class="card-title">Quickstart</h2>
+            </article>
+          </div>
+        </div>
+
+        <button id="btn-next-card" class="carousel-arrow next" title="Next Game (Right Arrow)">›</button>
+      </section>
+
+      <!-- Carousel Pagination Dots -->
+      <div id="album-dots" class="album-dots-container">
+        <button class="album-dot active" data-index="0" title="Echoes of Blackwood"></button>
+        <button class="album-dot" data-index="1" title="Skyward Courier"></button>
+        <button class="album-dot" data-index="2" title="Golden Quickstart"></button>
+      </div>
+
+      <div class="home-play">
+        <button id="btn-launch-game" type="button">Play</button>
+      </div>
+      <nav id="game-shelf" class="game-shelf" aria-label="Library">
+        <button type="button" class="shelf-item active" data-index="0" data-mode="psx">
+          <span class="shelf-art psx-art"></span>
+          <span>Echoes</span>
+        </button>
+        <button type="button" class="shelf-item" data-index="1" data-mode="flight">
+          <span class="shelf-art flight-art"></span>
+          <span>Skyward</span>
+        </button>
+        <button type="button" class="shelf-item" data-index="2" data-mode="quickstart">
+          <span class="shelf-art quickstart-art"></span>
+          <span>Lab</span>
+        </button>
+      </nav>
+      <div hidden>
+        <span id="spotlight-badge"></span>
+        <span id="spotlight-genre"></span>
+        <span id="spotlight-title">Echoes of Blackwood</span>
+        <span id="spotlight-subtitle"></span>
+        <span id="spotlight-desc"></span>
+        <div id="spotlight-features"></div>
+        <div id="spotlight-controls-grid"></div>
+      </div>
+    </main>
+
+    <!-- Contextual In-Game HUD Container -->
+    <div id="game-hud" style="display: none;"></div>
+
+    <div id="pause-menu" class="pause-menu" hidden>
+      <div class="pause-card">
+        <p id="pause-kicker" class="pause-kicker">Paused</p>
+        <h2 id="pause-title">Echoes of Blackwood</h2>
+        <button type="button" id="pause-resume">Resume</button>
+        <button type="button" id="pause-home">Home</button>
+      </div>
+    </div>
 
     <!-- Retro Note Inspection Overlay (for PSX game) -->
     <div id="inspect-modal" class="inspect-modal" style="display: none;">
@@ -39,6 +244,7 @@
       <span id="prompt-text"></span>
     </div>
 
+    <!-- Loop Overlay -->
     <div id="loop-overlay" class="loop-overlay" hidden>
       <div class="loop-card">
         <div id="loop-kicker" class="loop-kicker">Renderoni</div>
@@ -48,34 +254,97 @@
       </div>
     </div>
 
-    <!-- Live Agent Inspector HUD (Bottom Right) -->
-    <div class="inspector-panel">
-      <div class="inspector-header">
-        <div class="title">
-          <span>🤖</span> Agent Inspector
-        </div>
-        <div class="meta">
-          <span id="inspector-tick" class="badge">Tick: 0</span>
-          <span id="inspector-hash" class="badge">Hash: ...</span>
-          <span id="inspector-bytes" class="badge success">0B / 500B</span>
-          <button id="toggle-inspector" class="btn-icon" title="Toggle Inspector">▼</button>
-        </div>
-      </div>
-      <div id="inspector-body">
-        <div id="inspector-content" class="inspector-terminal"># Initializing Renderoni Engine...</div>
-        <div class="quick-actions-row" id="quick-actions">
-          <button class="chip-btn" data-action="quest.readJournal">📖 Read Journal</button>
-          <button class="chip-btn" data-action="quest.pickupKey">🗝️ Pickup Key</button>
-          <button class="chip-btn" data-action="quest.solveClock">🕰️ Solve Clock (11:45)</button>
-          <button class="chip-btn" data-action="quest.pickupCrest">🛡️ Pickup Crest</button>
-          <button class="chip-btn" data-action="quest.unlockGate">🚪 Escape Gate</button>
-        </div>
-        <div class="action-bar">
-          <input id="action-input" type="text" placeholder="Dispatch action (e.g. hero.move or JSON)" />
-          <button id="btn-dispatch-action">Act</button>
-        </div>
-      </div>
+    <!-- Floating Unobtrusive Agent Dock Pill (Collapsed Trigger) -->
+    <div id="inspector-dock-pill" class="inspector-dock-pill" title="Toggle Agent Inspector & State Debugger (` or F12)">
+      <span class="dock-pill-icon">🤖</span>
+      <span class="dock-pill-label">Agent Inspector</span>
+      <span id="dock-pill-tick" class="dock-pill-badge">Tick: 0</span>
+      <span id="dock-pill-hash" class="dock-pill-badge hash">#0000</span>
     </div>
+
+    <!-- Advanced Agent Inspector & DevTools Drawer -->
+    <aside id="inspector-drawer" class="inspector-drawer" style="display: none;" aria-label="Agent Telemetry & State Debugger">
+      <div class="drawer-header">
+        <div class="drawer-title-group">
+          <span class="drawer-icon">🤖</span>
+          <div>
+            <h3 class="drawer-title">Renderoni Agent Inspector</h3>
+            <span class="drawer-sub">L0 Deterministic Kernel &bull; Tier 0 MCP Telemetry &bull; State Hashing</span>
+          </div>
+        </div>
+
+        <div class="drawer-meta-badges">
+          <span id="inspector-fps" class="meta-badge fps">60 FPS</span>
+          <span id="inspector-tick" class="meta-badge">Tick: 0</span>
+          <span id="inspector-hash" class="meta-badge hash">#INIT</span>
+          <span id="inspector-bytes" class="meta-badge bytes">0B / 500B</span>
+          <button id="btn-close-inspector" class="btn-drawer-close" title="Collapse Inspector (Esc or `)">✕</button>
+        </div>
+      </div>
+
+      <!-- Inspector Navigation Tabs -->
+      <nav class="inspector-tabs">
+        <button class="insp-tab active" data-tab="telemetry">📡 Telemetry (MCP)</button>
+        <button class="insp-tab" data-tab="entities">🌳 World Entities</button>
+        <button class="insp-tab" data-tab="actions">⚡ Action Console</button>
+        <button class="insp-tab" data-tab="state">💾 State & Sharing</button>
+      </nav>
+
+      <!-- Tab 1: Live Telemetry (MCP Tier-0 Observation) -->
+      <div id="tab-telemetry" class="insp-tab-content active">
+        <div class="telemetry-toolbar">
+          <div class="toolbar-label">Tier 0 Markdown Telemetry:</div>
+          <div class="toolbar-actions">
+            <button id="btn-copy-mcp" class="btn-sm btn-accent" title="Copy Tier-0 Markdown for LLM prompt">📋 Copy for AI Agent</button>
+            <button id="btn-step-tick-1" class="btn-sm" title="Advance simulation by 1 deterministic tick">▶ +1 Tick</button>
+            <button id="btn-step-tick-10" class="btn-sm" title="Advance simulation by 10 deterministic ticks">⏩ +10 Ticks</button>
+          </div>
+        </div>
+        <pre id="inspector-content" class="telemetry-terminal"># Initializing Renderoni Engine...</pre>
+      </div>
+
+      <!-- Tab 2: Entity & World Graph Inspector -->
+      <div id="tab-entities" class="insp-tab-content">
+        <div class="entities-toolbar">
+          <input id="entity-search-input" type="text" class="entity-search" placeholder="Filter entities by ID or tag (e.g. player, light, chest)..." />
+          <span id="entity-count-badge" class="entity-count">0 Entities</span>
+        </div>
+        <div id="entities-tree-container" class="entities-tree-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Tab 3: Action Console & Dispatcher -->
+      <div id="tab-actions" class="insp-tab-content">
+        <div class="actions-section-title">Contextual Gameplay Actions (Click to Dispatch):</div>
+        <div id="inspector-quick-actions" class="quick-actions-grid">
+          <!-- Populated dynamically -->
+        </div>
+        <div class="custom-action-form">
+          <div class="form-label">Dispatch Custom Typed Action:</div>
+          <div class="action-input-row">
+            <input id="action-input" type="text" placeholder='e.g. flight.throttle: 1.0 or {"name":"rocket.launch"}' />
+            <button id="btn-dispatch-action" class="btn-dispatch">Dispatch Action</button>
+          </div>
+        </div>
+        <div class="action-history-log">
+          <div class="log-label">Recent Action Dispatches:</div>
+          <div id="action-history-list" class="log-entries">
+            <div class="log-entry empty">No actions dispatched yet in this session.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 4: State Snapshot, Export & Sharing -->
+      <div id="tab-state" class="insp-tab-content">
+        <div class="state-actions-bar">
+          <button id="btn-copy-state-json" class="btn-sm btn-accent">📋 Copy State JSON</button>
+          <button id="btn-download-state" class="btn-sm">💾 Download Snapshot (.json)</button>
+          <button id="btn-copy-share-url" class="btn-sm">🔗 Copy Shareable Link</button>
+        </div>
+        <pre id="state-json-view" class="state-json-terminal">{ "status": "Ready", "stateHash": "..." }</pre>
+      </div>
+    </aside>
 
     <!-- Entry Script -->
     <script type="module" src="./src/demo/main.ts"></script>

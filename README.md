@@ -36,8 +36,7 @@ Try the interactive playground live in your browser: **[elemarin.github.io/rende
 | :--- | :--- | :--- |
 | **🪙 Quickstart Demo** | Live interactive browser implementation of the README quickstart: hero character, spinning gold coin sensor, audio chime, and particle burst VFX. | `WASD` / Arrows (Move Hero), `Space` (Jump), `🪙 Respawn Coin` Button |
 | **✈️ Flight Simulator** | Aerodynamic flight physics with lift, drag, runway takeoff & landing, retractable landing gear, and ring course. | `W`/`S` (Pitch), `A`/`D` (Yaw), `Q`/`E` (Roll), `Shift`/`Ctrl` (Throttle), `Z`/`X` (Max/Cut), `G` (Gear), `C` (Cockpit/Chase View), `R` (Reset) |
-| **🧱 Vast Voxel Sandbox** | Multi-biome procedural world (~2,000+ blocks) with ocean water, sandy beaches, rolling hills, snowy peaks, and trees. | `WASD` (Walk & Auto-step), `Shift` (Sprint), `Space` (Jump), `1`-`6` (Hotbar), `Left/Right Click` (Break/Place) |
-| **🔦 PSX 3rd-Person Horror** | Retro PSX survival horror with 3rd-person chase camera, gothic manor corridor, flashlight, key puzzle, and animated iron gate. | `WASD` (Walk Detective), Mouse (Orbit Camera), `E` (Pickup Key & Unlock Gate) |
+| **🔦 Echoes of Blackwood** | Retro PSX 1st-person manor mystery: flashlight, journal clue, clock puzzle, crest, and gate escape. | `WASD` (Walk), Mouse (Look), `F` (Flashlight), `E` (Interact) |
 
 ---
 
@@ -51,7 +50,8 @@ Tree-shakable subpath exports:
 
 ```ts
 import { createRenderoni } from 'renderoni';
-import { body, kccPlayer, sensor, light } from 'renderoni/presets';
+import { body, kccPlayer, sensor, light, proceduralModel } from 'renderoni/presets';
+import { mountSceneInventory } from 'renderoni/scene';
 import { audio } from 'renderoni/audio';
 import { animation } from 'renderoni/animation';
 import { vfx } from 'renderoni/vfx';
@@ -137,6 +137,34 @@ Connect Claude Desktop, Antigravity, Cursor, or any MCP client directly to your 
 - **`act`**: Injects deterministic semantic gameplay actions (`game.act({ name, payload })`).
 - **`step`**: Advances the simulation by $N$ fixed ticks and returns state hashes.
 - **`check`**: Evaluates machine AST assertions.
+
+---
+
+## 🖼️ Prompt → scene (img2threejs)
+
+Agents should not dump a whole game into one prompt. Keep a **compact inventory JSON** in context, reconstruct each unique object with [img2threejs](https://github.com/img2threejs/img2threejs), then mount:
+
+```ts
+import { createRenderoni } from 'renderoni';
+import { kccPlayer, light } from 'renderoni/presets';
+import { mountSceneInventory, type SceneInventory } from 'renderoni/scene';
+import { createWoodCrateModel } from './generated/woodCrate.js';
+
+const inventory: SceneInventory = {
+  version: 1,
+  prompt: 'stone courtyard with a crate and a coin',
+  elements: [
+    { id: 'crate', factory: 'woodCrate', kind: 'prop', position: [0, 0.5, 0], collider: { shape: 'box', size: [1, 1, 1] } },
+  ],
+};
+
+const game = await createRenderoni({ mode: 'headless', seed: 42 });
+game.add(light({ type: 'directional', position: [12, 20, 8] }));
+mountSceneInventory(game, inventory, { woodCrate: createWoodCrateModel });
+game.add(kccPlayer({ id: 'hero', position: [0, 1.5, 6] }));
+```
+
+Skill: `.agents/skills/prompt-to-scene/SKILL.md`.
 
 ---
 

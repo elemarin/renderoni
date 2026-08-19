@@ -510,74 +510,43 @@ These three structurally diverse archetypes serve as official benchmark evaluati
 +---------------------------------------------------------------------------------------------------+
 |                                THREE REFERENCE GAME ARCHETYPES                                    |
 +---------------------------------+---------------------------------+-------------------------------+
-|  1. KSP Rocket Simulator        |  2. Voxel Infinite Terrain      |  3. PSX 1st-Person Horror     |
-|  - Multi-body physics joints    |  - Procedural 3D Simplex noise  |  - PSX dither & affine shader |
-|  - Center of Mass & Thrust      |  - Greedy meshing + Trimesh     |  - Flashlight decay state     |
-|  - Staged part detachment       |  - Raycast block edit + KCC     |  - 3D spatial eerie soundscape|
-|  - Reactive Flight Navball HUD  |  - Voxel inventory reactive UI  |  - Delivery quest triggers    |
+|  1. Prompt-to-Scene contract    |  2. Skyward Courier Flight       |  3. PSX 1st-Person Horror     |
+|  - Compact scene inventory JSON |  - Kinematic aero on fixed tick  |  - kccPlayer first-person     |
+|  - img2threejs factory mount    |  - Island bodies + plane preset  |  - Manor bodies + sensors     |
+|  - Token-cheap object registry  |  - Throttle / landing loop       |  - Journal / clock / gate     |
 +---------------------------------+---------------------------------+-------------------------------+
 ```
 
-### 13.1 Archetype A: KSP-Style Low-Poly Rocket & Space Simulator
+### 13.1 Archetype A: Prompt-to-Scene Lab (img2threejs)
 
 ```ts
 import { createRenderoni } from 'renderoni';
-import { body, light } from 'renderoni/presets';
-import { vfx } from 'renderoni/vfx';
-import { ui } from 'renderoni/ui';
-import { audio } from 'renderoni/audio';
+import { kccPlayer, light } from 'renderoni/presets';
+import { mountSceneInventory, type SceneInventory } from 'renderoni/scene';
 
-// 1. Initialize simulation
-const game = await createRenderoni({
-  mode: 'interactive',
-  subsystems: [vfx(), ui(), audio()],
+const inventory: SceneInventory = {
+  version: 1,
+  prompt: 'stone courtyard with a crate and a coin',
+  elements: [
+    { id: 'crate', factory: 'woodCrate', kind: 'prop', position: [0, 0.5, 0], collider: { shape: 'box', size: [1, 1, 1] } },
+    { id: 'coin', factory: 'goldCoin', kind: 'pickup', position: [2, 1, 0], collider: { shape: 'sphere', radius: 0.6, sensor: true } },
+  ],
+};
+
+const game = await createRenderoni({ mode: 'headless', seed: 42 });
+game.add(light({ type: 'directional', position: [12, 20, 8] }));
+mountSceneInventory(game, inventory, {
+  woodCrate: createWoodCrateModel,
+  goldCoin: createGoldCoinModel,
 });
-
-// 2. Build multi-stage rocket with Rapier Impulse Joints
-const capsule = game.add(body({ id: 'capsule', shape: 'cylinder', size: [1, 2], mass: 500, position: [0, 10, 0] }));
-const booster = game.add(body({ id: 'booster', shape: 'cylinder', size: [1.2, 6], mass: 2000, position: [0, 6, 0] }));
-
-// Connect stage with breakable/detachable joint
-const decouplerJoint = game.native.world.createImpulseJoint(
-  RAPIER.JointData.fixed({ x: 0, y: -1, z: 0 }, { w: 1, x: 0, y: 0, z: 0 }, { x: 0, y: 3, z: 0 }, { w: 1, x: 0, y: 0, z: 0 }),
-  capsule.native.rigidBody(),
-  booster.native.rigidBody(),
-  true
-);
-
-// 3. Thrust & Flight Physics System
-game.systems.add({
-  phase: 'prePhysics',
-  update: (ctx) => {
-    if (booster.state.fuel > 0 && booster.state.throttle > 0) {
-      const thrustForce = booster.state.throttle * 45000;
-      booster.native.rigidBody().applyForceAtPoint({ x: 0, y: thrustForce, z: 0 }, booster.position, true);
-      booster.state.fuel -= ctx.dt * 10;
-      ctx.events.emit('vfx.particles', { type: 'exhaustPlume', position: booster.position });
-    }
-  },
-});
-
-// 4. Staging Action
-game.actions.register({
-  name: 'rocket.stage',
-  handle: () => {
-    game.native.world.removeImpulseJoint(decouplerJoint, true);
-    game.audio.play('stage_decouple');
-    game.events.emit('stage.separated', { stage: 1 });
-  },
-});
+game.add(kccPlayer({ id: 'hero', position: [0, 1.5, 4] }));
 ```
 
 * **Headless Agent Verification Test:**
   ```ts
-  // Agent tests full launch and staging sequence headlessly
-  booster.state.throttle = 1.0;
-  game.step(300); // Simulate 5s of burn
-  game.act({ name: 'rocket.stage' });
-  game.step(60);
-  expect(capsule.position.y).toBeGreaterThan(150);
-  expect(game).toEmitEvent('stage.separated', { stage: 1 });
+  game.step(10);
+  expect(game.entities.get('crate')?.tags.has('prop')).toBe(true);
+  expect(game.entities.get('coin')?.tags.has('sensor')).toBe(true);
   ```
 
 ---
@@ -742,7 +711,7 @@ The MVP is a focused vertical slice proving the dual-buffer kernel, the 5 modula
 - **Gate 3 (Transform Isolation):** Zero transient render interpolation state bleeds into the canonical physics state buffer.
 - **Gate 4 (Agent Verification):** An AI coding agent connected via the built-in MCP server can diagnose, modify, and verify a gameplay defect headlessly using `observe`, `act`, `step`, and `check`.
 - **Gate 5 (Memory Safety):** Repeated spawn/despawn cycles across 3,600 ticks demonstrate zero VRAM leaks and zero Rapier WASM heap handle panics.
-- **Gate 6 (Archetype Conformance):** All three Section 13 reference game evaluation tests (KSP Rocket Staging, Voxel Chunk Raycasting, PSX Horror Quest Chain) pass headlessly in CI with zero DOM dependencies.
+- **Gate 6 (Archetype Conformance):** Section 13 evaluation tests (Prompt-to-Scene inventory mount, PSX horror quest chain) pass headlessly in CI with zero DOM dependencies.
 
 ---
 

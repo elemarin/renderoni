@@ -15,8 +15,8 @@
  */
 
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
-import { RenderoniEngine } from '../core/engine.js';
+import { createRenderoni, type RenderoniEngine } from '../index.js';
+import { body, kccPlayer, sensor, light } from '../presets/index.js';
 import { sfx } from './audio-sfx.js';
 
 export interface PsxTelemetry {
@@ -31,16 +31,14 @@ export interface PsxTelemetry {
 }
 
 export class PsxGame {
-  readonly engine: RenderoniEngine;
+  engine!: RenderoniEngine;
   private canvas: HTMLCanvasElement;
 
   // 1st-Person Controls & Camera
   private camera!: THREE.PerspectiveCamera;
   private yawObject = new THREE.Object3D();
   private pitchObject = new THREE.Object3D();
-  private playerBody!: RAPIER.RigidBody;
-  private playerCollider!: RAPIER.Collider;
-  private characterController!: RAPIER.KinematicCharacterController;
+  private vfxRng!: { nextFloat: () => number };
 
   private isLocked = false;
   private keys: Record<string, boolean> = {};
@@ -90,9 +88,13 @@ export class PsxGame {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.engine = new RenderoniEngine({
+  }
+
+  async init(): Promise<void> {
+    this.engine = await createRenderoni({
       mode: 'interactive',
       canvas: this.canvas,
+      seed: 42,
       gravity: [0, -18.0, 0],
       loop: {
         enabled: true,
@@ -100,10 +102,7 @@ export class PsxGame {
         subtitle: 'Read the journal, wind the clock, take the crest, walk out the gate.',
       },
     });
-  }
-
-  async init(): Promise<void> {
-    await this.engine.init({ gravity: [0, -18.0, 0] });
+    this.vfxRng = this.engine.prng.fork('psx-vfx');
 
     const scene = this.engine.native.scene;
     this.camera = this.engine.native.camera;
@@ -156,26 +155,29 @@ export class PsxGame {
     this.camera.quaternion.identity();
     scene.add(this.yawObject);
 
-    // Create Rapier Kinematic Position Body & Capsule Collider
-    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(startPos[0], startPos[1], startPos[2]);
-    this.playerBody = this.engine.native.world.createRigidBody(bodyDesc);
+    this.engine.add(
+      kccPlayer({
+        id: 'hero',
+        position: [startPos[0], startPos[1], startPos[2]],
+        radius: 0.35,
+        height: 1.2,
+        moveSpeed: 4.0,
+        gravity: 18,
+        camera: 'firstPerson',
+        tags: ['investigator'],
+      })
+    );
 
-    const colliderDesc = RAPIER.ColliderDesc.capsule(0.6, 0.35);
-    this.playerCollider = this.engine.native.world.createCollider(colliderDesc, this.playerBody);
-
-    this.characterController = this.engine.native.world.createCharacterController(0.02);
-    this.characterController.enableAutostep(0.4, 0.2, true);
-    this.characterController.enableSnapToGround(0.3);
-    this.characterController.setMaxSlopeClimbAngle((45 * Math.PI) / 180);
-    this.characterController.setApplyImpulsesToDynamicBodies(false);
+    this.engine.systems.add({
+      phase: 'prePhysics',
+      update: () => this.applyHeroInput(),
+    });
   }
 
   private setupLighting(): void {
     const scene = this.engine.native.scene;
 
-    // Ambient Moonlight
-    const ambient = new THREE.AmbientLight(0x1e293b, 0.4);
-    scene.add(ambient);
+    this.engine.add(light({ type: 'ambient', color: 0x1e293b, intensity: 0.4 }));
 
     // Stained-Glass Window Lightning Light
     this.lightningLight = new THREE.DirectionalLight(0x93c5fd, 0.0);
@@ -329,10 +331,16 @@ export class PsxGame {
   }
 
   private addStaticCollider(x: number, y: number, z: number, hx: number, hy: number, hz: number): void {
-    const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z);
-    const body = this.engine.native.world.createRigidBody(bodyDesc);
-    const colliderDesc = RAPIER.ColliderDesc.cuboid(hx, hy, hz);
-    this.engine.native.world.createCollider(colliderDesc, body);
+    this.engine.add(
+      body({
+        shape: 'box',
+        type: 'fixed',
+        size: [hx * 2, hy * 2, hz * 2],
+        position: [x, y, z],
+        visible: false,
+        tags: ['manor', 'static'],
+      })
+    );
   }
 
   private buildBookshelf(x: number, y: number, z: number): void {
@@ -412,6 +420,15 @@ export class PsxGame {
       prompt: '📖 Read Clockmaker\'s Journal (E)',
       onInteract: () => this.readJournal(),
     });
+    this.engine.add(
+      sensor({
+        id: 'journal',
+        shape: 'box',
+        size: [2, 2, 2],
+        position: [x + 0.4, y + 1.2, z],
+        tags: ['interact', 'journal'],
+      })
+    );
   }
 
   private buildGrandfatherClock(x: number, y: number, z: number): void {
@@ -465,6 +482,7 @@ export class PsxGame {
       prompt: '🕰️ Inspect Grandfather Clock (E)',
       onInteract: () => this.interactClock(),
     });
+    this.engine.add(sensor({ id: 'clock', shape: 'box', size: [2, 3, 2], position: [x, y + 1.5, z], tags: ['interact', 'clock'] }));
   }
 
   private buildKeyTable(x: number, y: number, z: number): void {
@@ -508,6 +526,7 @@ export class PsxGame {
       prompt: '🗝️ Pick up Clock Winding Key (E)',
       onInteract: () => this.pickupKey(),
     });
+    this.engine.add(sensor({ id: 'key', shape: 'sphere', radius: 1.2, position: [x, y + 1.2, z], tags: ['interact', 'key'] }));
   }
 
   private buildGrandExitGate(x: number, y: number, z: number): void {
@@ -551,6 +570,7 @@ export class PsxGame {
       prompt: '🚪 Examine Sealed Gate (E)',
       onInteract: () => this.interactGate(),
     });
+    this.engine.add(sensor({ id: 'gate', shape: 'box', size: [4, 4, 2], position: [x, y + 1.5, z], tags: ['interact', 'gate'] }));
   }
 
   private setupPuzzles(): void {
@@ -583,6 +603,7 @@ export class PsxGame {
       prompt: '🛡️ Take Blackwood Crest (E)',
       onInteract: () => this.pickupCrest(),
     });
+    this.engine.add(sensor({ id: 'crest', shape: 'sphere', radius: 1.2, position: [8, 1.7, -22], tags: ['interact', 'crest'] }));
   }
 
   // --- Puzzle Interactions ---
@@ -678,9 +699,10 @@ export class PsxGame {
       this.clockHands.hour.rotation.z = 0;
       this.clockHands.minute.rotation.z = 0;
     }
-    const start = { x: 0, y: 1.7, z: 6 };
-    this.playerBody.setNextKinematicTranslation(start);
-    this.yawObject.position.set(start.x, start.y, start.z);
+    const start: [number, number, number] = [0, 1.7, 6];
+    const hero = this.engine.entities.get('hero');
+    if (hero) hero.position = start;
+    this.yawObject.position.set(start[0], start[1], start[2]);
     this.yawObject.rotation.set(0, 0, 0);
     this.pitchObject.rotation.set(0, 0, 0);
     this.keys = {};
@@ -830,8 +852,36 @@ export class PsxGame {
     return null;
   }
 
+  private applyHeroInput(): void {
+    const hero = this.engine.entities.get('hero');
+    if (!hero) return;
+
+    let forward = 0;
+    let strafe = 0;
+    if (this.engine.loop.playing) {
+      if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) forward += 1;
+      if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) forward -= 1;
+      if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
+      if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
+    }
+
+    const yaw = this.yawObject.rotation.y;
+    const speed = this.keys['ShiftLeft'] || this.keys['ShiftRight'] ? 6.5 : 4.0;
+    const len = Math.hypot(strafe, forward) || 1;
+    const lx = strafe / len;
+    const lz = -forward / len;
+    const worldX = lx * Math.cos(yaw) + lz * Math.sin(yaw);
+    const worldZ = -lx * Math.sin(yaw) + lz * Math.cos(yaw);
+    hero.actions.move?.({
+      x: forward === 0 && strafe === 0 ? 0 : worldX,
+      z: forward === 0 && strafe === 0 ? 0 : worldZ,
+      speed,
+    });
+  }
+
   getTelemetry(): PsxTelemetry {
-    const p = this.yawObject.position;
+    const hero = this.engine.entities.get('hero');
+    const p = hero?.position ?? [this.yawObject.position.x, this.yawObject.position.y, this.yawObject.position.z];
     let quest = 'Walk the hall. First left: journal on the desk';
     if (this.gateUnlocked) quest = 'Escaped the manor';
     else if (this.hasCrest) quest = 'Keep walking to the gate at the end';
@@ -840,7 +890,7 @@ export class PsxGame {
     else if (this.inspectingText) quest = quest;
 
     return {
-      playerPos: [parseFloat(p.x.toFixed(1)), parseFloat(p.y.toFixed(1)), parseFloat(p.z.toFixed(1))],
+      playerPos: [parseFloat(p[0].toFixed(1)), parseFloat(p[1].toFixed(1)), parseFloat(p[2].toFixed(1))],
       questStatus: quest,
       hasKey: this.hasKey,
       hasCrest: this.hasCrest,
@@ -852,42 +902,16 @@ export class PsxGame {
   }
 
   update(dt: number): void {
-    // 1. Process 1st-Person WASD Movement
-    let forward = 0;
-    let strafe = 0;
+    const hero = this.engine.entities.get('hero');
+    const pos = hero?.position ?? [this.yawObject.position.x, this.yawObject.position.y, this.yawObject.position.z];
+    this.yawObject.position.set(pos[0], pos[1], pos[2]);
 
-    if (this.engine.loop.playing) {
-      if (this.keys['KeyW'] || this.keys['w'] || this.keys['ArrowUp']) forward += 1;
-      if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) forward -= 1;
-      if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) strafe -= 1;
-      if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) strafe += 1;
-    }
-
-    const isMoving = forward !== 0 || strafe !== 0;
-    const speed = (this.keys['ShiftLeft'] || this.keys['ShiftRight']) ? 6.5 : 4.0;
-
-    // Movement relative to yaw direction
-    const moveDir = new THREE.Vector3(strafe, 0, -forward).normalize();
-    moveDir.applyEuler(new THREE.Euler(0, this.yawObject.rotation.y, 0));
-
-    const desiredTranslation = new RAPIER.Vector3(
-      moveDir.x * speed * dt,
-      -9.8 * dt,
-      moveDir.z * speed * dt
-    );
-
-    this.characterController.computeColliderMovement(this.playerCollider, desiredTranslation);
-    const corrected = this.characterController.computedMovement();
-
-    const curr = this.playerBody.translation();
-    const newPos = {
-      x: curr.x + corrected.x,
-      y: curr.y + corrected.y,
-      z: curr.z + corrected.z,
-    };
-
-    this.playerBody.setNextKinematicTranslation(newPos);
-    this.yawObject.position.set(newPos.x, newPos.y, newPos.z);
+    const isMoving =
+      this.engine.loop.playing &&
+      !!(this.keys['KeyW'] || this.keys['KeyS'] || this.keys['KeyA'] || this.keys['KeyD'] ||
+        this.keys['w'] || this.keys['s'] || this.keys['a'] || this.keys['d'] ||
+        this.keys['ArrowUp'] || this.keys['ArrowDown'] || this.keys['ArrowLeft'] || this.keys['ArrowRight']);
+    const speed = this.keys['ShiftLeft'] || this.keys['ShiftRight'] ? 6.5 : 4.0;
 
     // 2. Head Bob & Footstep SFX
     if (isMoving) {
@@ -912,7 +936,7 @@ export class PsxGame {
 
     // 3. Torch Sconce Flame Flickering
     this.torches.forEach((t) => {
-      const flicker = (Math.random() - 0.5) * 0.3;
+      const flicker = (this.vfxRng.nextFloat() - 0.5) * 0.3;
       t.light.intensity = t.baseIntensity + flicker;
       t.mesh.scale.set(1 + flicker * 0.5, 1 + flicker * 0.8, 1 + flicker * 0.5);
     });
@@ -929,7 +953,7 @@ export class PsxGame {
 
     // 5. Grandfather Clock Pendulum & Tick Sound
     if (this.pendulumMesh) {
-      const pendAngle = Math.sin(Date.now() * 0.0035) * 0.35;
+      const pendAngle = Math.sin(this.engine.clock.tick * 0.06) * 0.35;
       this.pendulumMesh.rotation.z = pendAngle;
 
       // Clock tick at swing apex
