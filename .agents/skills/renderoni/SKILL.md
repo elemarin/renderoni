@@ -20,6 +20,7 @@ This skill provides comprehensive architectural guidelines, Three.js optimizatio
 7. [Camera, Input & Audio Systems](#7-camera-input--audio-systems)
 8. [VFX, Particles & Juice](#8-vfx-particles--juice)
 9. [Headless Testing & Agent Verification](#9-headless-testing--agent-verification)
+10. [Prompt-to-Scene (img2threejs)](#10-prompt-to-scene-img2threejs)
 
 ---
 
@@ -314,3 +315,18 @@ test('hero triggers sensor and verifies determinism hash', async () => {
   expect(game).toHavePassedDiagnostics();
 });
 ```
+
+---
+
+## 10. Prompt-to-Scene (img2threejs)
+
+Do not one-shot a whole game. Keep a compact `SceneInventory` in context, reconstruct each unique `factory` with [img2threejs](https://github.com/img2threejs/img2threejs), then mount:
+
+```ts
+import { mountSceneInventory } from 'renderoni/scene';
+import { proceduralModel } from 'renderoni/presets';
+
+mountSceneInventory(game, inventory, { woodCrate: createWoodCrateModel });
+```
+
+Full agent recipe: `.agents/skills/prompt-to-scene/SKILL.md`.

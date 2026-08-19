@@ -35,6 +35,7 @@ export const BodyOptionsSchema = Type.Object({
   color: Type.Optional(Type.Number()),
   friction: Type.Optional(Type.Number()),
   restitution: Type.Optional(Type.Number()),
+  visible: Type.Optional(Type.Boolean()),
   tags: Type.Optional(Type.Array(Type.String())),
 });
 
@@ -78,7 +79,11 @@ export const body = definePreset({
     }
 
     const material = new THREE.MeshStandardMaterial({ color });
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = options.visible === false ? new THREE.Group() : new THREE.Mesh(geometry, material);
+    if (options.visible === false) {
+      geometry.dispose();
+      material.dispose();
+    }
     mesh.position.set(pos[0], pos[1], pos[2]);
 
     if (options.rotation) {

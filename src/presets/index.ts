@@ -4,3 +4,6 @@ export * from './sensor.js';
 export * from './light.js';
 export * from './kcc-player.js';
 export * from './dynamic-player.js';
+export * from './procedural-model.js';
+export * from './mesh.js';
+export * from './model.js';

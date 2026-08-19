@@ -26,6 +26,7 @@ export const KCCPlayerOptionsSchema = Type.Object({
       minStepWidth: Type.Number(),
     })
   ),
+  visible: Type.Optional(Type.Boolean()),
   state: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
   tags: Type.Optional(Type.Array(Type.String())),
 });
@@ -41,6 +42,7 @@ export const kccPlayer = definePreset({
     const radius = options.radius ?? 0.4;
     const halfHeight = options.height ? options.height / 2 : 0.8;
     const moveSpeed = options.moveSpeed ?? 6.0;
+    let moveSpeedRuntime = moveSpeed;
     const jumpSpeed = options.jumpSpeed ?? 8.5;
     const gravity = options.gravity ?? 20.0;
 
@@ -48,6 +50,7 @@ export const kccPlayer = definePreset({
     const geometry = new THREE.CapsuleGeometry(radius, halfHeight * 2, 8, 16);
     const material = new THREE.MeshStandardMaterial({ color: 0x2288ff });
     const mesh = new THREE.Mesh(geometry, material);
+    mesh.visible = options.visible !== false && options.camera !== 'firstPerson';
     mesh.position.set(pos[0], pos[1], pos[2]);
 
     // 2. Create Kinematic Position-Based Rigid Body & Capsule Collider
@@ -98,9 +101,10 @@ export const kccPlayer = definePreset({
         },
       },
       actions: {
-        move: (payload: { x: number; z: number }) => {
+        move: (payload: { x: number; z: number; speed?: number }) => {
           inputVector.x = payload.x;
           inputVector.z = payload.z;
+          moveSpeedRuntime = payload.speed ?? moveSpeed;
         },
         jump: () => {
           if (isGrounded) {
@@ -141,9 +145,9 @@ export const kccPlayer = definePreset({
 
       // Compute desired movement vector
       const desiredTranslation = new RAPIER.Vector3(
-        inputVector.x * moveSpeed * dt,
+        inputVector.x * moveSpeedRuntime * dt,
         verticalVelocity * dt,
-        inputVector.z * moveSpeed * dt
+        inputVector.z * moveSpeedRuntime * dt
       );
 
       // Compute collider movement through Rapier KCC

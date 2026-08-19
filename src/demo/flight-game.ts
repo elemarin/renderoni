@@ -15,9 +15,8 @@
  */
 
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
-import { RenderoniEngine } from '../core/engine.js';
-import { light } from '../presets/index.js';
+import { createRenderoni, type RenderoniEngine } from '../index.js';
+import { body, light, proceduralModel } from '../presets/index.js';
 import { sfx } from './audio-sfx.js';
 
 export interface FlightTelemetry {
@@ -32,7 +31,7 @@ export interface FlightTelemetry {
 }
 
 export class FlightGame {
-  readonly engine: RenderoniEngine;
+  engine!: RenderoniEngine;
   private canvas: HTMLCanvasElement;
 
   // Aircraft Visual Mesh Hierarchy
@@ -46,8 +45,7 @@ export class FlightGame {
   private rightAileron!: THREE.Mesh;
   private elevatorMesh!: THREE.Mesh;
 
-  // Physics
-  private planeBody!: RAPIER.RigidBody;
+  private planeBody: { translation: () => { x: number; y: number; z: number }; rotation: () => { x: number; y: number; z: number; w: number }; setNextKinematicTranslation: (v: { x: number; y: number; z: number }) => void; setNextKinematicRotation: (q: { x: number; y: number; z: number; w: number }) => void } | null = null;
 
   // Flight State
   private throttle = 0.0; // 0.0 to 1.0
@@ -66,9 +64,13 @@ export class FlightGame {
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.engine = new RenderoniEngine({
+  }
+
+  async init(): Promise<void> {
+    this.engine = await createRenderoni({
       mode: 'interactive',
       canvas: this.canvas,
+      seed: 42,
       gravity: [0, -14.0, 0],
       loop: {
         enabled: true,
@@ -76,10 +78,6 @@ export class FlightGame {
         subtitle: 'Hold Z to take off. Below half throttle you sink. Fly the islands.',
       },
     });
-  }
-
-  async init(): Promise<void> {
-    await this.engine.init({ gravity: [0, -14.0, 0] });
 
     const scene = this.engine.native.scene;
     scene.background = new THREE.Color(0x38bdf8);
@@ -101,6 +99,10 @@ export class FlightGame {
 
     // 6. Setup Controls
     this.setupControls();
+    this.engine.systems.add({
+      phase: 'prePhysics',
+      update: ({ dt }) => this.stepFlight(dt),
+    });
     this.engine.loop.onReset(() => this.resetPlane());
 
     // Start engine sound
@@ -129,7 +131,6 @@ export class FlightGame {
   }
 
   private buildBiplane(): void {
-    const scene = this.engine.native.scene;
     this.planeRoot = new THREE.Group();
 
     // Materials
@@ -218,21 +219,24 @@ export class FlightGame {
     pontoonR.position.set(1.3, -0.9, -0.2);
     this.planeRoot.add(pontoonL, pontoonR);
 
-    // On the runway, yawed toward +X (open water) so takeoff is not a canyon wall.
-    const startPos = [0, 3.1, 40];
+    const startPos: [number, number, number] = [0, 3.1, 40];
     this.planeRoot.position.set(startPos[0], startPos[1], startPos[2]);
     this.planeRoot.quaternion.set(0, -0.7071, 0, 0.7071);
-    scene.add(this.planeRoot);
 
-    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased()
-      .setTranslation(startPos[0], startPos[1], startPos[2])
-      .setRotation({ x: 0, y: -0.7071, z: 0, w: 0.7071 });
-    this.planeBody = this.engine.native.world.createRigidBody(bodyDesc);
-
-    const colliderDesc = RAPIER.ColliderDesc.cuboid(1.6, 0.45, 2.2);
-    colliderDesc.setFriction(0.15);
-    colliderDesc.setRestitution(0.1);
-    this.engine.native.world.createCollider(colliderDesc, this.planeBody);
+    const plane = this.engine.add(
+      proceduralModel({
+        id: 'courier',
+        create: () => this.planeRoot,
+        position: startPos,
+        rotation: [0, -0.7071, 0, 0.7071],
+        type: 'kinematicPositionBased',
+        collider: { shape: 'box', size: [3.2, 0.9, 4.4] },
+        friction: 0.15,
+        restitution: 0.1,
+        tags: ['plane', 'player'],
+      })
+    );
+    this.planeBody = plane.native.rapier?.body ?? null;
   }
 
   private buildArchipelago(): void {
@@ -335,10 +339,16 @@ export class FlightGame {
   }
 
   private addStaticBox(x: number, y: number, z: number, hx: number, hy: number, hz: number): void {
-    const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z);
-    const body = this.engine.native.world.createRigidBody(bodyDesc);
-    const colliderDesc = RAPIER.ColliderDesc.cuboid(hx, hy, hz);
-    this.engine.native.world.createCollider(colliderDesc, body);
+    this.engine.add(
+      body({
+        shape: 'box',
+        type: 'fixed',
+        size: [hx * 2, hy * 2, hz * 2],
+        position: [x, y, z],
+        visible: false,
+        tags: ['island', 'static'],
+      })
+    );
   }
 
   private setupActions(): void {
@@ -396,13 +406,13 @@ export class FlightGame {
     this.throttle = 0.0;
     this.airspeed = 0.0;
     this.isAirborne = false;
-    this.planeBody.setNextKinematicTranslation({ x: 0, y: 3.1, z: 40 });
-    this.planeBody.setNextKinematicRotation({ x: 0, y: -0.7071, z: 0, w: 0.7071 });
+    this.planeBody?.setNextKinematicTranslation({ x: 0, y: 3.1, z: 40 });
+    this.planeBody?.setNextKinematicRotation({ x: 0, y: -0.7071, z: 0, w: 0.7071 });
     this.currentObjective = 'Hold Z until ~70% — then you leave the grass';
   }
 
   getTelemetry(): FlightTelemetry {
-    const pos = this.planeBody.translation();
+    const pos = this.planeBody?.translation() ?? { x: 0, y: 0, z: 0 };
     const speedKmh = Math.round(this.airspeed * 3.6);
     const alt = Math.max(0, Math.round(pos.y));
 
@@ -425,11 +435,27 @@ export class FlightGame {
   }
 
   update(dt: number): void {
+    this.syncPlaneVisual();
     if (!this.engine.loop.playing) {
-      this.syncPlaneVisual();
       this.updateCamera();
       return;
     }
+
+    const propSpeed = 2 + this.throttle * 35;
+    this.propMeshLeft.rotation.z += propSpeed * dt;
+    this.propMeshRight.rotation.z -= propSpeed * dt;
+    this.blurDiscLeft.visible = this.throttle > 0.45;
+    this.blurDiscRight.visible = this.throttle > 0.45;
+    this.rudderMesh.rotation.y = (this.keys['KeyA'] ? 0.3 : 0) + (this.keys['KeyD'] ? -0.3 : 0);
+    this.leftAileron.rotation.x = this.roll * 0.6;
+    this.rightAileron.rotation.x = -this.roll * 0.6;
+    this.elevatorMesh.rotation.x = this.pitch;
+    sfx.updateEngineDrone(this.throttle, Math.round(this.airspeed * 3.6));
+    this.updateCamera();
+  }
+
+  private stepFlight(dt: number): void {
+    if (!this.engine.loop.playing || !this.planeBody) return;
 
     if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) this.throttle = Math.min(1, this.throttle + dt * 0.85);
     if (this.keys['ControlLeft'] || this.keys['ControlRight']) this.throttle = Math.max(0, this.throttle - dt * 0.95);
@@ -479,27 +505,9 @@ export class FlightGame {
     this.planeBody.setNextKinematicRotation({ x: q.x, y: q.y, z: q.z, w: q.w });
 
     this.isAirborne = next.y > 3.4;
-    const speedKmh = Math.round(this.airspeed * 3.6);
-    this.planeRoot.position.set(next.x, next.y, next.z);
-    this.planeRoot.quaternion.copy(q);
-
-    const propSpeed = 2 + this.throttle * 35;
-    this.propMeshLeft.rotation.z += propSpeed * dt;
-    this.propMeshRight.rotation.z -= propSpeed * dt;
-    this.blurDiscLeft.visible = this.throttle > 0.45;
-    this.blurDiscRight.visible = this.throttle > 0.45;
-    this.rudderMesh.rotation.y = (this.keys['KeyA'] ? 0.3 : 0) + (this.keys['KeyD'] ? -0.3 : 0);
-    this.leftAileron.rotation.x = this.roll * 0.6;
-    this.rightAileron.rotation.x = -this.roll * 0.6;
-    this.elevatorMesh.rotation.x = this.pitch;
-
-    sfx.updateEngineDrone(this.throttle, speedKmh);
     this.currentObjective = this.isAirborne
       ? 'Shift faster · Ctrl slower · Q/E roll · cut throttle to land'
       : 'Taxi with Shift. Hold past 60% to take off';
-
-    // 11. Camera System
-    this.updateCamera();
   }
 
   private groundHeight(x: number, z: number): number {
@@ -510,6 +518,7 @@ export class FlightGame {
   }
 
   private syncPlaneVisual(): void {
+    if (!this.planeBody) return;
     const p = this.planeBody.translation();
     const rot = this.planeBody.rotation();
     this.planeRoot.position.set(p.x, p.y, p.z);
@@ -517,6 +526,7 @@ export class FlightGame {
   }
 
   private updateCamera(): void {
+    if (!this.planeBody) return;
     const camera = this.engine.native.camera;
     const p = this.planeBody.translation();
     const rot = this.planeBody.rotation();
