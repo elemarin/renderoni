@@ -8,6 +8,7 @@ import { RenderoniEngine, type RenderoniConfig } from './core/engine.js';
 
 export * from './core/index.js';
 export * from './presets/index.js';
+export * from './input/index.js';
 export { RenderoniEngine, type RenderoniConfig } from './core/engine.js';
 
 export async function createRenderoni(config: RenderoniConfig = {}): Promise<RenderoniEngine> {

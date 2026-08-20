@@ -393,6 +393,13 @@ export class QuickstartGame {
     };
     window.addEventListener('keyup', onKeyUp);
     this.unbind.push(() => window.removeEventListener('keyup', onKeyUp));
+    this.engine.input.attachMobileControls({
+      buttons: [
+        { name: 'jump', label: 'JUMP' },
+        { name: 'blast', label: 'BLAST' },
+      ],
+      joystickColor: '#f59e0b',
+    });
   }
 
   getTelemetry(): QuickstartTelemetry {
@@ -418,6 +425,9 @@ export class QuickstartGame {
     if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) dz += 1;
     if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) dx -= 1;
     if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) dx += 1;
+    const mobileMove = this.engine.input.getMoveVector();
+    dx += mobileMove.x;
+    dz -= mobileMove.z;
 
     const isSprint = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
     const speedMult = isSprint ? 1.7 : 1.0;
@@ -433,9 +443,10 @@ export class QuickstartGame {
       }
     }
 
-    if (this.keys['Space']) {
+    if (this.keys['Space'] || this.engine.input.isButtonPressed('jump')) {
       this.hero.actions.jump();
     }
+    if (this.engine.input.consumeButtonPress('blast')) this.explode();
 
     // Sync Hero Mesh Visuals
     this.heroMesh.position.set(this.hero.position[0], this.hero.position[1] - 0.9, this.hero.position[2]);

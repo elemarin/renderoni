@@ -200,6 +200,14 @@ export class EchoesOfBlackwoodGame {
   private update(dt: number): void {
     if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused) return;
     const keys = this.keys;
+    const mobileMove = this.engine.input.getMoveVector();
+    const mobileLook = this.engine.input.consumeLookDelta();
+    this.yawAngle -= mobileLook.dx * 0.004;
+    this.pitchAngle -= mobileLook.dy * 0.004;
+    this.pitchAngle = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, this.pitchAngle));
+
+    if (this.engine.input.consumeButtonPress('interact')) this.tryInteract();
+    if (this.engine.input.consumeButtonPress('flashlight')) this.toggleFlashlight();
 
     // 1. Smooth Keyboard Turning (ArrowLeft / ArrowRight)
     const turnSpeed = 2.4;
@@ -212,8 +220,8 @@ export class EchoesOfBlackwoodGame {
     const rightX = Math.cos(this.yawAngle);
     const rightZ = -Math.sin(this.yawAngle);
 
-    let dirX = 0;
-    let dirZ = 0;
+    let dirX = forwardX * mobileMove.z + rightX * mobileMove.x;
+    let dirZ = forwardZ * mobileMove.z + rightZ * mobileMove.x;
     if (keys['KeyW'] || keys['ArrowUp']) { dirX += forwardX; dirZ += forwardZ; }
     if (keys['KeyS'] || keys['ArrowDown']) { dirX -= forwardX; dirZ -= forwardZ; }
     if (keys['KeyD']) { dirX += rightX; dirZ += rightZ; }
@@ -481,7 +489,7 @@ export class EchoesOfBlackwoodGame {
         useHorrorStore.getState().dismissInspect();
         return;
       }
-      if (!this.isLocked) {
+      if (!this.isLocked && navigator.maxTouchPoints === 0) {
         this.canvas.requestPointerLock();
       }
     };
@@ -493,6 +501,14 @@ export class EchoesOfBlackwoodGame {
     window.addEventListener('mousemove', onMouseMove);
     document.addEventListener('pointerlockchange', onPointerLockChange);
     this.canvas.addEventListener('click', onClick);
+    this.engine.input.attachMobileControls({
+      lookElement: this.canvas,
+      buttons: [
+        { name: 'interact', label: 'USE', ariaLabel: 'Interact' },
+        { name: 'flashlight', label: 'LIGHT', ariaLabel: 'Toggle flashlight' },
+      ],
+      joystickColor: '#ef4444',
+    });
 
     this.unbindInput.push(() => {
       window.removeEventListener('keydown', onKeyDown);

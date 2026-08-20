@@ -367,6 +367,19 @@ class PlaygroundApp {
       }
     });
 
+    let swipeStartX: number | null = null;
+    this.consoleHome.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'touch') swipeStartX = event.clientX;
+    });
+    this.consoleHome.addEventListener('pointerup', (event) => {
+      if (swipeStartX === null || event.pointerType !== 'touch') return;
+      const distance = event.clientX - swipeStartX;
+      swipeStartX = null;
+      if (Math.abs(distance) < 50) return;
+      const next = (this.selectedAlbumIndex + (distance < 0 ? 1 : -1) + GAME_ORDER.length) % GAME_ORDER.length;
+      this.selectAlbumCard(next);
+    });
+
     this.selectAlbumCard(0);
     this.updateSpotlightContent();
   }

@@ -145,9 +145,13 @@ export class SkywardCourierGame {
     if (!plane) return;
 
     const keys = this.keys;
+    const mobileMove = this.engine.input.getMoveVector();
+    if (this.engine.input.consumeButtonPress('engine')) this.startEngine();
+    if (this.engine.input.consumeButtonPress('view')) this.toggleView();
 
     // 1. Auto-Start & Throttle Input (W, Shift, Space accelerate)
-    if (keys['KeyW'] || keys['ShiftLeft'] || keys['ShiftRight'] || keys['Space']) {
+    if (keys['KeyW'] || keys['ShiftLeft'] || keys['ShiftRight'] || keys['Space']
+      || this.engine.input.isButtonPressed('throttle')) {
       if (!this.engineRunning) {
         this.engineRunning = true;
         useFlightStore.getState().toggleEngine();
@@ -160,7 +164,7 @@ export class SkywardCourierGame {
     useFlightStore.getState().setThrottle(Math.round(this.throttle * 100));
 
     // Brakes
-    this.brakes = !!keys['KeyB'];
+    this.brakes = !!keys['KeyB'] || this.engine.input.isButtonPressed('brake');
     useFlightStore.getState().setBrakes(this.brakes);
 
     // 2. Propeller Spin & Audio
@@ -194,6 +198,13 @@ export class SkywardCourierGame {
     if (keys['KeyD'] || keys['ArrowRight']) {
       if (onGround) rotDelta.y -= 1.2 * dt;
       else rotDelta.z -= 2.4 * controlEff * dt;
+    }
+    if (Math.abs(mobileMove.z) > 0.05) {
+      rotDelta.x += mobileMove.z * (onGround ? 0.9 : 1.6) * controlEff * dt;
+    }
+    if (Math.abs(mobileMove.x) > 0.05) {
+      if (onGround) rotDelta.y -= mobileMove.x * 1.2 * dt;
+      else rotDelta.z -= mobileMove.x * 2.4 * controlEff * dt;
     }
     if (keys['KeyQ']) rotDelta.y += 1.2 * controlEff * dt;
     if (keys['KeyE']) rotDelta.y -= 1.2 * controlEff * dt;
@@ -321,6 +332,15 @@ export class SkywardCourierGame {
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    this.engine.input.attachMobileControls({
+      buttons: [
+        { name: 'throttle', label: 'GO', ariaLabel: 'Hold for throttle' },
+        { name: 'brake', label: 'BRAKE' },
+        { name: 'engine', label: 'START', ariaLabel: 'Toggle engine' },
+        { name: 'view', label: 'VIEW', ariaLabel: 'Change camera view' },
+      ],
+      joystickColor: '#38bdf8',
+    });
     this.unbind.push(() => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
