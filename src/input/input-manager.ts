@@ -19,7 +19,9 @@ export class InputManager {
   private moveVector: InputVector2D = { x: 0, z: 0 };
   private lookDelta: LookDelta = { dx: 0, dy: 0 };
   private buttons: Map<string, boolean> = new Map();
+  private buttonPresses: Set<string> = new Set();
   private isListening = false;
+  private mobileControls?: MobileControls;
 
   private cleanupListeners: Array<() => void> = [];
 
@@ -104,11 +106,31 @@ export class InputManager {
   }
 
   setButton(buttonName: string, pressed: boolean): void {
+    if (pressed && !this.buttons.get(buttonName)) {
+      this.buttonPresses.add(buttonName);
+    }
     this.buttons.set(buttonName, pressed);
   }
 
   isButtonPressed(buttonName: string): boolean {
     return this.buttons.get(buttonName) ?? false;
+  }
+
+  consumeButtonPress(buttonName: string): boolean {
+    const pressed = this.buttonPresses.has(buttonName);
+    this.buttonPresses.delete(buttonName);
+    return pressed;
+  }
+
+  addLookDelta(dx: number, dy: number): void {
+    this.lookDelta.dx += dx;
+    this.lookDelta.dy += dy;
+  }
+
+  attachMobileControls(options: MobileControlsOptions = {}): MobileControls {
+    this.mobileControls?.dispose();
+    this.mobileControls = new MobileControls(this, options);
+    return this.mobileControls;
   }
 
   consumeLookDelta(): LookDelta {
@@ -122,9 +144,12 @@ export class InputManager {
     this.moveVector = { x: 0, z: 0 };
     this.lookDelta = { dx: 0, dy: 0 };
     this.buttons.clear();
+    this.buttonPresses.clear();
   }
 
   dispose(): void {
+    this.mobileControls?.dispose();
+    this.mobileControls = undefined;
     for (const cleanup of this.cleanupListeners) {
       cleanup();
     }
@@ -132,3 +157,4 @@ export class InputManager {
     this.isListening = false;
   }
 }
+import { MobileControls, type MobileControlsOptions } from './mobile-controls.js';

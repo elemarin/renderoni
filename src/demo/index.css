@@ -1881,3 +1881,123 @@ body.in-game .top-nav.home-only { display: none !important; }
 .dock-pill-badge.hash {
   color: #38bdf8 !important;
 }
+
+@media (max-width: 700px), (any-pointer: coarse) {
+  .top-nav {
+    min-height: 48px;
+    padding: max(8px, env(safe-area-inset-top)) 12px 8px;
+  }
+  .top-nav .tab-btn,
+  .clock-badge {
+    display: none;
+  }
+  .console-home-view {
+    touch-action: pan-y;
+  }
+  .album-card > .card-title {
+    left: 20px;
+    right: 20px;
+    bottom: 176px !important;
+    font-size: clamp(1.6rem, 8vw, 2.5rem);
+  }
+  .carousel-arrow {
+    width: 48px;
+    height: 64px;
+    font-size: 2rem;
+  }
+  .carousel-arrow.prev { left: 8px; }
+  .carousel-arrow.next { right: 8px; }
+  .home-play {
+    right: 18px;
+    bottom: calc(104px + env(safe-area-inset-bottom));
+  }
+  .home-play button {
+    min-height: 48px;
+    padding: 10px 24px;
+  }
+  .game-shelf {
+    left: 10px;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .game-shelf::-webkit-scrollbar { display: none; }
+  .shelf-item {
+    flex: 0 0 82px;
+    width: 82px;
+    font-size: 0.8rem;
+  }
+  .shelf-art { height: 48px; }
+  .shelf-item span:last-child {
+    padding: 5px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hud-top-bar {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    right: max(10px, env(safe-area-inset-right));
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .hud-objective-pill {
+    min-width: 0;
+    max-width: calc(100vw - 110px);
+    padding: 6px 9px;
+    font-size: 0.82rem;
+  }
+  .hud-obj-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hud-inventory-bar {
+    justify-content: flex-end;
+  }
+  .hud-inventory-bar > :not(.btn-pause-chip):not(.btn-pause-menu-trigger) {
+    display: none;
+  }
+  .btn-pause-chip,
+  .btn-pause-menu-trigger {
+    min-width: 48px;
+    min-height: 44px;
+    padding: 6px 10px;
+  }
+  .hud-controls-banner,
+  .flight-controls-banner,
+  .qs-controls-banner,
+  .flight-bottom-slider-bar,
+  .inspector-dock-pill {
+    display: none !important;
+  }
+  .interaction-prompt {
+    top: 45% !important;
+    width: min(82vw, 420px);
+    justify-content: center;
+    padding: 8px 12px !important;
+    text-align: center;
+    font-size: 0.9rem !important;
+  }
+  .pause-card {
+    min-width: 0;
+    width: min(84vw, 360px);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+  .pause-card button {
+    min-height: 48px;
+  }
+  .menu-keyboard-hint {
+    display: none;
+  }
+  .inspector-drawer {
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    height: min(76dvh, 520px);
+  }
+}
