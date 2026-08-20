@@ -60,6 +60,7 @@ export class SimulationClock {
   /**
    * Feeds frame elapsed delta time (in seconds) into the accumulator for interactive presentation loops.
    * Returns the exact number of fixed simulation ticks that must be run this frame.
+   * The caller advances the authoritative tick after each simulation step.
    */
   advancePresentation(dtSeconds: number): number {
     if (dtSeconds < 0) {
@@ -73,7 +74,6 @@ export class SimulationClock {
     let subSteps = 0;
     while (this._accumulator >= this.fixedDt && subSteps < this.maxSubSteps) {
       this._accumulator -= this.fixedDt;
-      this._tick++;
       subSteps++;
     }
 

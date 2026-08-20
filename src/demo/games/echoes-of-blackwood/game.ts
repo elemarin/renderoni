@@ -116,9 +116,13 @@ export class EchoesOfBlackwoodGame {
     // 7. Bind Controls
     this.bindControls();
 
-    // 8. Start Match Loop & Presentation Loop
+    // 8. Run gameplay on Renderoni's deterministic fixed-tick scheduler
+    this.engine.systems.add({
+      phase: 'prePhysics',
+      update: ({ dt }) => this.update(dt),
+    });
     this.engine.loop.start();
-    this.engine.start((dt) => this.update(dt));
+    this.engine.start();
   }
 
   private setupActions(): void {

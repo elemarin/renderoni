@@ -83,21 +83,46 @@ export class ResourceOwnershipTracker {
     if (!record) return;
 
     // Clean up Three.js objects
+    const disposed = new Set<unknown>();
+    const disposeMaterial = (material: THREE.Material): void => {
+      if (disposed.has(material)) return;
+      disposed.add(material);
+      for (const value of Object.values(material)) {
+        if (value instanceof THREE.Texture && !disposed.has(value)) {
+          disposed.add(value);
+          value.dispose();
+        }
+      }
+      material.dispose();
+    };
+    const disposeObject = (object: THREE.Object3D): void => {
+      const resource = object as THREE.Object3D & {
+        geometry?: THREE.BufferGeometry;
+        material?: THREE.Material | THREE.Material[];
+      };
+      if (resource.geometry && !disposed.has(resource.geometry)) {
+        disposed.add(resource.geometry);
+        resource.geometry.dispose();
+      }
+      if (Array.isArray(resource.material)) {
+        for (const material of resource.material) disposeMaterial(material);
+      } else if (resource.material) {
+        disposeMaterial(resource.material);
+      }
+    };
+
     for (const item of record.threeObjects) {
       if (item.ownership === 'owned' || item.ownership === 'transferred') {
-        const obj = item.object as any;
-        if (obj.geometry?.dispose) {
-          obj.geometry.dispose();
-        }
-        if (obj.material) {
-          if (Array.isArray(obj.material)) {
-            for (const mat of obj.material) mat.dispose?.();
+        if (item.object instanceof THREE.Object3D) {
+          item.object.traverse(disposeObject);
+        } else {
+          item.object.geometry?.dispose();
+          if (Array.isArray(item.object.material)) {
+            for (const material of item.object.material) material.dispose();
           } else {
-            obj.material.dispose?.();
+            item.object.material?.dispose();
           }
-        }
-        if (obj.dispose) {
-          obj.dispose();
+          item.object.dispose?.();
         }
       }
     }

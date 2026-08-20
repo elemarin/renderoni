@@ -37,6 +37,7 @@ export class PhysicsEngine {
   private sensorColliders: Set<number> = new Set();
   private bodyToEntity: Map<number, string> = new Map();
   private entityToBody: Map<string, RAPIER.RigidBody> = new Map();
+  private activeContacts: Map<string, { event: CollisionEvent; count: number }> = new Map();
 
   async init(config: PhysicsWorldConfig = {}): Promise<void> {
     if (!this.isInitialized) {
@@ -49,8 +50,11 @@ export class PhysicsEngine {
     this._world = new RAPIER.World(gravity);
     this._eventQueue = new RAPIER.EventQueue(true);
 
-    if (config.integrationParameters?.dt) {
+    if (config.integrationParameters?.dt !== undefined) {
       this._world.integrationParameters.dt = config.integrationParameters.dt;
+    }
+    if (config.integrationParameters?.maxCcdSubsteps !== undefined) {
+      this._world.integrationParameters.maxCcdSubsteps = config.integrationParameters.maxCcdSubsteps;
     }
   }
 
@@ -90,6 +94,17 @@ export class PhysicsEngine {
       this.bodyToEntity.delete(body.handle);
       this.entityToBody.delete(entityId);
     }
+    for (const [handle, registeredEntityId] of this.colliderToEntity) {
+      if (registeredEntityId === entityId) {
+        this.colliderToEntity.delete(handle);
+        this.sensorColliders.delete(handle);
+      }
+    }
+    for (const [key, contact] of this.activeContacts) {
+      if (contact.event.entityA === entityId || contact.event.entityB === entityId) {
+        this.activeContacts.delete(key);
+      }
+    }
   }
 
   getEntityByColliderHandle(handle: number): string | undefined {
@@ -102,6 +117,13 @@ export class PhysicsEngine {
 
   getBodyByEntity(entityId: string): RAPIER.RigidBody | undefined {
     return this.entityToBody.get(entityId);
+  }
+
+  getActiveContacts(): CollisionEvent[] {
+    return Array.from(this.activeContacts.values()).map(({ event }) => event).sort((a, b) => {
+      const first = a.entityA.localeCompare(b.entityA);
+      return first !== 0 ? first : a.entityB.localeCompare(b.entityB);
+    });
   }
 
   /**
@@ -146,6 +168,23 @@ export class PhysicsEngine {
       const cmpA = a.entityA.localeCompare(b.entityA);
       return cmpA !== 0 ? cmpA : a.entityB.localeCompare(b.entityB);
     });
+    for (const collision of rawCollisions) {
+      const key = `${collision.entityA}\0${collision.entityB}`;
+      if (collision.started) {
+        const active = this.activeContacts.get(key);
+        this.activeContacts.set(key, {
+          event: collision,
+          count: (active?.count ?? 0) + 1,
+        });
+      } else {
+        const active = this.activeContacts.get(key);
+        if (active && active.count > 1) {
+          active.count--;
+        } else {
+          this.activeContacts.delete(key);
+        }
+      }
+    }
 
     if (onCollision) {
       for (let i = 0; i < rawCollisions.length; i++) {
@@ -191,5 +230,6 @@ export class PhysicsEngine {
     this.sensorColliders.clear();
     this.bodyToEntity.clear();
     this.entityToBody.clear();
+    this.activeContacts.clear();
   }
 }

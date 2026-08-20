@@ -87,7 +87,7 @@ export const dynamicPlayer = definePreset({
       },
     });
 
-    (entityInst as any).update = (_dt: number) => {
+    entityInst.update = (_dt: number) => {
       if (moveInput.x !== 0 || moveInput.z !== 0) {
         body.addForce({ x: moveInput.x * moveForce, y: 0, z: moveInput.z * moveForce }, true);
       }

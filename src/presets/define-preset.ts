@@ -58,6 +58,7 @@ export interface EntityInstance<TState extends Record<string, unknown> = Record<
   slot?: number;
   position: [number, number, number];
   quaternion: [number, number, number, number];
+  update?: (dt: number) => void;
   destroy: () => void;
   onDestroy?: () => void;
 }
