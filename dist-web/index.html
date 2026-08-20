@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="./assets/index-uoX3Oy83.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CfNnJGrp.css">
+    <script type="module" crossorigin src="./assets/index-DGfPMidY.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-C5LiL29M.css">
   </head>
   <body>
     <!-- 3D WebGL Canvas -->
@@ -17,6 +17,7 @@
     <!-- Top Navigation / Archetype Selector Bar -->
     <nav class="top-nav home-only">
       <div class="brand-badge" id="btn-brand-home">Renderoni</div>
+      <button type="button" class="tab-btn" data-mode="studio" id="btn-nav-studio" style="color: #38bdf8; font-weight: 700;">🎨 Model Studio</button>
       <div class="nav-right-tools">
         <span id="system-clock" class="clock-badge">12:00</span>
         <button id="btn-audio-toggle" class="icon-tool-btn" title="Mute">🔊</button>
@@ -204,6 +205,10 @@
           <span class="shelf-art quickstart-art"></span>
           <span>Lab</span>
         </button>
+        <button type="button" class="shelf-item" data-index="3" data-mode="studio">
+          <span class="shelf-art studio-art"></span>
+          <span>Studio</span>
+        </button>
       </nav>
       <div hidden>
         <span id="spotlight-badge"></span>
@@ -224,6 +229,7 @@
         <p id="pause-kicker" class="pause-kicker">Paused</p>
         <h2 id="pause-title">Echoes of Blackwood</h2>
         <button type="button" id="pause-resume">Resume</button>
+        <button type="button" id="pause-restart">Restart Game</button>
         <button type="button" id="pause-home">Home</button>
       </div>
     </div>
@@ -252,6 +258,7 @@
         <h1 id="loop-title" class="loop-title">Play</h1>
         <p id="loop-body" class="loop-body"></p>
         <button id="loop-action" class="loop-btn" type="button">Play</button>
+        <button id="loop-home" class="loop-btn loop-btn-secondary" type="button">Main Menu</button>
       </div>
     </div>
 
@@ -287,6 +294,7 @@
       <!-- Inspector Navigation Tabs -->
       <nav class="inspector-tabs">
         <button class="insp-tab active" data-tab="telemetry">📡 Telemetry (MCP)</button>
+        <button class="insp-tab" data-tab="models">🎨 3D Models</button>
         <button class="insp-tab" data-tab="entities">🌳 World Entities</button>
         <button class="insp-tab" data-tab="actions">⚡ Action Console</button>
         <button class="insp-tab" data-tab="state">💾 State & Sharing</button>
@@ -303,6 +311,14 @@
           </div>
         </div>
         <pre id="inspector-content" class="telemetry-terminal"># Initializing Renderoni Engine...</pre>
+      </div>
+
+      <!-- Tab: 3D Models & Scene Inventory Previewer -->
+      <div id="tab-models" class="insp-tab-content">
+        <div class="toolbar-label" style="margin-bottom: 8px;">Reconstructed Scene Models &img2threejs Factories:</div>
+        <div id="models-preview-list" class="entities-tree-list">
+          <!-- Populated dynamically with model cards -->
+        </div>
       </div>
 
       <!-- Tab 2: Entity & World Graph Inspector -->

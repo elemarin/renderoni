@@ -46,4 +46,17 @@ describe('GameLoop', () => {
     expect(game.loop.phase).toBe('won');
     game.dispose();
   });
+
+  it('enters game over and restarts from a clean playing phase', () => {
+    const loop = new GameLoop({ enabled: true, title: 'Manor' });
+    loop.start();
+    loop.lose('The manor claimed you');
+
+    expect(loop.phase).toBe('lost');
+    expect(loop.outcome).toBe('The manor claimed you');
+
+    loop.restart();
+    expect(loop.phase).toBe('playing');
+    expect(loop.outcome).toBeNull();
+  });
 });

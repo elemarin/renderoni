@@ -104,7 +104,7 @@ export function buildQuestItems(engine: RenderoniEngine): QuestItemsResult {
       position: [-8, 0.9, 2],
       physics: 'none',
       tags: ['interactive', 'clue', 'journal'],
-      state: { clueText: 'Entry #44: The Grandfather clock hides the Blackwood Crest. Turn the hands to 11:45!' },
+      state: { clueText: 'Entry #44: The ornate wall clock hides the Blackwood Crest. Turn the hands to 11:45!' },
     })
   );
 
@@ -292,9 +292,7 @@ export function buildQuestItems(engine: RenderoniEngine): QuestItemsResult {
       id: 'prop_escape_gate',
       object: gateGroup,
       position: [0, 0, -29],
-      physics: 'static',
-      colliderShape: 'box',
-      colliderSize: [3.2, 3.8, 0.2],
+      physics: 'none',
       tags: ['interactive', 'gate', 'exit'],
       state: { unlocked: false },
     })

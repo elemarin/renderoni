@@ -10,11 +10,12 @@
 import { EchoesOfBlackwoodGame as PsxGame } from './games/echoes-of-blackwood/game.js';
 import { SkywardCourierGame as FlightGame } from './games/skyward-courier/game.js';
 import { QuickstartGame } from './quickstart-game.js';
+import { ModelStudioScene } from './model-studio.js';
 import { HomeScene } from './home-scene.js';
 import { ObservationEngine } from '../core/observations.js';
 import { sfx } from './audio-sfx.js';
 
-export type GameMode = 'home' | 'psx' | 'flight' | 'quickstart';
+export type GameMode = 'home' | 'studio' | 'psx' | 'flight' | 'quickstart';
 
 export interface GameMetadata {
   id: GameMode;
@@ -31,6 +32,28 @@ export interface GameMetadata {
 }
 
 export const GAMES_METADATA: Record<string, GameMetadata> = {
+  studio: {
+    id: 'studio',
+    title: 'Model Studio & Forge',
+    subtitle: 'Pre-Game 3D Reconstruction & Approval Gate',
+    genre: 'PROMPT-TO-SCENE LAB',
+    badge: '🎨 3D MODEL STUDIO',
+    accentColor: '#38bdf8',
+    themeColorHex: 0x0284c7,
+    description: 'Inspect, rotate, view colliders, and approve reconstructed 3D models before adding them to games.',
+    features: [
+      '🔄 360-degree Turntable with OrbitControls (Drag/Scroll)',
+      '📐 Wireframe & Rapier Physics Collider Boundary Visualizer',
+      '✅ Interactive Model Approval Gate for Level Inception',
+      '📜 Declarative SceneInventory JSON Topology Viewer',
+    ],
+    controls: [
+      { key: 'Mouse Drag', desc: 'Orbit & Rotate Model' },
+      { key: 'Scroll Wheel', desc: 'Zoom In / Out' },
+      { key: 'Click Item', desc: 'Load Reconstructed Model' },
+    ],
+    quickActions: [],
+  },
   psx: {
     id: 'psx',
     title: 'Echoes of Blackwood',
@@ -39,7 +62,7 @@ export const GAMES_METADATA: Record<string, GameMetadata> = {
     badge: '🔦 PSX 1ST-PERSON',
     accentColor: '#ef4444',
     themeColorHex: 0x881337,
-    description: 'Investigate a haunted 90s PSX-style Victorian manor. Search for the clockmaker\'s secret journal, wind the grandfather clock to unlock the hidden bookcase, retrieve the Blackwood Crest, and escape the sealed iron gate.',
+    description: 'Investigate a haunted 90s PSX-style Victorian manor. Search for the clockmaker\'s secret journal, wind the ornate wall clock to unlock the hidden bookcase, retrieve the Blackwood Crest, and escape the sealed iron gate.',
     features: [
       '🎮 Kinematic Character Controller with Head Bob & Footstep Audio',
       '🔦 Handheld 3D Flashlight with Volumetric Beam & Battery Toggle',
@@ -133,11 +156,11 @@ const GAME_ORDER: GameMode[] = ['psx', 'flight', 'quickstart'];
 class PlaygroundApp {
   private activeMode: GameMode = 'home';
   private selectedAlbumIndex = 0;
-  private currentGame: PsxGame | FlightGame | QuickstartGame | null = null;
+  private currentGame: PsxGame | FlightGame | QuickstartGame | ModelStudioScene | null = null;
   private homeScene: HomeScene | null = null;
   private canvas: HTMLCanvasElement;
   private isInspectorOpen = false;
-  private activeInspectorTab: 'telemetry' | 'entities' | 'actions' | 'state' = 'telemetry';
+  private activeInspectorTab: 'telemetry' | 'models' | 'entities' | 'actions' | 'state' = 'telemetry';
   private actionHistory: Array<{ text: string; time: string; success: boolean }> = [];
   private lastFpsTime = performance.now();
   private frameCount = 0;
@@ -201,6 +224,19 @@ class PlaygroundApp {
     this.btnLaunchGame = document.getElementById('btn-launch-game')!;
     this.systemClock = document.getElementById('system-clock')!;
     this.btnAudioToggle = document.getElementById('btn-audio-toggle')!;
+    this.actionInput = document.getElementById('action-input') as HTMLInputElement;
+    this.entitySearchInput = document.getElementById('entity-search-input') as HTMLInputElement;
+    this.entitiesTreeContainer = document.getElementById('entities-tree-container')!;
+    this.entityCountBadge = document.getElementById('entity-count-badge')!;
+    this.stateJsonView = document.getElementById('state-json-view')!;
+    this.actionHistoryList = document.getElementById('action-history-list')!;
+    this.inspectModal = document.getElementById('inspect-modal')!;
+    this.inspectBodyText = document.getElementById('inspect-body-text')!;
+    this.loopOverlay = document.getElementById('loop-overlay')!;
+    this.loopKicker = document.getElementById('loop-kicker')!;
+    this.loopTitle = document.getElementById('loop-title')!;
+    this.loopBody = document.getElementById('loop-body')!;
+    this.loopAction = document.getElementById('loop-action') as HTMLButtonElement;
 
     // Inspector Floating Dock Pill & Close Button
     document.getElementById('inspector-dock-pill')?.addEventListener('click', () => {
@@ -297,12 +333,26 @@ class PlaygroundApp {
     document.getElementById('btn-close-note')?.addEventListener('click', handleCloseInspect);
 
     document.getElementById('pause-resume')?.addEventListener('click', () => this.setPaused(false));
+    document.getElementById('pause-restart')?.addEventListener('click', () => {
+      void this.restartCurrentGame();
+    });
     document.getElementById('pause-home')?.addEventListener('click', () => {
       this.setPaused(false);
       this.switchGame('home');
     });
+    document.getElementById('loop-home')?.addEventListener('click', () => {
+      this.switchGame('home');
+    });
+    document.getElementById('btn-nav-studio')?.addEventListener('click', () => {
+      this.launchSelectedGame('studio');
+    });
     document.querySelectorAll('.shelf-item').forEach((el) => {
       el.addEventListener('click', () => {
+        const mode = (el as HTMLElement).dataset.mode as GameMode | undefined;
+        if (mode === 'studio') {
+          this.launchSelectedGame('studio');
+          return;
+        }
         const index = Number((el as HTMLElement).dataset.index);
         if (Number.isFinite(index)) this.selectAlbumCard(index);
       });
@@ -335,7 +385,7 @@ class PlaygroundApp {
     }
   }
 
-  private switchInspectorTab(tabId: 'telemetry' | 'entities' | 'actions' | 'state'): void {
+  private switchInspectorTab(tabId: 'telemetry' | 'models' | 'entities' | 'actions' | 'state'): void {
     this.activeInspectorTab = tabId;
 
     document.querySelectorAll('.insp-tab').forEach((btn) => {
@@ -348,7 +398,9 @@ class PlaygroundApp {
       el.classList.toggle('active', el.id === `tab-${tabId}`);
     });
 
-    if (tabId === 'entities') {
+    if (tabId === 'models') {
+      this.renderModelsList();
+    } else if (tabId === 'entities') {
       this.renderEntityTree();
     } else if (tabId === 'state') {
       const snapshot = this.getEngineStateSnapshot();
@@ -356,6 +408,97 @@ class PlaygroundApp {
         this.stateJsonView.textContent = JSON.stringify(snapshot, null, 2);
       }
     }
+  }
+
+  private renderModelsList(): void {
+    const container = document.getElementById('models-preview-list');
+    if (!container) return;
+
+    const reconstructedModels = [
+      {
+        id: 'ancestor_portrait',
+        factory: 'createAncestorPortraitGroup',
+        file: 'models/AncestorPortrait.ts',
+        desc: 'Ornate walnut & gold frame with sepia ancestor portrait canvas (variant 0/1/2)',
+        tags: ['decor', 'portrait', 'prompt-to-scene'],
+        collider: 'none',
+      },
+      {
+        id: 'manor_door',
+        factory: 'createManorDoorModel',
+        file: 'models/ManorDoor.ts',
+        desc: 'Victorian 4-panel wooden door with frame, brass knobs & animated side-hinge',
+        tags: ['interactive', 'door', 'prompt-to-scene'],
+        collider: 'box [2.0, 3.5, 0.35]',
+      },
+      {
+        id: 'grandfather_clock',
+        factory: 'buildGrandfatherClockModel',
+        file: 'models/GrandfatherClock.ts',
+        desc: 'Mahogany clock case, pendulum housing, puzzle hands (3:00 -> 11:45), and secret bookcase door',
+        tags: ['interactive', 'clock', 'puzzle'],
+        collider: 'box [1.3, 3.8, 0.9]',
+      },
+      {
+        id: 'study_desk_journal',
+        factory: 'buildQuestItems -> studyDesk',
+        file: 'models/Items.ts',
+        desc: 'Antique pedestal desk with brass drawer pulls, open leather journal & candle',
+        tags: ['furniture', 'desk', 'clue'],
+        collider: 'box [2.4, 0.9, 1.3]',
+      },
+      {
+        id: 'winding_key',
+        factory: 'buildQuestItems -> prop_key',
+        file: 'models/Items.ts',
+        desc: 'Ornate brass clock winding key with spinning idle animation & stone pedestal',
+        tags: ['pickup', 'key', 'item'],
+        collider: 'pedestal: box [0.9, 1.0, 0.9]',
+      },
+      {
+        id: 'blackwood_crest',
+        factory: 'buildQuestItems -> prop_crest',
+        file: 'models/Items.ts',
+        desc: 'Gold heraldic shield with ruby octahedron gem on gothic stone altar',
+        tags: ['pickup', 'crest', 'item'],
+        collider: 'altar: box [1.2, 1.0, 1.2]',
+      },
+      {
+        id: 'escape_gate',
+        factory: 'buildQuestItems -> prop_escape_gate',
+        file: 'models/Items.ts',
+        desc: 'Wrought iron portcullis with vertical spear bars & stone pillars',
+        tags: ['interactive', 'gate', 'exit'],
+        collider: 'box [3.2, 3.8, 0.2]',
+      },
+      {
+        id: 'cobweb',
+        factory: 'createCobwebGroup',
+        file: 'models/Cobweb.ts',
+        desc: 'Translucent corner spiderweb geometry for ceiling corners and doorway trim',
+        tags: ['decor', 'atmosphere'],
+        collider: 'none',
+      },
+    ];
+
+    container.innerHTML = reconstructedModels
+      .map(
+        (m) => `
+        <div class="entity-row">
+          <div class="entity-row-header">
+            <span class="entity-id">${m.id}</span>
+            <div class="entity-tags-group">
+              ${m.tags.map((t) => `<span class="entity-tag-pill">${t}</span>`).join('')}
+            </div>
+          </div>
+          <div style="font-size:0.75rem; color:#f8fafc; margin-top:2px;">${m.desc}</div>
+          <div class="entity-coords" style="margin-top:2px;">
+            📁 <code>${m.file}</code> &bull; ⚙️ Collider: <strong>${m.collider}</strong>
+          </div>
+        </div>
+      `
+      )
+      .join('');
   }
 
   private copyToClipboard(text: string, btn?: HTMLElement): void {
@@ -635,8 +778,14 @@ class PlaygroundApp {
     this.switchGame(mode);
   }
 
-  async switchGame(mode: GameMode): Promise<void> {
-    if (this.activeMode === mode && this.currentGame) return;
+  private async restartCurrentGame(): Promise<void> {
+    if (this.activeMode === 'home') return;
+    sfx.playGameLaunch();
+    await this.switchGame(this.activeMode, true);
+  }
+
+  async switchGame(mode: GameMode, force = false): Promise<void> {
+    if (!force && this.activeMode === mode && this.currentGame) return;
 
     // 1. Dispose active game or home scene
     if (this.currentGame) {
@@ -670,7 +819,10 @@ class PlaygroundApp {
       this.consoleHome.style.display = 'none';
       this.hudContainer.style.display = 'block';
 
-      if (mode === 'psx') {
+      if (mode === 'studio') {
+        this.currentGame = new ModelStudioScene(this.canvas);
+        await (this.currentGame as ModelStudioScene).init();
+      } else if (mode === 'psx') {
         this.currentGame = new PsxGame(this.canvas);
         await (this.currentGame as PsxGame).init();
         this.mountPsxHUD();
@@ -936,7 +1088,7 @@ class PlaygroundApp {
             const promptEl = document.getElementById('interaction-prompt');
             const promptTextEl = document.getElementById('prompt-text');
             if (promptEl && promptTextEl) {
-              if (prompt && !t.inspectingText) {
+              if (this.currentGame.engine.loop.playing && prompt && !t.inspectingText) {
                 promptEl.classList.add('visible');
                 promptEl.style.display = 'flex';
                 promptTextEl.textContent = prompt;
@@ -1030,30 +1182,48 @@ class PlaygroundApp {
 
   private syncLoopOverlay(): void {
     if (!this.currentGame) {
-      this.loopOverlay.style.display = 'none';
+      if (this.loopOverlay) {
+        this.loopOverlay.style.display = 'none';
+        this.loopOverlay.hidden = true;
+      }
       return;
     }
     const ph = this.currentGame.engine.loop.phase;
     if (ph === 'playing') {
-      this.loopOverlay.style.display = 'none';
+      if (this.loopOverlay) {
+        this.loopOverlay.style.display = 'none';
+        this.loopOverlay.hidden = true;
+      }
       return;
     }
-    this.loopOverlay.style.display = 'flex';
-    this.loopKicker.textContent = this.currentGame.engine.loop.title;
-    this.loopTitle.textContent =
-      ph === 'ready' ? 'Simulation Ready' : ph === 'won' ? 'Victory!' : 'Complete';
-    this.loopBody.textContent = this.currentGame.engine.loop.subtitle;
-    this.loopAction.textContent =
-      ph === 'ready' ? '▶ Start Simulation' : '🔄 Restart';
-
-    this.loopAction.onclick = () => {
-      sfx.playMenuSelect();
-      if (ph === 'ready') {
-        this.currentGame?.engine.loop.start();
-      } else {
-        this.currentGame?.engine.loop.restart();
+    if (this.loopOverlay) {
+      this.loopOverlay.hidden = false;
+      this.loopOverlay.style.display = 'flex';
+      this.loopOverlay.classList.toggle('won', ph === 'won');
+      this.loopOverlay.classList.toggle('lost', ph === 'lost');
+      document.exitPointerLock?.();
+      if (this.loopKicker) this.loopKicker.textContent = this.currentGame.engine.loop.title;
+      if (this.loopTitle) {
+        this.loopTitle.textContent =
+          ph === 'ready' ? 'Simulation Ready' : ph === 'won' ? 'Victory!' : 'Game Over';
       }
-    };
+      if (this.loopBody) this.loopBody.textContent = this.currentGame.engine.loop.outcome || this.currentGame.engine.loop.subtitle;
+      if (this.loopAction) {
+        this.loopAction.textContent =
+          ph === 'ready' ? '▶ Start Simulation' : '🔄 Play Again';
+      }
+    }
+
+    if (this.loopAction) {
+      this.loopAction.onclick = () => {
+        sfx.playMenuSelect();
+        if (ph === 'ready') {
+          this.currentGame?.engine.loop.start();
+        } else {
+          void this.restartCurrentGame();
+        }
+      };
+    }
   }
 }
 

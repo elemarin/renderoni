@@ -13,9 +13,16 @@ import {
 } from '../../../materials.js';
 import { buildAncestorPortrait } from './AncestorPortrait.js';
 import { buildCobweb } from './Cobweb.js';
-import { buildManorDoor } from './ManorDoor.js';
+import { buildInteractiveManorDoor, type ManorDoorInstance } from './ManorDoor.js';
 
-export function buildManorArchitecture(engine: RenderoniEngine): void {
+export interface ManorArchitectureResult {
+  doorStudy: ManorDoorInstance;
+  doorKey: ManorDoorInstance;
+  doorClock: ManorDoorInstance;
+  doorCrest: ManorDoorInstance;
+}
+
+export function buildManorArchitecture(engine: RenderoniEngine): ManorArchitectureResult {
   const wallTex = createWallpaperTexture();
   const woodFloorTex = createWoodTexture({ base: '#26160e', dark: '#100805' });
   const carpetTex = createCarpetTexture();
@@ -68,14 +75,22 @@ export function buildManorArchitecture(engine: RenderoniEngine): void {
     })
   );
 
-  // 2. Main Hall Walls with Doorways & Alcove Openings
+  // 2. Main Hall Walls with Exact Doorway Openings & Lintel Headers
   engine.add(mesh({ id: 'hall_wall_back', customGeometry: new THREE.BoxGeometry(6.6, 4.8, 0.4), material: wallMat, position: [0, 2.4, 10.8], physics: 'static', tags: ['wall'] }));
-  engine.add(mesh({ id: 'hall_wall_L1', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 8), material: wallMat, position: [-3.3, 2.4, 6.8], physics: 'static', tags: ['wall'] }));
-  engine.add(mesh({ id: 'hall_wall_L2', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 12), material: wallMat, position: [-3.3, 2.4, -6], physics: 'static', tags: ['wall'] }));
-  engine.add(mesh({ id: 'hall_wall_L3', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 12), material: wallMat, position: [-3.3, 2.4, -22], physics: 'static', tags: ['wall'] }));
-  engine.add(mesh({ id: 'hall_wall_R1', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 14), material: wallMat, position: [3.3, 2.4, 3.8], physics: 'static', tags: ['wall'] }));
-  engine.add(mesh({ id: 'hall_wall_R2', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 12), material: wallMat, position: [3.3, 2.4, -14], physics: 'static', tags: ['wall'] }));
-  engine.add(mesh({ id: 'hall_wall_R3', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 6), material: wallMat, position: [3.3, 2.4, -26], physics: 'static', tags: ['wall'] }));
+
+  // Left Wall (X = -3.3)
+  engine.add(mesh({ id: 'hall_wall_L1', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 7.8), material: wallMat, position: [-3.3, 2.4, 6.9], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_lintel_L1', customGeometry: new THREE.BoxGeometry(0.4, 1.3, 2.0), material: wallMat, position: [-3.3, 4.15, 2.0], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_wall_L2', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 14.0), material: wallMat, position: [-3.3, 2.4, -6.0], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_lintel_L2', customGeometry: new THREE.BoxGeometry(0.4, 1.3, 2.0), material: wallMat, position: [-3.3, 4.15, -14.0], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_wall_L3', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 13.0), material: wallMat, position: [-3.3, 2.4, -21.5], physics: 'static', tags: ['wall'] }));
+
+  // Right Wall (X = 3.3)
+  engine.add(mesh({ id: 'hall_wall_R1', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 15.8), material: wallMat, position: [3.3, 2.4, 2.9], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_lintel_R1', customGeometry: new THREE.BoxGeometry(0.4, 1.3, 2.0), material: wallMat, position: [3.3, 4.15, -6.0], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_wall_R2', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 14.0), material: wallMat, position: [3.3, 2.4, -14.0], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_lintel_R2', customGeometry: new THREE.BoxGeometry(0.4, 1.3, 2.0), material: wallMat, position: [3.3, 4.15, -22.0], physics: 'static', tags: ['wall'] }));
+  engine.add(mesh({ id: 'hall_wall_R3', customGeometry: new THREE.BoxGeometry(0.4, 4.8, 5.0), material: wallMat, position: [3.3, 2.4, -25.5], physics: 'static', tags: ['wall'] }));
 
   // Helper for Alcove Rooms
   const buildRoom = (cx: number, cz: number, w: number, d: number) => {
@@ -113,11 +128,38 @@ export function buildManorArchitecture(engine: RenderoniEngine): void {
     buildAncestorPortrait(engine, p.id, p.pos, p.rotY, p.variant);
   });
 
-  // 4. Victorian Paneled Doors at Alcoves & End of Hall
-  buildManorDoor(engine, 'door_study', [-3.25, 0, 2], Math.PI / 2);
-  buildManorDoor(engine, 'door_key', [3.25, 0, -6], -Math.PI / 2);
-  buildManorDoor(engine, 'door_clock', [-3.25, 0, -14], Math.PI / 2);
-  buildManorDoor(engine, 'door_crest', [3.25, 0, -22], -Math.PI / 2);
+  // 4. Interactive Victorian Paneled Doors at Room Entrances
+  const doorStudy = buildInteractiveManorDoor(engine, {
+    id: 'door_study',
+    position: [-3.3, 0, 2.0],
+    rotationY: Math.PI / 2,
+    openAngle: -Math.PI / 2,
+    locked: false,
+  });
+
+  const doorKey = buildInteractiveManorDoor(engine, {
+    id: 'door_key',
+    position: [3.3, 0, -6.0],
+    rotationY: -Math.PI / 2,
+    openAngle: Math.PI / 2,
+    locked: false,
+  });
+
+  const doorClock = buildInteractiveManorDoor(engine, {
+    id: 'door_clock',
+    position: [-3.3, 0, -14.0],
+    rotationY: Math.PI / 2,
+    openAngle: -Math.PI / 2,
+    locked: false,
+  });
+
+  const doorCrest = buildInteractiveManorDoor(engine, {
+    id: 'door_crest',
+    position: [3.3, 0, -22.0],
+    rotationY: -Math.PI / 2,
+    openAngle: Math.PI / 2,
+    locked: false,
+  });
 
   // 5. Cobwebs in High Corners & Archways
   buildCobweb(engine, 'cobweb_1', [-3.1, 4.6, 9.5], [0, Math.PI / 4, 0]);
@@ -174,4 +216,6 @@ export function buildManorArchitecture(engine: RenderoniEngine): void {
     pLight.position.set(pos[0], pos[1] + 0.22, pos[2]);
     engine.native.scene.add(pLight);
   });
+
+  return { doorStudy, doorKey, doorClock, doorCrest };
 }

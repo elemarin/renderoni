@@ -153,6 +153,37 @@ export class HorrorSoundSynthesizer {
     osc.start(now);
     osc.stop(now + 0.04);
   }
+
+  /** Creaking wooden door swing */
+  playDoorCreak(): void {
+    if (this.isMuted) return;
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, now);
+    osc.frequency.linearRampToValueAtTime(160, now + 0.25);
+    osc.frequency.linearRampToValueAtTime(110, now + 0.5);
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(350, now);
+    filter.Q.setValueAtTime(4.0, now);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.56);
+  }
 }
 
 export const horrorSfx = new HorrorSoundSynthesizer();

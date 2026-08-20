@@ -904,7 +904,7 @@ kbd {
 .loop-overlay {
   position: absolute;
   inset: 0;
-  z-index: 80;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -956,6 +956,14 @@ kbd {
 .loop-btn:hover { filter: brightness(0.95); }
 .loop-overlay.won .loop-btn { background: #34d399; }
 .loop-overlay.lost .loop-btn { background: #fb7185; }
+.loop-overlay .loop-btn-secondary {
+  margin-top: 10px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #64748b;
+}
+.loop-overlay.won .loop-btn-secondary,
+.loop-overlay.lost .loop-btn-secondary { background: #0f172a; }
 
 /* ==========================================================================
    Modern Unobtrusive Agent Inspector & DevTools Drawer
@@ -1603,6 +1611,7 @@ body.in-game .top-nav.home-only { display: none !important; }
 .psx-art { background: linear-gradient(135deg, #18040a, #881337); }
 .flight-art { background: linear-gradient(135deg, #0369a1, #fbbf24); }
 .quickstart-art { background: linear-gradient(135deg, #1e1b4b, #f59e0b); }
+.studio-art { background: linear-gradient(135deg, #0284c7, #38bdf8); }
 
 .home-play { left: auto; right: 48px; bottom: 48px; }
 
@@ -1637,6 +1646,7 @@ body.in-game .top-nav.home-only { display: none !important; }
   color: #111;
   cursor: pointer;
 }
+.pause-card #pause-restart { background: #fb923c; }
 .pause-card #pause-home { background: #111; color: #fafaf9; }
 
 .album-card > .card-title { bottom: 168px !important; }

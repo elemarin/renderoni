@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "prompt": "haunted Victorian manor hallway with dark wood wainscoting, frayed crimson runner, ancestor oil portraits, grandfather clock, glowing torch sconces, and cobwebs",
+  "prompt": "haunted Victorian manor hallway with dark wood wainscoting, frayed crimson runner, ancestor oil portraits, an ornate gilded Victorian wall clock with a hanging pendulum, glowing torch sconces, and cobwebs",
+  "image": "refs/victorian-wall-clock.png",
   "seed": 42,
   "elements": [
     {
@@ -20,10 +21,10 @@
     },
     {
       "id": "clock_puzzle",
-      "factory": "grandfatherClock",
+      "factory": "victorianWallClock",
       "kind": "prop",
-      "position": [-8, 0, -14],
-      "collider": { "shape": "box", "size": [1.3, 3.8, 0.9] },
+      "position": [-8, 2.6, -14],
+      "collider": { "shape": "box", "size": [1.65, 2.45, 0.35] },
       "tags": ["interactive", "puzzle", "clock"]
     },
     {

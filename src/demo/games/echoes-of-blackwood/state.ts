@@ -45,7 +45,7 @@ export const useHorrorStore = createStore<HorrorState>((set) => ({
   readJournal: () =>
     set({
       quest: 'wind_clock',
-      objective: 'Journal Read: Grandfather clock must be set to 11:45. Search for the clock key in Room 2 (Right).',
+      objective: 'Journal Read: The Victorian wall clock must be set to 11:45. Search for the clock key in Room 2 (Right).',
       inspectingText:
         '📜 Blackwood Journal #44:\n\n"The master clock holds our family crest inside the hidden chamber. Wind the clock to 11:45 with the winding key to release the latch!"',
     }),
@@ -53,7 +53,7 @@ export const useHorrorStore = createStore<HorrorState>((set) => ({
   pickupKey: () =>
     set({
       hasKey: true,
-      objective: 'Clock Key Acquired! Go to Room 3 (Left) and wind the Grandfather Clock.',
+      objective: 'Clock Key Acquired! Go to Room 3 (Left) and wind the Victorian Wall Clock.',
     }),
 
   solveClock: () =>
