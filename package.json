@@ -1,7 +1,7 @@
 {
   "name": "renderoni",
   "version": "0.1.0",
-  "description": "3D web games, served al dente. A batteries-included, agent-native 3D engine for Three.js and Rapier.",
+  "description": "Open-source Three.js game engine for TypeScript with Rapier physics, deterministic simulation, headless testing, and MCP tooling for AI agents.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -71,7 +71,7 @@
     "type": "git",
     "url": "git+https://github.com/elemarin/renderoni.git"
   },
-  "homepage": "https://github.com/elemarin/renderoni#readme",
+  "homepage": "https://elemarin.github.io/renderoni/",
   "bugs": {
     "url": "https://github.com/elemarin/renderoni/issues"
   },
@@ -86,8 +86,14 @@
   },
   "keywords": [
     "threejs",
+    "three-js",
     "rapier",
+    "rapier3d",
     "game-engine",
+    "3d-game-engine",
+    "web-game-engine",
+    "browser-game-engine",
+    "javascript-game-engine",
     "physics-engine",
     "model-context-protocol",
     "mcp",

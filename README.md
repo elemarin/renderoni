@@ -1,30 +1,43 @@
-# 🍝 Renderoni
+# 🍝 Renderoni — Three.js Game Engine for TypeScript
 
-> **3D web games, served al dente.**  
-> A batteries-included, agent-native 3D engine for Three.js and Rapier.  
-> *Deterministic WebAssembly physics, declarative presets, and built-in Model Context Protocol (MCP) for AI pair programming.*
+> ## **Three.js renders. Rapier simulates. Renderoni makes it a game.**
+>
+> An open-source, batteries-included **3D web game engine** built with **Three.js** and **Rapier physics**. Create browser games in TypeScript with player controllers, deterministic simulation, audio, animation, VFX, headless testing, and AI-agent tooling already wired together.
 
 [![CI](https://github.com/elemarin/renderoni/actions/workflows/ci.yml/badge.svg)](https://github.com/elemarin/renderoni/actions)
 [![Deploy Pages](https://github.com/elemarin/renderoni/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/elemarin/renderoni/actions/workflows/deploy-pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
+[![Three.js](https://img.shields.io/badge/Three.js-Game_Engine-black.svg)](https://threejs.org/)
+[![Rapier](https://img.shields.io/badge/Rapier-WASM_Physics-d97706.svg)](https://rapier.rs/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
 
 <p align="center">
-  <a href="https://elemarin.github.io/renderoni/"><strong>🎮 Play Live Web Demos &rarr;</strong></a>
+  <a href="https://elemarin.github.io/renderoni/"><strong>🎮 Play the live games</strong></a>
+  &nbsp;&nbsp;•&nbsp;&nbsp;
+  <a href="#-quickstart"><strong>🚀 Build in minutes</strong></a>
+  &nbsp;&nbsp;•&nbsp;&nbsp;
+  <a href="#-ai-agent-integration-mcp-server"><strong>🤖 Connect an AI agent</strong></a>
 </p>
 
 ---
 
-## ⚡ The Problem & The Solution
+## Why Renderoni?
 
-Building 3D games with **Three.js** and **Rapier WebAssembly** usually means writing thousands of lines of boilerplate: fixed timestep loops, transform interpolation, character controllers, spatial audio, particle systems, and UI projections.
+**Three.js is an excellent renderer, but it is not a game engine.** Adding Rapier gives you physics, but you still need to build the game loop, transform synchronization, character controllers, lifecycle management, audio, VFX, UI, testing, and developer tooling.
 
-At the same time, **AI coding agents** (Claude, Gemini, Cursor) struggle with 3D engines because game loops are non-deterministic black boxes that require expensive vision screenshots.
+Renderoni is the missing game-engine layer:
 
-**Renderoni gives you both:**
-- **For Humans:** A declarative, batteries-included 3D engine. A single `createRenderoni()` call spins up physics, rendering, camera controls, spatial audio, animation state machines, and particle systems with typed presets.
-- **For AI Agents & Headless CI:** A deterministic simulation kernel with a built-in **Model Context Protocol (MCP)** server. Agents inspect scenes via lightweight semantic Markdown (<500 bytes / ~120 tokens), dispatch typed actions, and verify game state headlessly in Node.js in under 10ms.
+| What you get | Why it matters |
+|---|---|
+| **Three.js + Rapier, integrated** | Rendering, WASM physics, colliders, and interpolated transforms work as one system. |
+| **TypeScript game presets** | Add players, rigid bodies, sensors, lights, audio, animation, UI, and VFX without engine boilerplate. |
+| **Deterministic simulation** | Fixed ticks, seeded randomness, state hashing, and reproducible gameplay bugs. |
+| **Headless game testing** | Run complete physics and gameplay scenarios in Node.js with Vitest—no browser screenshots required. |
+| **Agent-native MCP tools** | AI coding agents can observe scenes, dispatch typed actions, advance ticks, and verify outcomes semantically. |
+| **No walled garden** | Use native Three.js objects, shaders, loaders, and Rapier APIs whenever you need them. |
+
+Renderoni is designed for **3D browser games, WebGL/WebGPU games, interactive simulations, AI-generated games, and testable Three.js applications**.
 
 ---
 
