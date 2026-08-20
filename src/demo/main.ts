@@ -166,6 +166,7 @@ class PlaygroundApp {
   private frameCount = 0;
   private currentFps = 60;
   private paused = false;
+  private focusedLoopPhase: string | null = null;
 
   // DOM Elements
   private consoleHome!: HTMLElement;
@@ -623,6 +624,8 @@ class PlaygroundApp {
         return;
       }
 
+      if (this.handleOverlayKeyboard(e)) return;
+
       if (document.activeElement === this.actionInput || document.activeElement === this.entitySearchInput) return;
 
       if (this.activeMode === 'home') {
@@ -655,6 +658,60 @@ class PlaygroundApp {
         }
       }
     });
+  }
+
+  private handleOverlayKeyboard(e: KeyboardEvent): boolean {
+    const pauseMenu = document.getElementById('pause-menu');
+    const activeMenu = pauseMenu && !pauseMenu.hidden
+      ? pauseMenu
+      : !this.loopOverlay.hidden
+        ? this.loopOverlay
+        : null;
+    if (!activeMenu) return false;
+
+    const buttons = Array.from(
+      activeMenu.querySelectorAll<HTMLButtonElement>('button:not([disabled])')
+    );
+    if (buttons.length === 0) return false;
+
+    if (e.code === 'Escape') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (activeMenu === pauseMenu) {
+        this.setPaused(false);
+      } else {
+        buttons.at(-1)?.focus({ preventScroll: true });
+        sfx.playMenuMove();
+      }
+      return true;
+    }
+
+    const previousKeys = new Set(['ArrowUp', 'ArrowLeft', 'KeyW', 'KeyA']);
+    const nextKeys = new Set(['ArrowDown', 'ArrowRight', 'KeyS', 'KeyD']);
+    if (previousKeys.has(e.code) || nextKeys.has(e.code)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const currentIndex = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const direction = previousKeys.has(e.code) ? -1 : 1;
+      const nextIndex = currentIndex < 0
+        ? 0
+        : (currentIndex + direction + buttons.length) % buttons.length;
+      buttons[nextIndex]?.focus({ preventScroll: true });
+      sfx.playMenuMove();
+      return true;
+    }
+
+    if (e.code === 'Enter' || e.code === 'Space') {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const activeButton = buttons.includes(document.activeElement as HTMLButtonElement)
+        ? document.activeElement as HTMLButtonElement
+        : buttons[0];
+      activeButton?.click();
+      return true;
+    }
+
+    return false;
   }
 
   private selectAlbumCard(index: number): void {
@@ -769,6 +826,9 @@ class PlaygroundApp {
     if (paused) {
       document.exitPointerLock?.();
       sfx.playMenuSelect();
+      document.getElementById('pause-resume')?.focus({ preventScroll: true });
+    } else {
+      this.canvas.focus({ preventScroll: true });
     }
   }
 
@@ -800,6 +860,7 @@ class PlaygroundApp {
     this.canvas.height = this.canvas.clientHeight;
 
     this.activeMode = mode;
+    this.focusedLoopPhase = null;
 
     // 2. Update navigation tab active state
     document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -1182,6 +1243,7 @@ class PlaygroundApp {
 
   private syncLoopOverlay(): void {
     if (!this.currentGame) {
+      this.focusedLoopPhase = null;
       if (this.loopOverlay) {
         this.loopOverlay.style.display = 'none';
         this.loopOverlay.hidden = true;
@@ -1190,6 +1252,7 @@ class PlaygroundApp {
     }
     const ph = this.currentGame.engine.loop.phase;
     if (ph === 'playing') {
+      this.focusedLoopPhase = null;
       if (this.loopOverlay) {
         this.loopOverlay.style.display = 'none';
         this.loopOverlay.hidden = true;
@@ -1211,6 +1274,10 @@ class PlaygroundApp {
       if (this.loopAction) {
         this.loopAction.textContent =
           ph === 'ready' ? '▶ Start Simulation' : '🔄 Play Again';
+      }
+      if (this.focusedLoopPhase !== ph) {
+        this.focusedLoopPhase = ph;
+        this.loopAction.focus({ preventScroll: true });
       }
     }
 

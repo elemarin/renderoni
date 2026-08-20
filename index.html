@@ -223,13 +223,14 @@
     <!-- Contextual In-Game HUD Container -->
     <div id="game-hud" style="display: none;"></div>
 
-    <div id="pause-menu" class="pause-menu" hidden>
+    <div id="pause-menu" class="pause-menu" role="dialog" aria-modal="true" aria-labelledby="pause-title" hidden>
       <div class="pause-card">
         <p id="pause-kicker" class="pause-kicker">Paused</p>
         <h2 id="pause-title">Echoes of Blackwood</h2>
         <button type="button" id="pause-resume">Resume</button>
         <button type="button" id="pause-restart">Restart Game</button>
         <button type="button" id="pause-home">Home</button>
+        <p class="menu-keyboard-hint">WASD / Arrows to navigate · Enter to select · ESC to resume</p>
       </div>
     </div>
 
@@ -251,13 +252,14 @@
     </div>
 
     <!-- Loop Overlay -->
-    <div id="loop-overlay" class="loop-overlay" hidden>
+    <div id="loop-overlay" class="loop-overlay" role="dialog" aria-modal="true" aria-labelledby="loop-title" hidden>
       <div class="loop-card">
         <div id="loop-kicker" class="loop-kicker">Renderoni</div>
         <h1 id="loop-title" class="loop-title">Play</h1>
         <p id="loop-body" class="loop-body"></p>
         <button id="loop-action" class="loop-btn" type="button">Play</button>
         <button id="loop-home" class="loop-btn loop-btn-secondary" type="button">Main Menu</button>
+        <p class="menu-keyboard-hint">WASD / Arrows to navigate · Enter to select</p>
       </div>
     </div>
 

@@ -954,6 +954,12 @@ kbd {
   cursor: pointer;
 }
 .loop-btn:hover { filter: brightness(0.95); }
+.loop-btn:focus-visible,
+.pause-card button:focus-visible {
+  outline: 4px solid #facc15;
+  outline-offset: 4px;
+  transform: translateY(-2px);
+}
 .loop-overlay.won .loop-btn { background: #34d399; }
 .loop-overlay.lost .loop-btn { background: #fb7185; }
 .loop-overlay .loop-btn-secondary {
@@ -1648,6 +1654,13 @@ body.in-game .top-nav.home-only { display: none !important; }
 }
 .pause-card #pause-restart { background: #fb923c; }
 .pause-card #pause-home { background: #111; color: #fafaf9; }
+.menu-keyboard-hint {
+  margin: 8px 0 0;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  text-align: center;
+}
 
 .album-card > .card-title { bottom: 168px !important; }
 .game-shelf {
