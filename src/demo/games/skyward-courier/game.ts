@@ -147,7 +147,12 @@ export class SkywardCourierGame {
     });
     this.engine.actions.register({
       name: 'flight.setBrakes',
-      handle: (pressed?: boolean) => this.engine.input.setButton('brake', pressed ?? true),
+      handle: (pressed?: boolean) => {
+        this.engine.input.setButton(
+          'brake',
+          pressed ?? !this.engine.input.isButtonPressed('brake')
+        );
+      },
     });
   }
 
@@ -392,6 +397,7 @@ export class SkywardCourierGame {
     this.throttle = 0;
     this.engineRunning = false;
     this.brakes = false;
+    this.engine.input.setButton('brake', false);
   }
 
   dispose(): void {

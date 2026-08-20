@@ -114,7 +114,7 @@ export const GAMES_METADATA: Record<string, GameMetadata> = {
       { label: '🔑 Start Engine (I)', action: 'flight.startEngine' },
       { label: '⚡ Max Throttle (Z)', action: 'flight.setThrottle', payload: { percent: 100 } },
       { label: '🛑 Idle Throttle (X)', action: 'flight.setThrottle', payload: { percent: 0 } },
-      { label: '🛑 Wheel Brakes (B)', action: 'flight.setBrakes', payload: true },
+      { label: '🛑 Wheel Brakes (B)', action: 'flight.setBrakes' },
       { label: '🎥 View (C)', action: 'flight.toggleView' },
       { label: '🔄 Reset to Runway (R)', action: 'flight.reset' },
     ],

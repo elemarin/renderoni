@@ -37,7 +37,7 @@ export class PhysicsEngine {
   private sensorColliders: Set<number> = new Set();
   private bodyToEntity: Map<number, string> = new Map();
   private entityToBody: Map<string, RAPIER.RigidBody> = new Map();
-  private activeContacts: Map<string, CollisionEvent> = new Map();
+  private activeContacts: Map<string, { event: CollisionEvent; count: number }> = new Map();
 
   async init(config: PhysicsWorldConfig = {}): Promise<void> {
     if (!this.isInitialized) {
@@ -100,6 +100,11 @@ export class PhysicsEngine {
         this.sensorColliders.delete(handle);
       }
     }
+    for (const [key, contact] of this.activeContacts) {
+      if (contact.event.entityA === entityId || contact.event.entityB === entityId) {
+        this.activeContacts.delete(key);
+      }
+    }
   }
 
   getEntityByColliderHandle(handle: number): string | undefined {
@@ -115,7 +120,7 @@ export class PhysicsEngine {
   }
 
   getActiveContacts(): CollisionEvent[] {
-    return Array.from(this.activeContacts.values()).sort((a, b) => {
+    return Array.from(this.activeContacts.values()).map(({ event }) => event).sort((a, b) => {
       const first = a.entityA.localeCompare(b.entityA);
       return first !== 0 ? first : a.entityB.localeCompare(b.entityB);
     });
@@ -166,9 +171,18 @@ export class PhysicsEngine {
     for (const collision of rawCollisions) {
       const key = `${collision.entityA}\0${collision.entityB}`;
       if (collision.started) {
-        this.activeContacts.set(key, collision);
+        const active = this.activeContacts.get(key);
+        this.activeContacts.set(key, {
+          event: collision,
+          count: (active?.count ?? 0) + 1,
+        });
       } else {
-        this.activeContacts.delete(key);
+        const active = this.activeContacts.get(key);
+        if (active && active.count > 1) {
+          active.count--;
+        } else {
+          this.activeContacts.delete(key);
+        }
       }
     }
 

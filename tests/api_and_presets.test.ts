@@ -289,4 +289,17 @@ describe('Unified API, Presets & Engine', () => {
 
     expect(destroyed).toBe(true);
   });
+
+  it('drops active contacts when an entity is removed', async () => {
+    const game = await createRenderoni({ mode: 'headless' });
+    game.add(body({ id: 'floor', type: 'fixed', size: [10, 1, 10] }));
+    const crate = game.add(body({ id: 'crate', type: 'dynamic', position: [0, 2, 0] }));
+    game.step(120);
+    expect(game.physics.getActiveContacts().length).toBeGreaterThan(0);
+
+    crate.destroy();
+
+    expect(game.physics.getActiveContacts()).toEqual([]);
+    game.dispose();
+  });
 });
