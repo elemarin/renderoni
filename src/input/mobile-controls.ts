@@ -1,4 +1,3 @@
-import nipplejs from 'nipplejs';
 import type { InputManager } from './input-manager.js';
 
 export interface MobileActionButton {
@@ -42,8 +41,9 @@ function installStyles(): void {
 export class MobileControls {
   readonly active: boolean;
   private readonly root?: HTMLDivElement;
-  private readonly joystick?: ReturnType<typeof nipplejs.create>;
+  private joystick?: ReturnType<(typeof import('nipplejs'))['default']['create']>;
   private readonly cleanup: Array<() => void> = [];
+  private disposed = false;
 
   constructor(private readonly input: InputManager, options: MobileControlsOptions = {}) {
     this.active = typeof window !== 'undefined'
@@ -96,11 +96,19 @@ export class MobileControls {
     (options.parent ?? document.body).append(root);
     this.root = root;
 
+    void this.createJoystick(stick, options.joystickColor);
+
+    if (options.lookElement) this.bindLook(options.lookElement);
+  }
+
+  private async createJoystick(stick: HTMLElement, color?: string): Promise<void> {
+    const { default: nipplejs } = await import('nipplejs');
+    if (this.disposed) return;
     this.joystick = nipplejs.create({
       zone: stick,
       mode: 'static',
       position: { left: '50%', top: '50%' },
-      color: options.joystickColor ?? '#facc15',
+      color: color ?? '#facc15',
       size: 112,
       restOpacity: 0.65,
       fadeTime: 0,
@@ -109,8 +117,6 @@ export class MobileControls {
       this.input.setMoveVector(data.vector?.x ?? 0, data.vector?.y ?? 0);
     });
     this.joystick.on('end', () => this.input.setMoveVector(0, 0));
-
-    if (options.lookElement) this.bindLook(options.lookElement);
   }
 
   private bindLook(element: HTMLElement): void {
@@ -145,6 +151,7 @@ export class MobileControls {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.input.setMoveVector(0, 0);
     this.joystick?.destroy();
     for (const cleanup of this.cleanup) cleanup();
