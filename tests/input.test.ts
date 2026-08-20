@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { InputManager } from '../src/input/input-manager.js';
+import { ActionRegistry } from '../src/input/actions.js';
 
 describe('InputManager', () => {
   it('normalizes movement outside the unit circle', () => {
@@ -40,5 +41,19 @@ describe('InputManager', () => {
 
     expect(input.getLookVector()).toEqual({ x: 0.6, y: 0.8 });
     expect(input.consumeLookDelta()).toEqual({ dx: 0, dy: 0 });
+  });
+
+  it('rejects unknown actions without queueing them and lists registered actions', () => {
+    const actions = new ActionRegistry();
+    let handled = 0;
+    actions.register({ name: 'player.jump', handle: () => handled++ });
+
+    expect(actions.list()).toEqual([{ name: 'player.jump', schema: undefined }]);
+    expect(() => actions.dispatch('player.missing')).toThrow('Unknown action: player.missing');
+    expect(actions.drain({})).toBe(0);
+
+    actions.dispatch('player.jump');
+    expect(actions.drain({})).toBe(1);
+    expect(handled).toBe(1);
   });
 });

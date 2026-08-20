@@ -21,6 +21,7 @@ export class HomeScene {
   private particles: THREE.Points | null = null;
   private particleGeo: THREE.BufferGeometry | null = null;
   private gridHelper: THREE.GridHelper | null = null;
+  private particleSeeds: Float32Array | null = null;
 
   // Dynamic Lighting
   private pointLight1!: THREE.PointLight;
@@ -165,15 +166,21 @@ export class HomeScene {
   private initParticles(): void {
     const scene = this.engine.native.scene;
     const count = 500;
+    const rng = this.engine.prng.fork('home-particles');
     this.particleGeo = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const speeds = new Float32Array(count);
+    this.particleSeeds = new Float32Array(count * 2);
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3 + 0] = (Math.random() - 0.5) * 36;
-      positions[i * 3 + 1] = Math.random() * 20 - 4;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
-      speeds[i] = 0.2 + Math.random() * 0.6;
+      const sx = rng.nextFloat();
+      const sz = rng.nextFloat();
+      positions[i * 3 + 0] = (sx - 0.5) * 36;
+      positions[i * 3 + 1] = rng.nextFloat() * 20 - 4;
+      positions[i * 3 + 2] = (sz - 0.5) * 30;
+      speeds[i] = 0.2 + rng.nextFloat() * 0.6;
+      this.particleSeeds[i * 2 + 0] = sx;
+      this.particleSeeds[i * 2 + 1] = sz;
     }
 
     this.particleGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -220,20 +227,21 @@ export class HomeScene {
     camera.lookAt(0, 1.8, 0);
 
     // 3. Artifact Rotation
+    const time = this.engine.tick / 60;
     this.artifactsGroup.rotation.y += dt * 0.35;
-    this.artifactsGroup.rotation.x = Math.sin(Date.now() * 0.001) * 0.15 + this.mouseY * 0.2;
-    this.artifactsGroup.position.y = 2.2 + Math.sin(Date.now() * 0.0015) * 0.35;
+    this.artifactsGroup.rotation.x = Math.sin(time) * 0.15 + this.mouseY * 0.2;
+    this.artifactsGroup.position.y = 2.2 + Math.sin(time * 1.5) * 0.35;
 
     // 4. Particle Float
-    if (this.particleGeo) {
+    if (this.particleGeo && this.particleSeeds) {
       const positions = this.particleGeo.attributes.position.array as Float32Array;
       const speeds = this.particleGeo.attributes.speed.array as Float32Array;
       for (let i = 0; i < speeds.length; i++) {
         positions[i * 3 + 1] += speeds[i] * dt * 0.8;
         if (positions[i * 3 + 1] > 16) {
           positions[i * 3 + 1] = -4;
-          positions[i * 3 + 0] = (Math.random() - 0.5) * 36;
-          positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+          positions[i * 3 + 0] = (this.particleSeeds[i * 2 + 0] - 0.5) * 36;
+          positions[i * 3 + 2] = (this.particleSeeds[i * 2 + 1] - 0.5) * 30;
         }
       }
       this.particleGeo.attributes.position.needsUpdate = true;

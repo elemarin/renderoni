@@ -8,6 +8,7 @@ export * from './ownership.js';
 export * from './diagnostics.js';
 export * from './observations.js';
 export * from './loop.js';
+export * from './engine.js';
 
 export interface EntityRecord {
   id: string;

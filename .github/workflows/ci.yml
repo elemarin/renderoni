@@ -6,8 +6,62 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  # Types, tests and gameplay determinism on every supported OS.
+  # The literal golden hash is only asserted on the pinned matrix
+  # (Node 22 / Linux / x64). The other runners assert deterministic gameplay
+  # outcomes and run-to-run equality instead.
+  verify:
+    name: Verify (Node 22, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Report determinism platform
+        run: node scripts/report-determinism-platform.mjs
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Determinism gate (golden hash pinned on Linux x64 only)
+        run: npm run gate:determinism
+        env:
+          # Fails the Linux x64 job if platform detection ever stops enforcing
+          # the pinned digest, instead of silently downgrading to shape checks.
+          RENDERONI_REQUIRE_EXACT_HASH: ${{ (runner.os == 'Linux' && runner.arch == 'X64') && '1' || '0' }}
+
+      - name: Test suite
+        run: npm test
+
+      # The full beta gate remains on Ubuntu because its consumer installs and
+      # browser bundle checks are expensive. Exercise every script that invokes
+      # npm/npx directly on Windows so .cmd launching stays covered in CI.
+      - name: Windows portable release scripts
+        if: runner.os == 'Windows'
+        run: npm run build && npm run test:readme-examples && npm run gate:package && npm run gate:release
+
+  # The aggregate release gate: determinism, MCP, lifecycle, tests, build,
+  # README examples, packed consumers, console build and load budgets.
+  beta-gate:
+    name: Beta release gate
     runs-on: ubuntu-latest
 
     steps:
@@ -22,11 +76,41 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Run 0.9 beta gate (never publishes)
+        run: npm run gate:beta
+        env:
+          RENDERONI_REQUIRE_EXACT_HASH: '1'
 
-      - name: Build
+      - name: Upload console build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-web
+          path: dist-web
+          retention-days: 7
+          if-no-files-found: ignore
+
+  security:
+    name: Security & release contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies
+        run: npm run gate:security
+
+      - name: Build package
         run: npm run build
 
-      - name: Run 6 MVP Validation Gates & Archetypes
-        run: npm test
+      - name: Release contract dry run (no publish)
+        run: npm run gate:release

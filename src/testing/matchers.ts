@@ -5,6 +5,7 @@
  */
 
 import { expect } from 'vitest';
+import 'vitest';
 import type { RenderoniEngine } from '../core/engine.js';
 import type { EntityInstance } from '../presets/define-preset.js';
 
@@ -78,4 +79,5 @@ if (typeof expect !== 'undefined' && expect.extend) {
   });
 }
 
-export {};
+/** Marker type that preserves Vitest module resolution for this augmentation. */
+export type VitestMatcherRegistration = import('vitest').Assertion;

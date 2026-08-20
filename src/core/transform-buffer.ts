@@ -33,6 +33,20 @@ export interface TransformData {
   angularVelocity?: [number, number, number];
 }
 
+/**
+ * Rejects any value that would poison the canonical buffer.
+ * NaN and Infinity spread through physics, hashing and rendering silently,
+ * so they are refused at the boundary where they enter canonical state.
+ */
+function assertFiniteComponent(value: number, slot: number, label: string): void {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(
+      `RND_0301: rejected non-finite ${label}=${String(value)} for transform slot ${slot}. ` +
+        'Canonical transforms must be finite numbers; check impulses, divisions by zero and NaN-producing math.'
+    );
+  }
+}
+
 /** Slerp helper for quaternions */
 function slerpQuat(
   qa: Float32Array,
@@ -114,6 +128,21 @@ export class DualBufferTransformPipeline {
     return this._previousBuffer;
   }
 
+  /** Number of transform slots the canonical buffers can currently address. */
+  get slotCapacity(): number {
+    return this.capacity;
+  }
+
+  /** Throws unless `slot` addresses a real row of the canonical buffers. */
+  private assertSlot(slot: number, operation: string): void {
+    if (!Number.isInteger(slot) || slot < 0 || slot >= this.capacity) {
+      throw new Error(
+        `RND_0302: ${operation} received invalid transform slot ${String(slot)}. ` +
+          `Slots must be integers in [0, ${this.capacity}); allocate one with allocateSlot(entityId).`
+      );
+    }
+  }
+
   /**
    * Allocates a transform slot for an entity.
    */
@@ -178,6 +207,8 @@ export class DualBufferTransformPipeline {
 
   /**
    * Sets canonical physics transform for an entity slot.
+   * Rejects non-finite components so a diverged simulation fails at the write,
+   * not many ticks later inside rendering or hashing.
    */
   setTransform(
     slot: number,
@@ -189,6 +220,15 @@ export class DualBufferTransformPipeline {
     quatZ: number,
     quatW: number
   ): void {
+    this.assertSlot(slot, 'setTransform');
+    assertFiniteComponent(posX, slot, 'position.x');
+    assertFiniteComponent(posY, slot, 'position.y');
+    assertFiniteComponent(posZ, slot, 'position.z');
+    assertFiniteComponent(quatX, slot, 'quaternion.x');
+    assertFiniteComponent(quatY, slot, 'quaternion.y');
+    assertFiniteComponent(quatZ, slot, 'quaternion.z');
+    assertFiniteComponent(quatW, slot, 'quaternion.w');
+
     const offset = slot * TRANSFORM_STRIDE;
     this._currentBuffer[offset + OFFSET_POS_X] = posX;
     this._currentBuffer[offset + OFFSET_POS_Y] = posY;
@@ -201,9 +241,42 @@ export class DualBufferTransformPipeline {
   }
 
   /**
+   * Sets canonical linear and angular velocity for an entity slot.
+   * Velocity is part of canonical simulation state, so it is hashed alongside
+   * the transform and must stay finite.
+   */
+  setVelocity(
+    slot: number,
+    linX: number,
+    linY: number,
+    linZ: number,
+    angX: number,
+    angY: number,
+    angZ: number
+  ): void {
+    this.assertSlot(slot, 'setVelocity');
+    assertFiniteComponent(linX, slot, 'linearVelocity.x');
+    assertFiniteComponent(linY, slot, 'linearVelocity.y');
+    assertFiniteComponent(linZ, slot, 'linearVelocity.z');
+    assertFiniteComponent(angX, slot, 'angularVelocity.x');
+    assertFiniteComponent(angY, slot, 'angularVelocity.y');
+    assertFiniteComponent(angZ, slot, 'angularVelocity.z');
+
+    const offset = slot * TRANSFORM_STRIDE;
+    this._currentBuffer[offset + OFFSET_LINVEL_X] = linX;
+    this._currentBuffer[offset + OFFSET_LINVEL_Y] = linY;
+    this._currentBuffer[offset + OFFSET_LINVEL_Z] = linZ;
+
+    this._currentBuffer[offset + OFFSET_ANGVEL_X] = angX;
+    this._currentBuffer[offset + OFFSET_ANGVEL_Y] = angY;
+    this._currentBuffer[offset + OFFSET_ANGVEL_Z] = angZ;
+  }
+
+  /**
    * Reads canonical position directly from the current simulation buffer.
    */
   getPosition(slot: number, out: [number, number, number] = [0, 0, 0]): [number, number, number] {
+    this.assertSlot(slot, 'getPosition');
     const offset = slot * TRANSFORM_STRIDE;
     out[0] = this._currentBuffer[offset + OFFSET_POS_X];
     out[1] = this._currentBuffer[offset + OFFSET_POS_Y];
@@ -218,11 +291,42 @@ export class DualBufferTransformPipeline {
     slot: number,
     out: [number, number, number, number] = [0, 0, 0, 1]
   ): [number, number, number, number] {
+    this.assertSlot(slot, 'getQuaternion');
     const offset = slot * TRANSFORM_STRIDE;
     out[0] = this._currentBuffer[offset + OFFSET_QUAT_X];
     out[1] = this._currentBuffer[offset + OFFSET_QUAT_Y];
     out[2] = this._currentBuffer[offset + OFFSET_QUAT_Z];
     out[3] = this._currentBuffer[offset + OFFSET_QUAT_W];
+    return out;
+  }
+
+  /**
+   * Reads canonical linear velocity directly from the current simulation buffer.
+   */
+  getLinearVelocity(
+    slot: number,
+    out: [number, number, number] = [0, 0, 0]
+  ): [number, number, number] {
+    this.assertSlot(slot, 'getLinearVelocity');
+    const offset = slot * TRANSFORM_STRIDE;
+    out[0] = this._currentBuffer[offset + OFFSET_LINVEL_X];
+    out[1] = this._currentBuffer[offset + OFFSET_LINVEL_Y];
+    out[2] = this._currentBuffer[offset + OFFSET_LINVEL_Z];
+    return out;
+  }
+
+  /**
+   * Reads canonical angular velocity directly from the current simulation buffer.
+   */
+  getAngularVelocity(
+    slot: number,
+    out: [number, number, number] = [0, 0, 0]
+  ): [number, number, number] {
+    this.assertSlot(slot, 'getAngularVelocity');
+    const offset = slot * TRANSFORM_STRIDE;
+    out[0] = this._currentBuffer[offset + OFFSET_ANGVEL_X];
+    out[1] = this._currentBuffer[offset + OFFSET_ANGVEL_Y];
+    out[2] = this._currentBuffer[offset + OFFSET_ANGVEL_Z];
     return out;
   }
 
@@ -235,6 +339,7 @@ export class DualBufferTransformPipeline {
     outPosition: [number, number, number],
     outQuaternion: [number, number, number, number]
   ): void {
+    this.assertSlot(slot, 'interpolate');
     const offset = slot * TRANSFORM_STRIDE;
 
     const prevX = this._previousBuffer[offset + OFFSET_POS_X];

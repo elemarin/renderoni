@@ -8,7 +8,7 @@
 import { type TSchema, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import type { ResourceOwnership } from '../core/ownership.js';
+import type { DisposableResource, ResourceOwnership } from '../core/ownership.js';
 import type { PRNG } from '../core/prng.js';
 
 export interface EntityContext {
@@ -29,6 +29,12 @@ export interface NativeBindingConfig {
   three?: {
     object: THREE.Object3D;
     ownership?: ResourceOwnership;
+    /**
+     * Caller-provided geometries, materials and textures inside `object`.
+     * The engine never disposes them, so shared resources survive the removal
+     * of any single entity that renders with them.
+     */
+    borrowed?: DisposableResource[];
   };
   rapier?: {
     body?: RAPIER.RigidBody;

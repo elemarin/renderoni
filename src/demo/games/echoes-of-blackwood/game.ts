@@ -123,7 +123,6 @@ export class EchoesOfBlackwoodGame {
       phase: 'prePhysics',
       update: ({ dt }) => this.update(dt),
     });
-    this.engine.loop.start();
     this.engine.start();
   }
 
@@ -204,7 +203,7 @@ export class EchoesOfBlackwoodGame {
   }
 
   private update(dt: number): void {
-    if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused) return;
+    if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused || !this.engine.loop.playing) return;
     const keys = this.keys;
     const mobileMove = this.engine.input.getMoveVector();
     const lookDelta = this.engine.input.consumeLookDelta();
@@ -458,10 +457,12 @@ export class EchoesOfBlackwoodGame {
   private bindControls(): void {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'KeyF') {
+        if (!this.engine.loop.playing) return;
         this.engine.act({ name: 'player.toggleFlashlight' });
       }
       if (e.code === 'KeyE') {
         e.preventDefault();
+        if (!this.engine.loop.playing) return;
         this.tryInteract();
       }
       this.keys[e.code] = true;
@@ -505,6 +506,7 @@ export class EchoesOfBlackwoodGame {
         useHorrorStore.getState().dismissInspect();
         return;
       }
+      if (!this.engine.loop.playing) return;
       if (!this.isLocked && !this.lastPointerWasTouch) {
         this.mouseDragFallback = false;
         try {

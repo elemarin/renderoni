@@ -237,7 +237,7 @@ describe('Unified API, Presets & Engine', () => {
     const first = game.add({ tags: ['first'] });
     game.add({ id: 'named' });
 
-    expect(() => game.add({ id: 'named' })).toThrow('Entity id already exists: named');
+    expect(() => game.add({ id: 'named' })).toThrow(/RND_0401: entity id already exists: "named"/);
     first.destroy();
     expect(game.add({ tags: ['second'] }).id).not.toBe(first.id);
     game.dispose();

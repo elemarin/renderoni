@@ -16,6 +16,11 @@ export interface ActionRecord {
   tick?: number;
 }
 
+export interface ActionDescriptor {
+  name: string;
+  schema?: unknown;
+}
+
 export class ActionRegistry {
   private actions: Map<string, ActionDefinition> = new Map();
   private pendingActions: ActionRecord[] = [];
@@ -33,9 +38,21 @@ export class ActionRegistry {
   }
 
   /**
+   * Lists registered actions for inspection by tools and agent clients.
+   */
+  list(): ActionDescriptor[] {
+    return Array.from(this.actions.values(), ({ name, schema }) => ({ name, schema })).sort((a, b) =>
+      a.name < b.name ? -1 : a.name > b.name ? 1 : 0
+    );
+  }
+
+  /**
    * Enqueues an action to be executed in the current or next simulation tick.
    */
   dispatch(name: string, payload?: unknown): void {
+    if (!this.actions.has(name)) {
+      throw new Error(`Unknown action: ${name}`);
+    }
     this.pendingActions.push({ name, payload });
   }
 

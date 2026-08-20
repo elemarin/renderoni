@@ -113,7 +113,6 @@ export class SkywardCourierGame {
       phase: 'prePhysics',
       update: ({ dt }) => this.update(dt),
     });
-    this.engine.loop.start();
     this.engine.start();
   }
 
@@ -157,7 +156,7 @@ export class SkywardCourierGame {
   }
 
   private update(dt: number): void {
-    if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused) return;
+    if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused || !this.engine.loop.playing) return;
     const plane = this.planeRig;
     if (!plane) return;
 
@@ -335,9 +334,11 @@ export class SkywardCourierGame {
   private bindControls(): void {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'KeyI') {
+        if (!this.engine.loop.playing) return;
         this.engine.act({ name: 'flight.startEngine' });
       }
       if (e.code === 'KeyV' || e.code === 'KeyC') {
+        if (!this.engine.loop.playing) return;
         this.engine.act({ name: 'flight.toggleView' });
       }
       this.keys[e.code] = true;

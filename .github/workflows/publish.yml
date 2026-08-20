@@ -31,7 +31,39 @@ jobs:
       - name: Build packages
         run: npm run build
 
+      - name: Verify release contract (dry run, publishes nothing)
+        run: npm run gate:release
+
+      - name: Audit production dependencies
+        run: npm run gate:security
+
+      - name: Determine npm dist-tag
+        id: npm-tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == *-* ]]; then
+            echo "Publishing prerelease $VERSION under the 'beta' dist-tag (never 'latest')."
+            echo "tag=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "Publishing stable $VERSION under the 'latest' dist-tag."
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Confirm the resolved dist-tag matches the package version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          RESOLVED=$(node -e "import('./scripts/check-release-contract.mjs').then((m) => console.log(m.resolveDistTag(require('./package.json').version)))")
+          if [[ "${{ steps.npm-tag.outputs.tag }}" != "$RESOLVED" ]]; then
+            echo "Workflow resolved '${{ steps.npm-tag.outputs.tag }}' but the release contract resolved '$RESOLVED' for $VERSION." >&2
+            exit 1
+          fi
+          if [[ "$VERSION" == *-* && "$RESOLVED" != "beta" ]]; then
+            echo "Refusing to publish prerelease $VERSION under '$RESOLVED'." >&2
+            exit 1
+          fi
+          echo "$VERSION will be published under the '$RESOLVED' dist-tag."
+
       - name: Publish to npm
-        run: npm publish --access public --provenance
+        run: npm publish --access public --provenance --tag ${{ steps.npm-tag.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

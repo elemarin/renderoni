@@ -25,10 +25,30 @@ export interface CheckResult {
   failures: string[];
 }
 
+export const ASSERTION_OPS = [
+  'greaterThan',
+  'lessThan',
+  'equals',
+  'isWithinDistance',
+  'hasState',
+  'noDiagnostics',
+  'hasTick',
+  'toEmitEvent',
+] as const;
+
+export function isAssertionOp(value: unknown): value is AssertionOp['op'] {
+  return typeof value === 'string' && (ASSERTION_OPS as readonly string[]).includes(value);
+}
+
 export function evaluateCheck(game: RenderoniEngine, assertions: AssertionOp[]): CheckResult {
   const failures: string[] = [];
 
   for (const ast of assertions) {
+    if (!ast || typeof ast !== 'object') {
+      failures.push('Invalid assertion: expected an object');
+      continue;
+    }
+
     switch (ast.op) {
       case 'hasTick': {
         if (game.tick !== (ast.value as number)) {
@@ -103,6 +123,8 @@ export function evaluateCheck(game: RenderoniEngine, assertions: AssertionOp[]):
         }
         break;
       }
+      default:
+        failures.push(`Unsupported assertion op: ${String(ast.op)}`);
     }
   }
 
