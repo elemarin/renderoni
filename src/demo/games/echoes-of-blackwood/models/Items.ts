@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mesh, model, type EntityInstance } from '../../../../presets/index.js';
 import type { RenderoniEngine } from '../../../../core/engine.js';
 import { createWoodTexture, createStoneTileTexture } from '../../../materials.js';
+import { createVictorianWindingKeyModel } from './VictorianWindingKey.js';
 
 export interface QuestItemsResult {
   journalEntity: EntityInstance;
@@ -166,15 +167,8 @@ export function buildQuestItems(engine: RenderoniEngine): QuestItemsResult {
     })
   );
 
-  // Ornate Clock Winding Key
-  const keyGroup = new THREE.Group();
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 8, 20), brassMat);
-  const ringCenter = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.28, 8), brassMat);
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.38, 8), brassMat);
-  shaft.position.y = -0.22;
-  const bit = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.09, 0.025), brassMat);
-  bit.position.set(0.05, -0.34, 0);
-  keyGroup.add(ring, ringCenter, shaft, bit);
+  const keyGroup = createVictorianWindingKeyModel();
+  keyGroup.scale.setScalar(0.65);
 
   const keyEntity = engine.add(
     model({

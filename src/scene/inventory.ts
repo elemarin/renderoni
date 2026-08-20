@@ -23,6 +23,8 @@ export interface SceneElement {
   id: string;
   /** Registry key for an img2threejs `createXxxModel()` factory. */
   factory: string;
+  /** Optional object-specific reconstruction image. */
+  image?: string;
   kind: SceneElementKind;
   position: [number, number, number];
   rotation?: [number, number, number, number];
@@ -100,6 +102,7 @@ function parseElement(raw: unknown, index: number): SceneElement {
   return {
     id: rec.id,
     factory: rec.factory,
+    image: typeof rec.image === 'string' ? rec.image : undefined,
     kind: rec.kind as SceneElementKind,
     position: rec.position,
     rotation: isTuple4(rec.rotation) ? rec.rotation : undefined,

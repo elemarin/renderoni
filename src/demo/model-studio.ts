@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { createAncestorPortraitGroup } from './games/echoes-of-blackwood/models/AncestorPortrait.js';
 import { createManorDoorModel } from './games/echoes-of-blackwood/models/ManorDoor.js';
 import { createVictorianWallClockModel } from './games/echoes-of-blackwood/models/VictorianWallClock.js';
+import { createVictorianWindingKeyModel } from './games/echoes-of-blackwood/models/VictorianWindingKey.js';
 import { buildQuestItems } from './games/echoes-of-blackwood/models/Items.js';
 import { createCobwebGroup } from './games/echoes-of-blackwood/models/Cobweb.js';
 import { buildAerobaticPlane } from './games/skyward-courier/models/AerobaticPlane.js';
@@ -30,7 +31,7 @@ export class ModelStudioScene {
   public engine: RenderoniEngine;
   private canvas: HTMLCanvasElement;
   private currentObject: THREE.Object3D | null = null;
-  private activeModelId = 'victorian_wall_clock';
+  private activeModelId = 'victorian_winding_key';
   private autoRotate = true;
   private showWireframe = false;
   private showCollider = false;
@@ -124,17 +125,14 @@ export class ModelStudioScene {
         create: () => createAncestorPortraitGroup(1),
       },
       {
-        id: 'key_pedestal',
-        name: 'Stone Pedestal & Clock Key',
+        id: 'victorian_winding_key',
+        name: 'Filigreed Victorian Winding Key',
         category: 'prop',
-        description: 'Gothic stone pedestal supporting a spinning brass clock winding key with ring handle and cross-cut bit.',
-        sourceFile: 'models/Items.ts',
-        colliderHint: 'pedestal: cylinder [0.35, 0.8]',
+        description: 'Reference-matched antique winding key with an open circular bow, curled filigree, ribbed collars, engraved shaft, rosette, and decorative ward.',
+        sourceFile: 'models/VictorianWindingKey.ts',
+        colliderHint: 'box [0.9, 0.45, 0.12]',
         approved: true,
-        create: (eng) => {
-          const res = buildQuestItems(eng);
-          return res.keyEntity.native.three?.object || new THREE.Group();
-        },
+        create: () => createVictorianWindingKeyModel(),
       },
       {
         id: 'crest_altar',

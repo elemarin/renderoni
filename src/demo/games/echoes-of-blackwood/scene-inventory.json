@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "prompt": "haunted Victorian manor hallway with dark wood wainscoting, frayed crimson runner, ancestor oil portraits, an ornate gilded Victorian wall clock with a hanging pendulum, glowing torch sconces, and cobwebs",
+  "prompt": "haunted Victorian manor hallway with dark wood wainscoting, frayed crimson runner, ancestor oil portraits, an ornate gilded wall clock, a filigreed Victorian winding key, glowing sconces, and cobwebs",
   "image": "refs/victorian-wall-clock.png",
   "seed": 42,
   "elements": [
@@ -52,9 +52,12 @@
     },
     {
       "id": "prop_key",
-      "factory": "windingKey",
+      "factory": "victorianWindingKey",
+      "image": "refs/victorian-winding-key.png",
       "kind": "pickup",
       "position": [8, 1.35, -6],
+      "scale": 0.65,
+      "collider": { "shape": "box", "size": [0.9, 0.45, 0.12] },
       "tags": ["interactive", "item", "key"]
     },
     {

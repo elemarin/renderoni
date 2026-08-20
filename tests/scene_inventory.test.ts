@@ -13,6 +13,7 @@ const courtyard = {
     {
       id: 'crate',
       factory: 'woodCrate',
+      image: 'refs/crate.png',
       kind: 'prop' as const,
       position: [0, 0.5, 0] as [number, number, number],
       collider: { shape: 'box' as const, size: [1, 1, 1] },
@@ -32,6 +33,7 @@ describe('Scene inventory + procedural models', () => {
   it('parses a compact inventory and lists unique factories', () => {
     const inventory = parseSceneInventory(courtyard);
     expect(inventory.elements).toHaveLength(2);
+    expect(inventory.elements[0]?.image).toBe('refs/crate.png');
     expect(uniqueFactories(inventory)).toEqual(['woodCrate', 'goldCoin']);
   });
 
