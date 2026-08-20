@@ -1204,9 +1204,6 @@ class PlaygroundApp {
             if (questEl) questEl.textContent = t.lastAction;
           }
 
-          // Live Agent Inspector Update
-          this.syncLoopOverlay();
-
           if (this.isInspectorOpen) {
             try {
               const obs = ObservationEngine.generateTier0(this.currentGame.engine);
@@ -1231,6 +1228,8 @@ class PlaygroundApp {
             } catch (_) {}
           }
         }
+
+        this.syncLoopOverlay();
       } catch (err) {
         console.error('HUD update error:', err);
       } finally {
