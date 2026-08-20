@@ -33,4 +33,12 @@ describe('InputManager', () => {
     expect(input.consumeLookDelta()).toEqual({ dx: 5, dy: 1 });
     expect(input.consumeLookDelta()).toEqual({ dx: 0, dy: 0 });
   });
+
+  it('normalizes a held look vector independently from pointer deltas', () => {
+    const input = new InputManager();
+    input.setLookVector(3, 4);
+
+    expect(input.getLookVector()).toEqual({ x: 0.6, y: 0.8 });
+    expect(input.consumeLookDelta()).toEqual({ dx: 0, dy: 0 });
+  });
 });

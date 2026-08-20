@@ -43,6 +43,8 @@ export class EchoesOfBlackwoodGame {
   private pitchAngle = 0.0;
   private isLocked = false;
   private isMouseDown = false;
+  private lastPointerWasTouch = false;
+  private mouseDragFallback = false;
   private keys: Record<string, boolean> = {};
   private unbindInput: Array<() => void> = [];
   private _camForward = new THREE.Vector3();
@@ -205,9 +207,10 @@ export class EchoesOfBlackwoodGame {
     if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused) return;
     const keys = this.keys;
     const mobileMove = this.engine.input.getMoveVector();
-    const mobileLook = this.engine.input.consumeLookDelta();
-    this.yawAngle -= mobileLook.dx * 0.004;
-    this.pitchAngle -= mobileLook.dy * 0.004;
+    const lookDelta = this.engine.input.consumeLookDelta();
+    const lookVector = this.engine.input.getLookVector();
+    this.yawAngle -= lookDelta.dx * 0.004 + lookVector.x * 2.4 * dt;
+    this.pitchAngle -= lookDelta.dy * 0.004 - lookVector.y * 1.9 * dt;
     this.pitchAngle = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, this.pitchAngle));
 
     if (this.engine.input.consumeButtonPress('interact')) this.tryInteract();
@@ -468,8 +471,12 @@ export class EchoesOfBlackwoodGame {
       this.keys[e.code] = false;
     };
 
+    const onPointerDown = (event: PointerEvent) => {
+      this.lastPointerWasTouch = event.pointerType === 'touch';
+    };
+
     const onMouseDown = () => {
-      this.isMouseDown = true;
+      if (this.mouseDragFallback) this.isMouseDown = true;
     };
 
     const onMouseUp = () => {
@@ -477,7 +484,7 @@ export class EchoesOfBlackwoodGame {
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!this.isLocked && !this.isMouseDown) return;
+      if (!this.isLocked && !(this.mouseDragFallback && this.isMouseDown)) return;
       const sensitivity = 0.0024;
       this.yawAngle -= e.movementX * sensitivity;
       this.pitchAngle -= e.movementY * sensitivity;
@@ -486,6 +493,11 @@ export class EchoesOfBlackwoodGame {
 
     const onPointerLockChange = () => {
       this.isLocked = document.pointerLockElement === this.canvas;
+      if (this.isLocked) this.mouseDragFallback = false;
+    };
+
+    const onPointerLockError = () => {
+      this.mouseDragFallback = true;
     };
 
     const onClick = () => {
@@ -493,8 +505,15 @@ export class EchoesOfBlackwoodGame {
         useHorrorStore.getState().dismissInspect();
         return;
       }
-      if (!this.isLocked && navigator.maxTouchPoints === 0) {
-        this.canvas.requestPointerLock();
+      if (!this.isLocked && !this.lastPointerWasTouch) {
+        this.mouseDragFallback = false;
+        try {
+          void this.canvas.requestPointerLock().catch(() => {
+            this.mouseDragFallback = true;
+          });
+        } catch {
+          this.mouseDragFallback = true;
+        }
       }
     };
 
@@ -504,6 +523,8 @@ export class EchoesOfBlackwoodGame {
     window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('mousemove', onMouseMove);
     document.addEventListener('pointerlockchange', onPointerLockChange);
+    document.addEventListener('pointerlockerror', onPointerLockError);
+    this.canvas.addEventListener('pointerdown', onPointerDown);
     this.canvas.addEventListener('click', onClick);
     this.engine.input.attachMobileControls({
       lookElement: this.canvas,
@@ -521,6 +542,8 @@ export class EchoesOfBlackwoodGame {
       window.removeEventListener('mouseup', onMouseUp);
       window.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('pointerlockchange', onPointerLockChange);
+      document.removeEventListener('pointerlockerror', onPointerLockError);
+      this.canvas.removeEventListener('pointerdown', onPointerDown);
       this.canvas.removeEventListener('click', onClick);
     });
   }
