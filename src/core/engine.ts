@@ -76,6 +76,7 @@ export class EventEmitter {
 
   clear(): void {
     this.eventBuffer = [];
+    this.listeners.clear();
   }
 }
 
@@ -86,12 +87,13 @@ export class SystemManager {
   add(system: {
     phase?: 'prePhysics' | 'postPhysics';
     update: (ctx: { dt: number; tick: number; events: EventEmitter }) => void;
-  }): void {
-    if (system.phase === 'prePhysics') {
-      this.prePhysics.push(system.update);
-    } else {
-      this.postPhysics.push(system.update);
-    }
+  }): () => void {
+    const collection = system.phase === 'prePhysics' ? this.prePhysics : this.postPhysics;
+    collection.push(system.update);
+    return () => {
+      const index = collection.indexOf(system.update);
+      if (index >= 0) collection.splice(index, 1);
+    };
   }
 
   runPre(ctx: { dt: number; tick: number; events: EventEmitter }): void {
@@ -100,6 +102,11 @@ export class SystemManager {
 
   runPost(ctx: { dt: number; tick: number; events: EventEmitter }): void {
     for (const sys of this.postPhysics) sys(ctx);
+  }
+
+  clear(): void {
+    this.prePhysics = [];
+    this.postPhysics = [];
   }
 }
 
@@ -133,16 +140,19 @@ export class RenderoniEngine {
   };
 
   private entitiesMap: Map<string, EntityInstance> = new Map();
+  private readonly initialConfig: RenderoniConfig;
+  private nextEntityId: number = 1;
   private isRunning: boolean = false;
   private animationFrameId: number | null = null;
 
   constructor(config: RenderoniConfig = {}) {
+    this.initialConfig = config;
     this.mode = config.mode ?? 'headless';
     this.seed = config.seed ?? 42;
     this.physics = new PhysicsEngine();
 
     this.clock = new SimulationClock(config.clock);
-    this.prng = new PRNG(typeof this.seed === 'number' ? this.seed : 42);
+    this.prng = new PRNG(this.seed);
     this.commands = new StructuralCommandQueue();
     this.transformPipeline = new DualBufferTransformPipeline(1024);
     this.hasher = new StateHasher();
@@ -192,14 +202,18 @@ export class RenderoniEngine {
     };
   }
 
-  async init(config: RenderoniConfig = {}): Promise<void> {
+  async init(config: RenderoniConfig = this.initialConfig): Promise<void> {
+    const resolvedConfig = { ...this.initialConfig, ...config };
     await Promise.all([
-      this.physics.init({ gravity: config.gravity }),
+      this.physics.init({
+        gravity: resolvedConfig.gravity,
+        integrationParameters: { dt: this.clock.fixedDt },
+      }),
       this.hasher.init(),
     ]);
 
-    if (config.subsystems) {
-      for (const sub of config.subsystems) {
+    if (resolvedConfig.subsystems) {
+      for (const sub of resolvedConfig.subsystems) {
         sub(this);
       }
     }
@@ -228,10 +242,20 @@ export class RenderoniEngine {
     factoryOrEntity: PresetInstance<any> | EntityConfig | ((ctx: EntityContext) => EntityInstance)
   ): T {
     let inst: EntityInstance;
-    const generateId = () => `entity_${this.entitiesMap.size + 1}`;
+    const generateId = () => {
+      let id: string;
+      do {
+        id = `entity_${this.nextEntityId++}`;
+      } while (this.entitiesMap.has(id));
+      return id;
+    };
+    const requestedId = (factoryOrEntity as any).options?.id ?? (factoryOrEntity as any).id;
+    if (requestedId !== undefined && this.entitiesMap.has(requestedId)) {
+      throw new Error(`Entity id already exists: ${requestedId}`);
+    }
 
     const ctx: EntityContext = {
-      id: (factoryOrEntity as any).options?.id ?? (factoryOrEntity as any).id ?? generateId(),
+      id: requestedId ?? generateId(),
       native: {
         world: this.native.world,
         threeScene: this.native.scene,
@@ -295,6 +319,9 @@ export class RenderoniEngine {
                 rot[3]
               );
             }
+            if (cfg.native?.rapier?.body) {
+              cfg.native.rapier.body.setTranslation({ x: pos[0], y: pos[1], z: pos[2] }, true);
+            }
             if (cfg.native?.three?.object) {
               cfg.native.three.object.position.set(pos[0], pos[1], pos[2]);
             }
@@ -303,7 +330,38 @@ export class RenderoniEngine {
             if (slot !== undefined) {
               return (instance as any).transformPipeline.getQuaternion(slot);
             }
+            if (cfg.native?.three?.object) {
+              const q = cfg.native.three.object.quaternion;
+              return [q.x, q.y, q.z, q.w];
+            }
             return [0, 0, 0, 1];
+          },
+          set quaternion(rotation: [number, number, number, number]) {
+            if (slot !== undefined) {
+              const pos = (instance as any).transformPipeline.getPosition(slot);
+              (instance as any).transformPipeline.setTransform(
+                slot,
+                pos[0],
+                pos[1],
+                pos[2],
+                rotation[0],
+                rotation[1],
+                rotation[2],
+                rotation[3]
+              );
+            }
+            if (cfg.native?.rapier?.body) {
+              cfg.native.rapier.body.setRotation(
+                { x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] },
+                true
+              );
+            }
+            cfg.native?.three?.object?.quaternion.set(
+              rotation[0],
+              rotation[1],
+              rotation[2],
+              rotation[3]
+            );
           },
           destroy: () => {
             this.remove(entId);
@@ -357,12 +415,6 @@ export class RenderoniEngine {
       this.native.scene.remove(ent.native.three.object);
     }
 
-    if (ent.native.rapier?.body) {
-      try {
-        this.native.world.removeRigidBody(ent.native.rapier.body);
-      } catch (_) {}
-    }
-
     if (ent.onDestroy) {
       ent.onDestroy();
     }
@@ -376,24 +428,39 @@ export class RenderoniEngine {
    */
   step(ticksToRun: number = 1, advanceClock: boolean = true): void {
     for (let i = 0; i < ticksToRun; i++) {
+      // Preserve the last authoritative transform for presentation interpolation.
+      this.transformPipeline.commitTick();
+
       // 1. Drain & execute pending actions
       this.actions.drain(this);
 
-      // 2. Process Pre-Physics Systems
+      // 2. Drain structural mutations before iterating entities.
+      this.commands.drain({
+        onSpawnEntity: (command) => {
+          this.add({ id: command.entityId, tags: command.tags, state: command.initialState });
+        },
+        onDestroyEntity: (command) => this.remove(command.entityId),
+        onAddTag: (command) => this.entitiesMap.get(command.entityId)?.tags.add(command.tag),
+        onRemoveTag: (command) => this.entitiesMap.get(command.entityId)?.tags.delete(command.tag),
+        onSetState: (command) => {
+          const entity = this.entitiesMap.get(command.entityId);
+          if (entity) entity.state[command.path] = command.value;
+        },
+      });
+
+      // 3. Process Pre-Physics Systems
       this.systems.runPre({
         dt: this.clock.fixedDt,
         tick: this.clock.tick,
         events: this.events,
       });
 
-      // 3. Entity internal updates (e.g. KCC player / Dynamic player)
+      // 4. Entity internal updates (e.g. KCC player / Dynamic player)
       for (const ent of this.entitiesMap.values()) {
-        if (typeof (ent as any).update === 'function') {
-          (ent as any).update(this.clock.fixedDt);
-        }
+        ent.update?.(this.clock.fixedDt);
       }
 
-      // 4. Step Rapier Physics World
+      // 5. Step Rapier Physics World
       const currentTick = this.clock.tick;
       this.physics.step(
         this.transformPipeline,
@@ -413,42 +480,6 @@ export class RenderoniEngine {
         }
       );
 
-      // 5. Sensor Trigger Overlap Checks
-      for (const sensorEntity of this.entitiesMap.values()) {
-        if (sensorEntity.tags.has('sensor')) {
-          const sPos = sensorEntity.position;
-          for (const other of this.entitiesMap.values()) {
-            if (
-              other.id !== sensorEntity.id &&
-              (other.tags.has('player') || other.tags.has('dynamic') || other.tags.has('kcc'))
-            ) {
-              const oPos = other.position;
-              const dx = Math.abs(sPos[0] - oPos[0]);
-              const dy = Math.abs(sPos[1] - oPos[1]);
-              const dz = Math.abs(sPos[2] - oPos[2]);
-
-              if (dx < 3.5 && dy < 3.5 && dz < 3.5) {
-                if (!sensorEntity.state[`overlapping_${other.id}`]) {
-                  sensorEntity.state[`overlapping_${other.id}`] = true;
-                  this.events.emit(
-                    'sensor.enter',
-                    { sensor: { id: sensorEntity.id }, target: { id: other.id } },
-                    currentTick
-                  );
-                }
-              } else if (sensorEntity.state[`overlapping_${other.id}`]) {
-                delete sensorEntity.state[`overlapping_${other.id}`];
-                this.events.emit(
-                  'sensor.exit',
-                  { sensor: { id: sensorEntity.id }, target: { id: other.id } },
-                  currentTick
-                );
-              }
-            }
-          }
-        }
-      }
-
       // 6. Post-Physics Systems
       this.systems.runPost({
         dt: this.clock.fixedDt,
@@ -456,8 +487,7 @@ export class RenderoniEngine {
         events: this.events,
       });
 
-      // 7. Commit transform pipeline tick and advance Simulation Clock
-      this.transformPipeline.commitTick();
+      // 7. Advance Simulation Clock
       if (advanceClock) {
         this.clock.stepTicks(1);
       }
@@ -477,13 +507,17 @@ export class RenderoniEngine {
   getStateHash(): string {
     const rawEntities = Array.from(this.entitiesMap.values()).map((e) => ({
       id: e.id,
-      slot: e.slot ?? 0,
+      slot: e.slot ?? -1,
       position: e.position,
       quaternion: e.quaternion,
       state: e.state,
     }));
 
-    return this.hasher.computeHash(rawEntities, this.transformPipeline.currentBuffer);
+    return this.hasher.computeHash(
+      rawEntities,
+      this.transformPipeline.currentBuffer,
+      this.physics.getActiveContacts()
+    );
   }
 
   /**
@@ -510,7 +544,7 @@ export class RenderoniEngine {
 
       const numTicks = this.clock.advancePresentation(dt);
       if (numTicks > 0) {
-        this.step(numTicks, false);
+        this.step(numTicks);
       }
 
       if (onUpdate) {
@@ -556,12 +590,17 @@ export class RenderoniEngine {
    */
   dispose(): void {
     this.stop();
-    this.ownership.disposeAll(this.native.world as any);
+    for (const id of Array.from(this.entitiesMap.keys())) {
+      this.remove(id);
+    }
+    this.input.dispose();
+    this.actions.clear();
+    this.commands.clear();
+    this.systems.clear();
     this.physics.dispose();
     if (this.native.renderer) {
       this.native.renderer.dispose();
     }
-    this.entitiesMap.clear();
     this.events.clear();
   }
 }

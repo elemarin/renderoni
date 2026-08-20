@@ -108,9 +108,13 @@ export class SkywardCourierGame {
     // 5. Bind Controls
     this.bindControls();
 
-    // 6. Start Simulation Loop
+    // 6. Run gameplay on Renderoni's deterministic fixed-tick scheduler
+    this.engine.systems.add({
+      phase: 'prePhysics',
+      update: ({ dt }) => this.update(dt),
+    });
     this.engine.loop.start();
-    this.engine.start((dt) => this.update(dt));
+    this.engine.start();
   }
 
   private setupActions(): void {
@@ -136,6 +140,14 @@ export class SkywardCourierGame {
       handle: () => {
         useFlightStore.getState().toggleViewMode();
       },
+    });
+    this.engine.actions.register({
+      name: 'flight.reset',
+      handle: () => this.resetFlight(),
+    });
+    this.engine.actions.register({
+      name: 'flight.setBrakes',
+      handle: (pressed?: boolean) => this.engine.input.setButton('brake', pressed ?? true),
     });
   }
 

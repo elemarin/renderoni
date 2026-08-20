@@ -32,6 +32,15 @@ export class ScreenShake {
   private duration: number = 0;
   private elapsed: number = 0;
   private offset: [number, number, number] = [0, 0, 0];
+  private readonly random: () => number;
+
+  constructor(random?: () => number) {
+    let fallbackState = 0x9e3779b9;
+    this.random = random ?? (() => {
+      fallbackState = (Math.imul(fallbackState, 1664525) + 1013904223) >>> 0;
+      return fallbackState / 4294967296;
+    });
+  }
 
   shake(intensity: number = 0.5, durationSeconds: number = 0.3): void {
     this.intensity = intensity;
@@ -49,9 +58,9 @@ export class ScreenShake {
     const progress = 1.0 - this.elapsed / this.duration;
     const currentIntensity = this.intensity * progress;
 
-    this.offset[0] = (Math.random() * 2 - 1) * currentIntensity;
-    this.offset[1] = (Math.random() * 2 - 1) * currentIntensity;
-    this.offset[2] = (Math.random() * 2 - 1) * currentIntensity;
+    this.offset[0] = (this.random() * 2 - 1) * currentIntensity;
+    this.offset[1] = (this.random() * 2 - 1) * currentIntensity;
+    this.offset[2] = (this.random() * 2 - 1) * currentIntensity;
 
     return this.offset;
   }
@@ -81,7 +90,8 @@ export class ParticleEmitter {
 
 export function vfx(options: VFXSubsystemOptions = {}) {
   return (game: any) => {
-    const shake = new ScreenShake();
+    const random = game.prng?.fork('vfx.screenShake');
+    const shake = new ScreenShake(random ? () => random.nextFloat() : undefined);
     const particles = new ParticleEmitter(500);
 
     game.vfx = {

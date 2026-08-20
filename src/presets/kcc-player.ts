@@ -135,7 +135,7 @@ export const kccPlayer = definePreset({
     });
 
     // Register update callback with entity to advance KCC on every tick
-    (entityInst as any).update = (dt: number) => {
+    entityInst.update = (dt: number) => {
       // Apply gravity
       if (!isGrounded) {
         verticalVelocity -= gravity * dt;
@@ -151,7 +151,11 @@ export const kccPlayer = definePreset({
       );
 
       // Compute collider movement through Rapier KCC
-      characterController.computeColliderMovement(collider, desiredTranslation);
+      characterController.computeColliderMovement(
+        collider,
+        desiredTranslation,
+        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
+      );
       const correctedMovement = characterController.computedMovement();
       isGrounded = characterController.computedGrounded();
       playerState.grounded = isGrounded;
@@ -164,7 +168,6 @@ export const kccPlayer = definePreset({
       };
 
       body.setNextKinematicTranslation(newPos);
-      entityInst.position = [newPos.x, newPos.y, newPos.z];
     };
 
     return entityInst;

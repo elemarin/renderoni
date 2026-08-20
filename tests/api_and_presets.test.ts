@@ -217,4 +217,76 @@ describe('Unified API, Presets & Engine', () => {
     expect(hash1).toBe(hash2);
     expect(hash2).toBe(hash3);
   });
+
+  it('retains constructor configuration when initialized separately', async () => {
+    const game = new (await import('../src/core/engine.js')).RenderoniEngine({
+      mode: 'headless',
+      gravity: [0, -3, 0],
+      clock: { tickRateHz: 30 },
+    });
+
+    await game.init();
+
+    expect(game.native.world.gravity.y).toBe(-3);
+    expect(game.native.world.integrationParameters.dt).toBeCloseTo(1 / 30);
+    game.dispose();
+  });
+
+  it('rejects duplicate ids and never reuses generated live ids', async () => {
+    const game = await createRenderoni({ mode: 'headless' });
+    const first = game.add({ tags: ['first'] });
+    game.add({ id: 'named' });
+
+    expect(() => game.add({ id: 'named' })).toThrow('Entity id already exists: named');
+    first.destroy();
+    expect(game.add({ tags: ['second'] }).id).not.toBe(first.id);
+    game.dispose();
+  });
+
+  it('keeps entity transform writes authoritative in Rapier', async () => {
+    const game = await createRenderoni({ mode: 'headless' });
+    const crate = game.add(body({ type: 'dynamic', position: [0, 5, 0] }));
+
+    crate.position = [4, 8, 2];
+    expect(crate.native.rapier?.body?.translation()).toMatchObject({ x: 4, y: 8, z: 2 });
+
+    game.step();
+    expect(crate.position[0]).toBeCloseTo(4);
+    expect(crate.position[2]).toBeCloseTo(2);
+    game.dispose();
+  });
+
+  it('drains structural mutations before systems and entity updates', async () => {
+    const game = await createRenderoni({ mode: 'headless' });
+    game.add({ id: 'target', state: { active: false } });
+    game.commands.addTag('target', 'active');
+    game.commands.enqueue({ type: 'set_state', entityId: 'target', path: 'active', value: true });
+
+    game.step();
+
+    expect(game.entities.get('target')?.tags.has('active')).toBe(true);
+    expect(game.entities.get('target')?.state.active).toBe(true);
+    game.dispose();
+  });
+
+  it('includes entity state in deterministic hashes', async () => {
+    const game = await createRenderoni({ mode: 'headless' });
+    const entity = game.add({ id: 'stateful', state: { score: 1 } });
+    const before = game.getStateHash();
+
+    entity.state.score = 2;
+
+    expect(game.getStateHash()).not.toBe(before);
+    game.dispose();
+  });
+
+  it('runs entity destruction hooks during engine disposal', async () => {
+    const game = await createRenderoni({ mode: 'headless' });
+    let destroyed = false;
+    game.add({ id: 'temporary', onDestroy: () => { destroyed = true; } });
+
+    game.dispose();
+
+    expect(destroyed).toBe(true);
+  });
 });

@@ -30,12 +30,12 @@ describe('L0 Deterministic Kernel', () => {
       expect(clock.tick).toBe(10);
     });
 
-    it('accumulates presentation dt and advances ticks accordingly', () => {
+    it('accumulates presentation dt without advancing simulation state', () => {
       const clock = new SimulationClock({ tickRateHz: 60 });
       // 0.0333s = ~2 ticks at 60Hz
       const ticksRun = clock.advancePresentation(0.034);
       expect(ticksRun).toBe(2);
-      expect(clock.tick).toBe(2);
+      expect(clock.tick).toBe(0);
       expect(clock.accumulator).toBeGreaterThanOrEqual(0);
     });
   });
