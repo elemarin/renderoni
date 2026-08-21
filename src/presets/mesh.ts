@@ -65,10 +65,18 @@ export const mesh = definePreset({
     const geometry = makeGeometry(options);
     const material =
       options.material ?? new THREE.MeshStandardMaterial({ color: options.color ?? 0x94a3b8, roughness: 0.8 });
-    material.transparent = false;
-    material.opacity = 1;
-    material.depthWrite = true;
-    material.depthTest = true;
+    // Caller-provided geometry and materials are borrowed: they are commonly
+    // shared between many meshes, so only engine-created ones are disposed.
+    const borrowed: Array<THREE.BufferGeometry | THREE.Material> = [];
+    if (options.customGeometry) borrowed.push(options.customGeometry);
+    if (options.material) {
+      borrowed.push(options.material);
+    } else {
+      material.transparent = false;
+      material.opacity = 1;
+      material.depthWrite = true;
+      material.depthTest = true;
+    }
     const object = new THREE.Mesh(geometry, material);
     object.castShadow = false;
     object.receiveShadow = true;
@@ -91,7 +99,7 @@ export const mesh = definePreset({
       tags: options.tags ?? [],
       state: options.state ?? {},
       native: {
-        three: { object, ownership: 'owned' },
+        three: { object, ownership: 'owned', borrowed },
         rapier: body
           ? { body, colliders: collider ? [collider] : [], colliderHandles: collider ? [collider.handle] : [], ownership: 'owned' }
           : undefined,

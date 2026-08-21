@@ -1,200 +1,79 @@
-# 🍝 Renderoni — Three.js Game Engine for TypeScript
+# 🍝 Renderoni
 
-> ## **Three.js renders. Rapier simulates. Renderoni makes it a game.**
->
-> An open-source, batteries-included **3D web game engine** built with **Three.js** and **Rapier physics**. Create browser games in TypeScript with player controllers, deterministic simulation, audio, animation, VFX, headless testing, and AI-agent tooling already wired together.
+> **Three.js and Rapier, already wired up.**
+
+Renderoni is an open-source 3D web game engine. It wires Three.js and Rapier into a fixed game loop with player controls, headless tests, and tools for coding agents.
 
 [![CI](https://github.com/elemarin/renderoni/actions/workflows/ci.yml/badge.svg)](https://github.com/elemarin/renderoni/actions)
 [![Deploy Pages](https://github.com/elemarin/renderoni/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/elemarin/renderoni/actions/workflows/deploy-pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue.svg)](https://www.typescriptlang.org/)
-[![Three.js](https://img.shields.io/badge/Three.js-Game_Engine-black.svg)](https://threejs.org/)
-[![Rapier](https://img.shields.io/badge/Rapier-WASM_Physics-d97706.svg)](https://rapier.rs/)
-[![MCP](https://img.shields.io/badge/MCP-Compatible-green.svg)](https://modelcontextprotocol.io/)
+[![Version](https://img.shields.io/badge/Beta-0.9.0-blue.svg)](#)
 
-<p align="center">
-  <a href="https://elemarin.github.io/renderoni/"><strong>🎮 Play the live games</strong></a>
-  &nbsp;&nbsp;•&nbsp;&nbsp;
-  <a href="#-quickstart"><strong>🚀 Build in minutes</strong></a>
-  &nbsp;&nbsp;•&nbsp;&nbsp;
-  <a href="#-ai-agent-integration-mcp-server"><strong>🤖 Connect an AI agent</strong></a>
-</p>
+[🕹️ Play the console OS](#-live-console-games) • [🚀 Quickstart](#-install--quickstart) • [🤖 MCP Agent Tools](#-mcp-agent-tools)
 
 ---
 
-## Why Renderoni?
+## 📦 Install & Quickstart
 
-**Three.js is an excellent renderer, but it is not a game engine.** Adding Rapier gives you physics, but you still need to build the game loop, transform synchronization, character controllers, lifecycle management, audio, VFX, UI, testing, and developer tooling.
-
-Renderoni is the missing game-engine layer:
-
-| What you get | Why it matters |
-|---|---|
-| **Three.js + Rapier, integrated** | Rendering, WASM physics, colliders, and interpolated transforms work as one system. |
-| **TypeScript game presets** | Add players, rigid bodies, sensors, lights, audio, animation, UI, and VFX without engine boilerplate. |
-| **Deterministic simulation** | Fixed ticks, seeded randomness, state hashing, and reproducible gameplay bugs. |
-| **Headless game testing** | Run complete physics and gameplay scenarios in Node.js with Vitest—no browser screenshots required. |
-| **Agent-native MCP tools** | AI coding agents can observe scenes, dispatch typed actions, advance ticks, and verify outcomes semantically. |
-| **No walled garden** | Use native Three.js objects, shaders, loaders, and Rapier APIs whenever you need them. |
-
-Renderoni is designed for **3D browser games, WebGL/WebGPU games, interactive simulations, AI-generated games, and testable Three.js applications**.
-
----
-
-## 🎮 Live Demos
-
-Try the interactive playground live in your browser: **[elemarin.github.io/renderoni](https://elemarin.github.io/renderoni/)** (or run `npm run dev` locally).
-
-| Demo | What It Does | Controls |
-| :--- | :--- | :--- |
-| **🪙 Quickstart Demo** | Live interactive browser implementation of the README quickstart: hero character, spinning gold coin sensor, audio chime, and particle burst VFX. | `WASD` / Arrows (Move Hero), `Space` (Jump), `🪙 Respawn Coin` Button |
-| **✈️ Flight Simulator** | Aerodynamic flight physics with lift, drag, runway takeoff & landing, retractable landing gear, and ring course. | `W`/`S` (Pitch), `A`/`D` (Yaw), `Q`/`E` (Roll), `Shift`/`Ctrl` (Throttle), `Z`/`X` (Max/Cut), `G` (Gear), `C` (Cockpit/Chase View), `R` (Reset) |
-| **🔦 Echoes of Blackwood** | Retro PSX 1st-person manor mystery: flashlight, journal clue, clock puzzle, crest, and gate escape. | `WASD` (Walk), Mouse (Look), `F` (Flashlight), `E` (Interact) |
-
----
-
-## 📦 Installation
+Install the beta release. (Note: npm package is not yet published in this repo worktree, so consider these commands the beta release contract).
 
 ```bash
-npm install renderoni three @dimforge/rapier3d-compat
+npm install renderoni@beta three @dimforge/rapier3d-compat
 ```
 
-Tree-shakable subpath exports:
+When a stable 1.0 release is published, the future stable install command will be `npm install renderoni three @dimforge/rapier3d-compat`.
+
+Here's how you spawn a player, a floor, and a coin in a real browser:
 
 ```ts
 import { createRenderoni } from 'renderoni';
-import { body, kccPlayer, sensor, light, proceduralModel } from 'renderoni/presets';
-import { mountSceneInventory } from 'renderoni/scene';
-import { audio } from 'renderoni/audio';
-import { animation } from 'renderoni/animation';
-import { vfx } from 'renderoni/vfx';
-import { ui } from 'renderoni/ui';
-import { createMCPServer } from 'renderoni/mcp';
-import 'renderoni/testing/matchers';
-```
+import { body, kccPlayer, light, sensor } from 'renderoni/presets';
 
----
+const canvas = document.querySelector<HTMLCanvasElement>('#game');
+if (!canvas) throw new Error('Expected <canvas id="game">');
 
-## 🚀 Quickstart
-
-```ts
-import { createRenderoni } from 'renderoni';
-import { body, kccPlayer, sensor, light } from 'renderoni/presets';
-import { audio } from 'renderoni/audio';
-import { vfx } from 'renderoni/vfx';
-
-// 1. Initialize engine (runs headlessly in CI or interactively in browser)
 const game = await createRenderoni({
-  mode: 'interactive', // or 'headless'
+  mode: 'interactive',
+  canvas,
   seed: 42,
-  loop: { enabled: true, title: 'My Game', subtitle: 'Press Play' },
-  subsystems: [
-    audio({ volume: 0.8 }),
-    vfx({ particles: true }),
-  ],
 });
 
-// 2. Add Environment & Lighting
 game.add(light({ type: 'directional', position: [20, 40, 20] }));
-game.add(body({ shape: 'box', type: 'fixed', size: [100, 1, 100], position: [0, 0, 0] }));
+game.add(body({ shape: 'box', type: 'fixed', size: [100, 1, 100], position: [0, -0.5, 0] }));
+const player = game.add(kccPlayer({ id: 'hero', position: [0, 1, 0], moveSpeed: 6.5 }));
+game.add(sensor({ id: 'coin', position: [3, 1, 0] }));
 
-// 3. Add Collectible Item
-const coin = game.add(sensor({
-  id: 'golden_coin',
-  shape: 'sphere',
-  radius: 0.6,
-  position: [4, 1.2, 0],
-}));
-
-// 4. Add Player Character
-const player = game.add(kccPlayer({
-  id: 'hero',
-  position: [0, 1.5, 0],
-  moveSpeed: 6.5,
-}));
-
-// 5. Handle Gameplay Events
-game.events.on('sensor.enter', ({ sensor, target }) => {
-  if (sensor.id === 'golden_coin' && target.id === 'hero') {
-    game.audio.play('coin_pickup');
-    game.vfx.spawnParticles({ count: 16, position: [4, 1.2, 0] });
-    coin.destroy();
+const resize = () => {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (game.native.renderer) {
+    game.native.renderer.setSize(width, height, false);
   }
-});
-
-// 6. Run headlessly (CI/Tests) or start interactive render loop (Browser)
-game.step(60);   // Step 60 fixed ticks in ~1ms (Headless CI)
-// game.start(); // Start 60fps presentation loop (Browser)
-```
-
----
-
-## 🤖 AI Agent Integration (MCP Server)
-
-Connect Claude Desktop, Antigravity, Cursor, or any MCP client directly to your simulation:
-
-```json
-{
-  "mcpServers": {
-    "renderoni": {
-      "command": "npx",
-      "args": ["renderoni", "mcp"]
-    }
-  }
-}
-```
-
-### Built-in MCP Tools:
-- **`describe`**: Returns active entities, colliders, tags, and engine schemas.
-- **`observe`**: Returns ultra-dense **Tier 0 Markdown summaries (<500B / ~120 tokens)** with positions, velocities, and game state.
-- **`act`**: Injects deterministic semantic gameplay actions (`game.act({ name, payload })`).
-- **`step`**: Advances the simulation by $N$ fixed ticks and returns state hashes.
-- **`check`**: Evaluates machine AST assertions.
-
----
-
-## 🖼️ Prompt → scene (img2threejs)
-
-Agents should not dump a whole game into one prompt. Keep a **compact inventory JSON** in context, reconstruct each unique object with [img2threejs](https://github.com/img2threejs/img2threejs), then mount:
-
-```ts
-import { createRenderoni } from 'renderoni';
-import { kccPlayer, light } from 'renderoni/presets';
-import { mountSceneInventory, type SceneInventory } from 'renderoni/scene';
-import { createWoodCrateModel } from './generated/woodCrate.js';
-
-const inventory: SceneInventory = {
-  version: 1,
-  prompt: 'stone courtyard with a crate and a coin',
-  elements: [
-    { id: 'crate', factory: 'woodCrate', kind: 'prop', position: [0, 0.5, 0], collider: { shape: 'box', size: [1, 1, 1] } },
-  ],
+  game.native.camera.aspect = width / height;
+  game.native.camera.updateProjectionMatrix();
 };
-
-const game = await createRenderoni({ mode: 'headless', seed: 42 });
-game.add(light({ type: 'directional', position: [12, 20, 8] }));
-mountSceneInventory(game, inventory, { woodCrate: createWoodCrateModel });
-game.add(kccPlayer({ id: 'hero', position: [0, 1.5, 6] }));
+new ResizeObserver(resize).observe(canvas);
+resize();
+game.start();
 ```
-
-Skill: `.agents/skills/prompt-to-scene/SKILL.md`.
 
 ---
 
-## 🧪 Headless Testing with Vitest
+## 🧪 Headless Testing
 
-Run complete game integration tests headlessly in Node.js in under 10ms with custom Vitest matchers:
+You can run that exact same game headlessly in Vitest. No browser, no visual regression screenshots, just deterministic physics and game logic running in Node.js.
 
 ```ts
 import { expect, test } from 'vitest';
 import { createRenderoni } from 'renderoni';
-import { kccPlayer, sensor } from 'renderoni/presets';
+import { body, kccPlayer, sensor } from 'renderoni/presets';
 import 'renderoni/testing/matchers';
 
-test('player collects coin and verifies state hash', async () => {
+test('player collects coin', async () => {
   const game = await createRenderoni({ mode: 'headless', seed: 42 });
+  game.add(body({ shape: 'box', type: 'fixed', size: [100, 1, 100], position: [0, -0.5, 0] }));
   const hero = game.add(kccPlayer({ id: 'hero', position: [0, 1, 0] }));
-  const coin = game.add(sensor({ id: 'coin', position: [3, 1, 0] }));
+  game.add(sensor({ id: 'coin', position: [3, 1, 0] }));
 
   hero.actions.move({ x: 1, z: 0 });
   game.step(60);
@@ -207,31 +86,136 @@ test('player collects coin and verifies state hash', async () => {
 
 ---
 
-## 🏛️ Architecture
+## 🤔 Why use Renderoni?
 
+If you've ever built a game in Three.js, you know rendering is just the first step. Renderoni solves the boilerplate:
+
+- **Three.js + Rapier Sync**: Visuals and physics transforms interpolate perfectly.
+- **Deterministic Scope**: Fixed ticks, seeded PRNG, and quantized state hashing. Run it twice, get the same result.
+- **Useful Presets**: Players, rigid bodies, sensors, lights.
+- **Headless Node.js Testing**: Run full physics and game logic in Vitest.
+- **AI-Agent Ready**: Built-in stdio MCP server for agent tooling.
+- **Native Escape Hatches**: Direct access to `game.native.scene`, `.camera`, and `.world` when you need standard Three/Rapier features.
+
+---
+
+## 🚦 Feature Status
+
+Renderoni is currently in `0.9.0-beta.1`. Here is exactly what works today and what is coming post-1.0.
+
+| Feature | Status | Notes |
+|---|---|---|
+| Engine Core (Ticks, PRNG) | 🟢 Stable Beta | Exact run-to-run hashes on the pinned matrix. |
+| Physics Sync | 🟢 Stable Beta | Dual-buffer interpolation. |
+| Audio Events | 🟡 Preview | Records and emits sound events. Connect your own playback. |
+| VFX Triggers | 🟡 Preview | Screen shake and VFX event hooks. Rendered particles are planned. |
+| Model Studio | 🟡 Preview | Local notes/screenshots/JSON export only. No project persistence. |
+| Networking / SSE | 🔴 Post-1.0 | Removed until stable release. |
+| Gamepads | 🔴 Post-1.0 | Keyboards, mice, and touch only right now. |
+| Bloom / GPU Particles | 🔴 Post-1.0 | Not available yet. |
+
+---
+
+## 🤖 MCP Agent Tools
+
+Connect Claude Desktop, Antigravity, Cursor, or any MCP client directly to your game. Renderoni uses a `stdio` MCP server (no network required).
+
+To start the MCP server:
+
+```bash
+npx renderoni@beta mcp
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                              L3 APPLICATION                            │
-│           Game Rules, Custom Assets, Levels, Shaders, UI Layouts       │
-├────────────────────────────────────────────────────────────────────────┤
-│                           L2 TOOLING & AGENTS                          │
-│     Built-in MCP Server (stdio/SSE), Vitest Matchers, Live Inspector   │
-├────────────────────────────────────────────────────────────────────────┤
-│                         L1 BATTERIES & SUBSYSTEMS                      │
-│   Spatial Audio • Skeletal Animation • UI Projections • VFX Emitters   │
-│   Declarative Presets: body, sensor, light, kccPlayer, dynamicPlayer   │
-├────────────────────────────────────────────────────────────────────────┤
-│                          L0 DETERMINISTIC KERNEL                       │
-│   Integer Tick Clock • Seeded PRNG • Dual-Buffer Transform Pipeline    │
-│   Quantized State Hashing (XXH3) • Resource Ownership Tracking         │
-├────────────────────────────────────────────────────────────────────────┤
-│                             NATIVE ENGINES                             │
-│       Three.js (WebGL / WebGPU)   │   @dimforge/rapier3d-compat (WASM) │
-└────────────────────────────────────────────────────────────────────────┘
+
+The server exposes five tools for coding agents:
+
+- **`describe`**: Inspect engine configuration, active entities, and registered actions.
+- **`observe`**: Get a Tier 0 Markdown summary (at most 500 bytes) of positions, tags, state, and recent events.
+- **`act`**: Dispatch typed gameplay actions (`{ name, payload }`).
+- **`step`**: Advance the simulation by $N$ fixed ticks.
+- **`check`**: Run AST assertions against the engine state.
+
+---
+
+## 🖼️ Prompt-to-Scene
+
+Don't have your coding agent write giant scene graphs. Use a concise SceneInventory JSON, build objects with [img2threejs](https://github.com/img2threejs/img2threejs), and mount them.
+
+```ts
+import { createRenderoni } from 'renderoni';
+import { kccPlayer, light } from 'renderoni/presets';
+import { mountSceneInventory, type SceneInventory } from 'renderoni/scene';
+
+const inventory: SceneInventory = {
+  version: 1,
+  prompt: 'stone courtyard with a crate and a coin',
+  elements: [
+    { id: 'crate', factory: 'woodCrate', kind: 'prop', position: [0, 0.5, 0], collider: { shape: 'box', size: [1, 1, 1] } },
+  ],
+};
+
+const game = await createRenderoni({ mode: 'headless', seed: 42 });
+game.add(light({ type: 'directional', position: [12, 20, 8] }));
+mountSceneInventory(game, inventory, {});
+game.add(kccPlayer({ id: 'hero', position: [0, 1.5, 6] }));
 ```
 
 ---
 
-## 📜 License
+## 🕹️ Live Console Games
 
-MIT © [Esteban Leandro Marín](https://github.com/elemarin)
+We built a fun Console OS web app to showcase the engine. Play it to see the physics, inputs, and graphics in action.
+
+| Game | Description | Controls |
+|---|---|---|
+| **🪙 Quickstart Demo** | The README hero character, coin sensor, audio chime, and particle burst VFX. | `WASD` / Arrows (Move), `Space` (Jump) |
+| **✈️ Flight Simulator** | Aerodynamic physics, runway takeoff, landing gear, and ring course. | `W`/`S` (Pitch), `A`/`D` (Roll), `Q`/`E` (Yaw), `Shift`/`Ctrl` (Throttle), `Z`/`X` (Max/Cut), `G` (Gear), `C` (Camera), `R` (Reset) |
+| **🔦 Echoes of Blackwood** | Retro PSX 1st-person manor mystery: flashlight, clock puzzle, and escape. | `WASD` (Walk), Mouse (Look), `F` (Flashlight), `E` (Interact) |
+
+*Mobile support: Dual virtual sticks. Mid/high-end current phones target 45 FPS.*
+
+---
+
+## 🧩 Public Subpaths
+
+Renderoni uses tree-shakable subpath exports. Network exports have been removed for the beta.
+
+| Subpath | Purpose |
+|---|---|
+| `renderoni` | Core `createRenderoni` entrypoint. |
+| `renderoni/core` | Internal engine types (`RenderoniEngine`). |
+| `renderoni/presets` | `body`, `sensor`, `light`, `kccPlayer`, `proceduralModel`. |
+| `renderoni/animation` | Skeletal animation helpers. |
+| `renderoni/audio` | Audio event records and hooks. |
+| `renderoni/ui` | UI overlay components. |
+| `renderoni/vfx` | Screen shake and VFX event hooks. |
+| `renderoni/scene` | `mountSceneInventory` and scene parsing. |
+| `renderoni/mcp` | Node.js MCP server entrypoint. |
+| `renderoni/testing` | Framework-free assertion checks for headless tests. |
+| `renderoni/testing/matchers` | Custom Vitest matchers (requires `vitest` peer dependency). |
+| `renderoni/input` | Player input management. |
+
+---
+
+## 🔒 Determinism & Beta Contract
+
+Renderoni targets **consistent gameplay and run-to-run determinism** across devices.
+
+However, **exact state hashes** (bit-for-bit identical state) are currently only guaranteed on our pinned `Node 22 Linux x64` CI matrix. Floating-point math variations in different browsers or architectures may cause minor hash divergences over long sessions.
+
+---
+
+## 🛠️ Development & Support
+
+To work on Renderoni itself:
+
+- `npm install` (Install dependencies)
+- `npm run dev` (Start Vite dev server)
+- `npm run typecheck` (Check types)
+- `npm test` (Run unit and integration tests)
+- `npm run gate:beta` (Run the beta validation suite)
+
+### Links
+
+- **Support & Issues**: [GitHub Issues](https://github.com/elemarin/renderoni/issues)
+- **Security**: [Security Policy](https://github.com/elemarin/renderoni/security/policy)
+- **License**: [MIT License](https://opensource.org/licenses/MIT)

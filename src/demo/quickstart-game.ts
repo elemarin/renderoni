@@ -57,6 +57,11 @@ export class QuickstartGame {
       mode: 'interactive',
       canvas: this.canvas,
       gravity: [0, -20.0, 0],
+      loop: {
+        enabled: true,
+        title: 'Golden Quickstart',
+        subtitle: 'Move, jump, blast physics props, and collect all 8 coins.',
+      },
     });
   }
 
@@ -379,6 +384,7 @@ export class QuickstartGame {
     const onKeyDown = (e: KeyboardEvent) => {
       this.keys[e.code] = true;
       this.keys[e.key.toLowerCase()] = true;
+      if (!this.engine.loop.playing) return;
 
       if (e.code === 'KeyE') this.explode();
       if (e.code === 'KeyB') this.spawnBoxes(5);
@@ -417,7 +423,7 @@ export class QuickstartGame {
   }
 
   update(dt: number): void {
-    if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused) return;
+    if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused || !this.engine.loop.playing) return;
     // 1. KCC Movement
     let dx = 0;
     let dz = 0;

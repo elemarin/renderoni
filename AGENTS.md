@@ -11,7 +11,7 @@ Renderoni is structured in 4 strict hierarchical layers:
   - **Rule 1**: NEVER call `Math.random()`, `Date.now()`, `performance.now()`, or `requestAnimationFrame()` inside simulation logic or entity updates. Always use `engine.prng` and `engine.clock.tick`.
   - **Rule 2**: NEVER bypass the dual-buffer transform pipeline. Write physics transforms into canonical buffer slots, never directly into render scene graphs.
 - **L1: Batteries & Subsystems (`src/presets/`, `src/animation/`, `src/audio/`, `src/vfx/`, `src/ui/`, `src/scene/`)**: High-level declarative presets (`body`, `sensor`, `light`, `kccPlayer`, `dynamicPlayer`, `proceduralModel`) and compact scene inventories for prompt → img2threejs factories.
-- **L2: Agent Tooling & MCP (`src/mcp/`, `src/testing/`)**: Stdio/SSE Model Context Protocol server, custom Vitest matchers, and headless CLI verification.
+- **L2: Agent Tooling & MCP (`src/mcp/`, `src/testing/`)**: Stdio Model Context Protocol server, custom Vitest matchers, and headless CLI verification.
 - **L3: Web Application & Demos (`src/demo/`, `index.html`)**: Interactive playground and multi-archetype web showcases.
 
 ---

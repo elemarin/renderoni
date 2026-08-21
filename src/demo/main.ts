@@ -7,12 +7,9 @@
  * - Live Agent Inspector with AST telemetry & action dispatch
  */
 
-import { EchoesOfBlackwoodGame as PsxGame } from './games/echoes-of-blackwood/game.js';
-import { SkywardCourierGame as FlightGame } from './games/skyward-courier/game.js';
-import { QuickstartGame } from './quickstart-game.js';
-import { ModelStudioScene } from './model-studio.js';
-import { HomeScene } from './home-scene.js';
 import { ObservationEngine } from '../core/observations.js';
+import type { RenderoniEngine } from '../core/engine.js';
+import { RENDERONI_VERSION } from '../version.js';
 import { sfx } from './audio-sfx.js';
 
 export type GameMode = 'home' | 'studio' | 'psx' | 'flight' | 'quickstart';
@@ -31,26 +28,71 @@ export interface GameMetadata {
   quickActions: Array<{ label: string; action: string; payload?: any }>;
 }
 
+interface DemoScene {
+  engine: RenderoniEngine;
+  init(): Promise<void>;
+  dispose(): void;
+}
+
+interface PsxGameScene extends DemoScene {
+  dismissInspect(): void;
+  toggleFlashlight(): void;
+  getTelemetry(): {
+    questStatus: string;
+    flashlightOn: boolean;
+    hasKey: boolean;
+    hasCrest: boolean;
+    gateUnlocked: boolean;
+    inspectingText: string | null;
+  };
+  getHoverPrompt(): string | null;
+}
+
+interface FlightGameScene extends DemoScene {
+  setThrottle(percent: number): void;
+  getTelemetry(): {
+    speedKmh: number;
+    altitudeM: number;
+    verticalSpeedMs: number;
+    throttlePercent: number;
+    flightPhase: string;
+    phaseLabel: string;
+    ringsCleared: number;
+    totalRings: number;
+    objective: string;
+  };
+}
+
+interface QuickstartGameScene extends DemoScene {
+  getTelemetry(): {
+    playerPos: [number, number, number];
+    coinsCollected: number;
+    totalCoins: number;
+    dynamicBodyCount: number;
+    lastAction: string;
+  };
+}
+
 export const GAMES_METADATA: Record<string, GameMetadata> = {
   studio: {
     id: 'studio',
-    title: 'Model Studio & Forge',
-    subtitle: 'Pre-Game 3D Reconstruction & Approval Gate',
+    title: 'Model Studio',
+    subtitle: 'Preview Lab for Game Props',
     genre: 'PROMPT-TO-SCENE LAB',
     badge: '🎨 3D MODEL STUDIO',
     accentColor: '#38bdf8',
     themeColorHex: 0x0284c7,
-    description: 'Inspect, rotate, view colliders, and approve reconstructed 3D models before adding them to games.',
+    description: 'Preview reconstructed 3D models, frame details, add annotation pins, and capture clean PNGs.',
     features: [
-      '🔄 360-degree Turntable with OrbitControls (Drag/Scroll)',
+      '🕹️ Manual Orbit/Frame/Reset Controls (Drag/Scroll)',
       '📐 Wireframe & Rapier Physics Collider Boundary Visualizer',
-      '✅ Interactive Model Approval Gate for Level Inception',
-      '📜 Declarative SceneInventory JSON Topology Viewer',
+      '📍 Click-to-place Annotation Pins saved per Model',
+      '🖼️ Clean PNG Copy/Download and Annotation JSON Export',
     ],
     controls: [
       { key: 'Mouse Drag', desc: 'Orbit & Rotate Model' },
       { key: 'Scroll Wheel', desc: 'Zoom In / Out' },
-      { key: 'Click Item', desc: 'Load Reconstructed Model' },
+      { key: 'Click Model', desc: 'Place Annotation Pin' },
     ],
     quickActions: [],
   },
@@ -156,8 +198,8 @@ const GAME_ORDER: GameMode[] = ['psx', 'flight', 'quickstart'];
 class PlaygroundApp {
   private activeMode: GameMode = 'home';
   private selectedAlbumIndex = 0;
-  private currentGame: PsxGame | FlightGame | QuickstartGame | ModelStudioScene | null = null;
-  private homeScene: HomeScene | null = null;
+  private currentGame: DemoScene | null = null;
+  private homeScene: DemoScene | null = null;
   private canvas: HTMLCanvasElement;
   private isInspectorOpen = false;
   private activeInspectorTab: 'telemetry' | 'models' | 'entities' | 'actions' | 'state' = 'telemetry';
@@ -167,6 +209,8 @@ class PlaygroundApp {
   private currentFps = 60;
   private paused = false;
   private focusedLoopPhase: string | null = null;
+  private resizeRaf = 0;
+  private loadingToken = 0;
 
   // DOM Elements
   private consoleHome!: HTMLElement;
@@ -205,8 +249,9 @@ class PlaygroundApp {
     this.canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     this.initDOM();
     this.initClock();
+    this.initAppViewport();
     this.initKeyboardNavigation();
-    this.switchGame('home');
+    void this.switchGame(this.getModeFromRoute());
     this.startHUDUpdateLoop();
   }
 
@@ -281,7 +326,7 @@ class PlaygroundApp {
       this.renderEntityTree();
     });
 
-    // Tab 4 Actions: Copy State JSON, Download Snapshot, Copy Share Link
+    // Tab 4 Actions: Copy State JSON, Download Snapshot
     document.getElementById('btn-copy-state-json')?.addEventListener('click', (e) => {
       const stateObj = this.getEngineStateSnapshot();
       this.copyToClipboard(JSON.stringify(stateObj, null, 2), e.currentTarget as HTMLElement);
@@ -289,11 +334,6 @@ class PlaygroundApp {
 
     document.getElementById('btn-download-state')?.addEventListener('click', () => {
       this.downloadStateSnapshot();
-    });
-
-    document.getElementById('btn-copy-share-url')?.addEventListener('click', (e) => {
-      const url = window.location.href;
-      this.copyToClipboard(url, e.currentTarget as HTMLElement);
     });
 
     // Action Dispatch
@@ -324,10 +364,24 @@ class PlaygroundApp {
       this.launchSelectedGame();
     });
 
+    document.getElementById('btn-prev-card')?.addEventListener('click', () => {
+      this.selectAlbumCard((this.selectedAlbumIndex - 1 + GAME_ORDER.length) % GAME_ORDER.length);
+    });
+
+    document.getElementById('btn-next-card')?.addEventListener('click', () => {
+      this.selectAlbumCard((this.selectedAlbumIndex + 1) % GAME_ORDER.length);
+    });
+
+    document.getElementById('btn-brand-home')?.addEventListener('click', () => {
+      this.switchGame('home');
+    });
+
+    this.btnAudioToggle?.addEventListener('click', () => this.toggleAudio());
+
     // Close Note Modal
     const handleCloseInspect = () => {
       if (this.activeMode === 'psx' && this.currentGame) {
-        (this.currentGame as PsxGame).dismissInspect();
+        (this.currentGame as PsxGameScene).dismissInspect();
       }
     };
     document.getElementById('btn-close-inspect')?.addEventListener('click', handleCloseInspect);
@@ -531,6 +585,56 @@ class PlaygroundApp {
     }
   }
 
+  private toggleAudio(): void {
+    const muted = sfx.toggleMute();
+    if (this.btnAudioToggle) {
+      this.btnAudioToggle.textContent = muted ? '🔇' : '🔊';
+      this.btnAudioToggle.classList.toggle('muted', muted);
+      this.btnAudioToggle.title = muted ? 'Unmute' : 'Mute';
+    }
+  }
+
+  private getModeFromRoute(): GameMode {
+    const raw = window.location.hash.replace(/^#\/?/, '').split('/')[0] as GameMode;
+    return raw === 'studio' || GAME_ORDER.includes(raw) ? raw : 'home';
+  }
+
+  private setRouteMode(mode: GameMode): void {
+    const hash = mode === 'home' ? '' : `#${mode}`;
+    if (window.location.hash !== hash) {
+      history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`);
+    }
+  }
+
+  private initAppViewport(): void {
+    const onResize = () => {
+      if (this.resizeRaf) cancelAnimationFrame(this.resizeRaf);
+      this.resizeRaf = requestAnimationFrame(() => this.resizeActiveScene());
+    };
+    window.addEventListener('resize', onResize, { passive: true });
+    window.addEventListener('orientationchange', onResize);
+    window.addEventListener('hashchange', () => {
+      void this.switchGame(this.getModeFromRoute());
+    });
+    onResize();
+  }
+
+  private resizeActiveScene(): void {
+    const scene = this.currentGame ?? this.homeScene;
+    const renderer = scene?.engine.native.renderer;
+    const camera = scene?.engine.native.camera;
+    const width = Math.max(1, this.canvas.clientWidth || window.innerWidth);
+    const height = Math.max(1, this.canvas.clientHeight || window.innerHeight);
+    this.canvas.width = width;
+    this.canvas.height = height;
+    renderer?.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer?.setSize(width, height, false);
+    if (camera) {
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+    }
+  }
+
   private getEngineStateSnapshot(): Record<string, any> {
     if (!this.currentGame) {
       return {
@@ -665,10 +769,7 @@ class PlaygroundApp {
       }
 
       if (e.code === 'KeyM') {
-        const muted = sfx.toggleMute();
-        if (this.btnAudioToggle) {
-          this.btnAudioToggle.textContent = muted ? '🔇' : '🔊';
-        }
+        this.toggleAudio();
       }
     });
   }
@@ -750,7 +851,7 @@ class PlaygroundApp {
     const gameKey = GAME_ORDER[index];
     const meta = GAMES_METADATA[gameKey];
     if (meta && this.homeScene) {
-      this.homeScene.setAccentColor(meta.themeColorHex);
+      (this.homeScene as DemoScene & { setAccentColor?: (colorHex: number) => void }).setAccentColor?.(meta.themeColorHex);
     }
   }
 
@@ -858,7 +959,8 @@ class PlaygroundApp {
   }
 
   async switchGame(mode: GameMode, force = false): Promise<void> {
-    if (!force && this.activeMode === mode && this.currentGame) return;
+    if (!force && this.activeMode === mode && (mode === 'home' ? this.homeScene : this.currentGame)) return;
+    const token = ++this.loadingToken;
 
     // 1. Dispose active game or home scene
     if (this.currentGame) {
@@ -874,6 +976,7 @@ class PlaygroundApp {
 
     this.activeMode = mode;
     this.focusedLoopPhase = null;
+    this.setRouteMode(mode);
 
     // 2. Update navigation tab active state
     document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -889,30 +992,111 @@ class PlaygroundApp {
       this.consoleHome.style.display = 'flex';
       this.hudContainer.style.display = 'none';
       this.selectAlbumCard(this.selectedAlbumIndex);
+      let nextHomeScene: DemoScene | null = null;
+      try {
+        const { HomeScene } = await import('./home-scene.js');
+        if (token !== this.loadingToken) return;
+        nextHomeScene = new HomeScene(this.canvas);
+        await nextHomeScene.init();
+        if (token !== this.loadingToken) {
+          nextHomeScene.dispose();
+          return;
+        }
+        this.homeScene = nextHomeScene;
+        nextHomeScene = null;
+        const meta = GAMES_METADATA[GAME_ORDER[this.selectedAlbumIndex]];
+        (this.homeScene as DemoScene & { setAccentColor?: (colorHex: number) => void }).setAccentColor?.(meta?.themeColorHex ?? 0x38bdf8);
+        this.resizeActiveScene();
+      } catch (err) {
+        nextHomeScene?.dispose();
+        if (token === this.loadingToken) this.showLoadError('home', err);
+      }
     } else {
       this.consoleHome.style.display = 'none';
       this.hudContainer.style.display = 'block';
+      this.showLoading(mode);
 
-      if (mode === 'studio') {
-        this.currentGame = new ModelStudioScene(this.canvas);
-        await (this.currentGame as ModelStudioScene).init();
-      } else if (mode === 'psx') {
-        this.currentGame = new PsxGame(this.canvas);
-        await (this.currentGame as PsxGame).init();
-        this.mountPsxHUD();
-      } else if (mode === 'flight') {
-        this.currentGame = new FlightGame(this.canvas);
-        await (this.currentGame as FlightGame).init();
-        this.mountFlightHUD();
-      } else if (mode === 'quickstart') {
-        this.currentGame = new QuickstartGame(this.canvas);
-        await (this.currentGame as QuickstartGame).init();
-        this.mountQuickstartHUD();
+      let nextGame: DemoScene | null = null;
+      let activateStudio = false;
+      try {
+        if (mode === 'studio') {
+          const { ModelStudioScene } = await import('./model-studio.js');
+          if (token !== this.loadingToken) return;
+          const studio = new ModelStudioScene(this.canvas);
+          nextGame = studio;
+          await studio.init({ activate: false });
+          activateStudio = true;
+        } else if (mode === 'psx') {
+          const { EchoesOfBlackwoodGame } = await import('./games/echoes-of-blackwood/game.js');
+          if (token !== this.loadingToken) return;
+          nextGame = new EchoesOfBlackwoodGame(this.canvas);
+        } else if (mode === 'flight') {
+          const { SkywardCourierGame } = await import('./games/skyward-courier/game.js');
+          if (token !== this.loadingToken) return;
+          nextGame = new SkywardCourierGame(this.canvas);
+        } else if (mode === 'quickstart') {
+          const { QuickstartGame } = await import('./quickstart-game.js');
+          if (token !== this.loadingToken) return;
+          nextGame = new QuickstartGame(this.canvas);
+        }
+        if (!nextGame) return;
+        if (!activateStudio) await nextGame.init();
+        if (token !== this.loadingToken) {
+          nextGame.dispose();
+          return;
+        }
+        this.currentGame = nextGame;
+        nextGame = null;
+        if (activateStudio) {
+          (this.currentGame as DemoScene & { activate: () => void }).activate();
+        }
+        if (mode === 'psx') this.mountPsxHUD();
+        if (mode === 'flight') this.mountFlightHUD();
+        if (mode === 'quickstart') this.mountQuickstartHUD();
+        this.resizeActiveScene();
+
+        const meta = GAMES_METADATA[mode];
+        if (meta) this.renderQuickActions(meta.quickActions);
+      } catch (err) {
+        nextGame?.dispose();
+        if (token === this.loadingToken) this.showLoadError(mode, err);
       }
-
-      const meta = GAMES_METADATA[mode];
-      if (meta) this.renderQuickActions(meta.quickActions);
     }
+  }
+
+  private showLoading(mode: GameMode): void {
+    const meta = GAMES_METADATA[mode];
+    this.hudContainer.innerHTML = `
+      <div class="launcher-status" role="status" aria-live="polite">
+        <div class="status-card">
+          <div class="status-kicker">Loading Cartridge</div>
+          <h2>${meta?.title ?? 'Renderoni'}</h2>
+          <p>Spinning up the module boundary…</p>
+        </div>
+      </div>
+    `;
+  }
+
+  private showLoadError(mode: GameMode, err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    this.hudContainer.style.display = 'block';
+    this.hudContainer.innerHTML = `
+      <div class="launcher-status error" role="alert">
+        <div class="status-card">
+          <div class="status-kicker">Cartridge Read Error</div>
+          <h2>${GAMES_METADATA[mode]?.title ?? 'Home Scene'}</h2>
+          <p>${message}</p>
+          <button id="btn-retry-load" type="button">Retry</button>
+          <button id="btn-error-home" type="button">Home</button>
+        </div>
+      </div>
+    `;
+    document.getElementById('btn-retry-load')?.addEventListener('click', () => {
+      void this.switchGame(mode, true);
+    });
+    document.getElementById('btn-error-home')?.addEventListener('click', () => {
+      void this.switchGame('home', true);
+    });
   }
 
   private mountPsxHUD(): void {
@@ -944,7 +1128,7 @@ class PlaygroundApp {
     `;
 
     document.getElementById('chip-flash')?.addEventListener('click', () => {
-      (this.currentGame as PsxGame)?.toggleFlashlight();
+      (this.currentGame as PsxGameScene)?.toggleFlashlight();
     });
 
     document.getElementById('btn-pause-psx')?.addEventListener('click', () => {
@@ -994,7 +1178,7 @@ class PlaygroundApp {
     const throttleInput = document.getElementById('flight-throttle') as HTMLInputElement;
     throttleInput?.addEventListener('input', (e) => {
       const val = parseFloat((e.target as HTMLInputElement).value) / 100;
-      (this.currentGame as FlightGame)?.setThrottle(val);
+      (this.currentGame as FlightGameScene)?.setThrottle(val);
       const label = document.getElementById('flight-throttle-val');
       if (label) label.textContent = `${Math.round(val * 100)}%`;
       (document.activeElement as HTMLElement)?.blur();
@@ -1040,7 +1224,7 @@ class PlaygroundApp {
     if (this.activeMode === 'home') {
       if (raw.startsWith('launch.')) {
         const target = raw.replace('launch.', '') as GameMode;
-        if (GAME_ORDER.includes(target)) {
+        if (target === 'studio' || GAME_ORDER.includes(target)) {
           this.launchSelectedGame(target);
           this.logActionDispatch(`launch.${target}`, true);
           this.actionInput.value = '';
@@ -1109,7 +1293,7 @@ class PlaygroundApp {
             const activeGameMeta = GAMES_METADATA[GAME_ORDER[this.selectedAlbumIndex]];
             const inspContent = document.getElementById('inspector-content');
             if (inspContent && this.activeInspectorTab === 'telemetry') {
-              inspContent.textContent = `# Renderoni Console OS [v0.1.0]
+              inspContent.textContent = `# Renderoni Console OS [v${RENDERONI_VERSION}]
 # Active View: Home Dashboard
 # Selected Album Card: ${activeGameMeta?.title ?? 'None'} (${activeGameMeta?.genre ?? ''})
 # Engine Subsystems: Deterministic L0 Kernel, Rapier WASM 3D, Three.js WebGL
@@ -1124,7 +1308,7 @@ class PlaygroundApp {
           }
         } else if (this.currentGame) {
           if (this.activeMode === 'psx') {
-            const t = (this.currentGame as PsxGame).getTelemetry();
+            const t = (this.currentGame as PsxGameScene).getTelemetry();
             const questEl = document.getElementById('psx-quest');
             const flashEl = document.getElementById('psx-flash');
             const chipFlash = document.getElementById('chip-flash');
@@ -1158,7 +1342,7 @@ class PlaygroundApp {
               chipGate?.classList.toggle('locked', !t.gateUnlocked);
             }
 
-            const prompt = (this.currentGame as PsxGame).getHoverPrompt();
+            const prompt = (this.currentGame as PsxGameScene).getHoverPrompt();
             const promptEl = document.getElementById('interaction-prompt');
             const promptTextEl = document.getElementById('prompt-text');
             if (promptEl && promptTextEl) {
@@ -1181,7 +1365,7 @@ class PlaygroundApp {
               }
             }
           } else if (this.activeMode === 'flight') {
-            const t = (this.currentGame as FlightGame).getTelemetry();
+            const t = (this.currentGame as FlightGameScene).getTelemetry();
             const spdEl = document.getElementById('flight-speed');
             const altEl = document.getElementById('flight-alt');
             const vsEl = document.getElementById('flight-vs');
@@ -1205,7 +1389,7 @@ class PlaygroundApp {
             }
             if (throttleVal) throttleVal.textContent = `${t.throttlePercent}%`;
           } else if (this.activeMode === 'quickstart') {
-            const t = (this.currentGame as QuickstartGame).getTelemetry();
+            const t = (this.currentGame as QuickstartGameScene).getTelemetry();
             const posEl = document.getElementById('qs-pos');
             const coinsEl = document.getElementById('qs-coins');
             const bodiesEl = document.getElementById('qs-bodies');
@@ -1282,7 +1466,13 @@ class PlaygroundApp {
         this.loopTitle.textContent =
           ph === 'ready' ? 'Simulation Ready' : ph === 'won' ? 'Victory!' : 'Game Over';
       }
-      if (this.loopBody) this.loopBody.textContent = this.currentGame.engine.loop.outcome || this.currentGame.engine.loop.subtitle;
+      if (this.loopBody) {
+        const meta = GAMES_METADATA[this.activeMode];
+        const controlText = ph === 'ready' && meta?.controls?.length
+          ? ` Controls: ${meta.controls.map((c) => `${c.key} ${c.desc}`).join(' · ')}`
+          : '';
+        this.loopBody.textContent = this.currentGame.engine.loop.outcome || `${this.currentGame.engine.loop.subtitle}${controlText}`;
+      }
       if (this.loopAction) {
         this.loopAction.textContent =
           ph === 'ready' ? '▶ Start Simulation' : '🔄 Play Again';

@@ -5,7 +5,6 @@ import { animation } from '../src/animation/index.js';
 import { audio } from '../src/audio/index.js';
 import { ui } from '../src/ui/index.js';
 import { vfx } from '../src/vfx/index.js';
-import { network } from '../src/network/index.js';
 import { createMCPServer } from '../src/mcp/index.js';
 
 describe('Renderoni Subpath Exports', () => {
@@ -26,7 +25,6 @@ describe('Renderoni Subpath Exports', () => {
     expect(audio).toBeDefined();
     expect(ui).toBeDefined();
     expect(vfx).toBeDefined();
-    expect(network).toBeDefined();
     expect(createMCPServer).toBeDefined();
   });
 });

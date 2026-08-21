@@ -14,6 +14,20 @@ export const ModelOptionsSchema = Type.Object({
   physics: Type.Optional(Type.Union([Type.Literal('static'), Type.Literal('dynamic'), Type.Literal('none')])),
   colliderShape: Type.Optional(Type.Union([Type.Literal('box'), Type.Literal('sphere'), Type.Literal('cylinder')])),
   colliderSize: Type.Optional(Type.Array(Type.Number())),
+  /**
+   * Who disposes the object graph. Defaults to `owned`: handing an object to
+   * model() transfers it to the engine. Use `borrowed` to keep a reusable
+   * object alive after the entity is removed. Geometries and materials shared
+   * by clones are refcounted, so removing one clone never breaks the others.
+   */
+  ownership: Type.Optional(
+    Type.Union([
+      Type.Literal('owned'),
+      Type.Literal('borrowed'),
+      Type.Literal('shared'),
+      Type.Literal('transferred'),
+    ])
+  ),
   tags: Type.Optional(Type.Array(Type.String())),
   state: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
@@ -58,7 +72,7 @@ export const model = definePreset({
       tags: options.tags ?? [],
       state: options.state ?? {},
       native: {
-        three: { object, ownership: 'owned' },
+        three: { object, ownership: options.ownership ?? 'owned' },
         rapier: body
           ? { body, colliders: collider ? [collider] : [], colliderHandles: collider ? [collider.handle] : [], ownership: 'owned' }
           : undefined,

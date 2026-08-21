@@ -19,6 +19,10 @@
 
 ---
 
+> **0.9 Beta Scope Note:** This document is the original architectural specification and captures the full long-term design intent, including subsystems and transports that are not part of the current public package contract. As of the `0.9.0-beta.1` public surface: **networking (`renderoni/network`) is deferred to a post-1.0 release** and is not exported or built by `tsup`; the MCP server ships **`stdio` transport only** (SSE is not implemented); gamepad input and post-processing effects (bloom/SSAO/FXAA) are not implemented; the audio subsystem is an **event-driven audio logger**, not true positional/spatial `PositionalAudio`; and `renderoni/vfx` particle bursts are currently an **event/stub surface** (`spawnParticles()` allocates a mesh and fires an event but does not yet render instanced particles) — real-time deterministic screen shake is fully implemented. See `README.md` for the authoritative list of what 0.9 currently ships. Sections below are preserved as historical design record and are annotated where they describe not-yet-shipped scope.
+
+---
+
 ## 1. Executive Summary
 
 Three.js is the standard for web graphics; Rapier is the standard for fast WebAssembly physics. However, connecting them into a production-grade, testable, and reproducible 3D application requires massive repetitive boilerplate: managing fixed timestep loops, transform synchronization, visual interpolation, asset lifecycles, character controllers, skeletal animations, spatial audio, UI projections, and network replication.
@@ -26,7 +30,7 @@ Three.js is the standard for web graphics; Rapier is the standard for fast WebAs
 For autonomous AI coding agents and automated CI test runners, this architecture is historically opaque: Three.js and Rapier scenes are mutable, non-deterministic black boxes that require costly vision snapshots, fragile browser automation, and produce non-reproducible bugs.
 
 **Renderoni solves this with a unified, dual-nature architecture:**
-1. **For Human Developers:** A batteries-included, ergonomic 3D game framework. A single call to `createRenderoni()` spins up physics, rendering, camera management, asset loading, animation state machines, spatial audio, UI projections, and particle effects with typed presets and zero boilerplate.
+1. **For Human Developers:** A batteries-included, ergonomic 3D game framework. A single call to `createRenderoni()` spins up physics, rendering, camera management, asset loading, animation state machines, audio event logging, UI projections, and screen-shake/particle-event VFX with typed presets and zero boilerplate.
 2. **For AI Agents & CI Suites:** A headless-first, deterministic simulation and verification kernel. It provides token-efficient semantic observations (<500B Markdown summaries), JIT-validated semantic actions, fixed-point state hashing, keyframed replays, and a built-in Model Context Protocol (MCP) server for instant agent pairing.
 
 ### 1.1 Prior Art & Architectural Learnings
@@ -48,11 +52,11 @@ Existing open-source web engine attempts (such as `three-game-engine` and `@reac
 |             Game Rules, Assets, Content Data, Custom Shaders, UI Layouts              |
 +---------------------------------------------------------------------------------------+
 |                                  L2 TOOLING & AGENTS                                  |
-|         Built-in MCP Server (stdio/SSE), Vitest Matchers, Replay CLI, Debug UI         |
+|         Built-in MCP Server (stdio), Vitest Matchers, Replay CLI, Debug UI            |
 +---------------------------------------------------------------------------------------+
 |                                L1 BATTERIES & SUBSYSTEMS                              |
-|   Animation State Machine | Spatial Audio | UI Screen Anchors | VFX Emitters | Net    |
-|   Presets: body, sensor, light, kccPlayer, particleEmitter | Asset Manifest Manager   |
+|   Animation State Machine | Audio Events | UI Screen Anchors | VFX Events | Net*      |
+|   Presets: body, sensor, light, kccPlayer, dynamicPlayer | Asset Manifest Manager     |
 +---------------------------------------------------------------------------------------+
 |                                  L0 DETERMINISTIC KERNEL                              |
 |   Integer Tick Clock | Seeded PRNG Streams | Dual-Buffer Transform Pipeline           |
@@ -63,10 +67,12 @@ Existing open-source web engine attempts (such as `three-game-engine` and `@reac
 +---------------------------------------------------------------------------------------+
 ```
 
+*`Net` (Networking) is planned for a post-1.0 release; it is not part of the current 0.9 beta public exports.
+
 ### Layer Breakdown:
 - **L0 Core Kernel:** Pure, DOM-free deterministic simulation runtime. Owns fixed-step time, seeded PRNG streams, structural command queues, dual-buffer transform isolation, Rapier WASM stepping, quantized state hashing, and explicit memory ownership.
-- **L1 Batteries & Subsystems:** Five modular, tree-shakable subsystems (Animation, Audio, UI, VFX, Network) and the Asset Manifest Manager. All subsystems feature automatic headless mocks that log verifiable events in tests without DOM or Web Audio dependencies.
-- **L2 Tooling & Transports:** Built-in Model Context Protocol (MCP) server, JSON-RPC stdio/SSE adapters, Vitest/Jest custom matchers (`@renderoni/testing`), and command-log replay bisection tools.
+- **L1 Batteries & Subsystems:** Four currently-shipped, tree-shakable subsystems (Animation, Audio, UI, VFX) and the Asset Manifest Manager, plus a Networking subsystem planned for post-1.0. All subsystems feature automatic headless mocks that log verifiable events in tests without DOM or Web Audio dependencies.
+- **L2 Tooling & Transports:** Built-in Model Context Protocol (MCP) server, JSON-RPC over `stdio`, Vitest/Jest custom matchers (`@renderoni/testing`), and command-log replay bisection tools.
 - **L3 Application:** User-defined game logic, art direction, and custom presets built via public contracts.
 
 ---
@@ -92,13 +98,15 @@ renderoni           Unified factory, default presets, and common public types
 renderoni/core      L0 deterministic kernel, constructor, and low-level contracts
 renderoni/presets   Typed official entity and system presets
 renderoni/animation Hybrid deterministic animation state machine and root motion
-renderoni/audio     Event-driven spatial audio with headless event mocks
+renderoni/audio     Event-driven audio logging with headless event mocks
 renderoni/ui        Reactive state store and 3D-to-2D screen anchor projection
-renderoni/vfx       GPU instanced particle emitters, post-processing, and screen shake
-renderoni/network   Pluggable transport abstraction (WebSocket, WebRTC, Colyseus)
-renderoni/mcp       Built-in Model Context Protocol (MCP) server (stdio/SSE)
+renderoni/vfx       Screen shake plus event-driven VFX triggers (particle rendering: planned)
+renderoni/scene     Compact scene inventory mounting for prompt-to-scene workflows
+renderoni/mcp       Built-in Model Context Protocol (MCP) server (stdio)
 renderoni/testing   Vitest and Jest custom matchers and test harnesses
 ```
+
+> `renderoni/network` (pluggable transport abstraction) is designed but **deferred to a post-1.0 release**; it is not part of the current 0.9 beta exports or `tsup` build entries.
 
 ### 4.1 Multi-Platform Distribution Targets
 
@@ -285,12 +293,15 @@ Provides reactive state observation and 3D-to-2D screen projections:
   ```
 
 ### 7.4 Rendering, Shaders & VFX Subsystem (`renderoni/vfx`)
-A dual-target rendering and post-processing pipeline:
-- **Dual-Target Renderer:** WebGL (`WebGLRenderer` + `EffectComposer` passes like Bloom, SSAO, FXAA) as standard default, with first-class opt-in support for Three.js WebGPU / TSL (Three Shading Language).
-- **GPU Instanced Particle Emitters:** High-performance particle bursts and continuous streams (`particleEmitter()`) managed via `THREE.InstancedMesh` with presentation-only particle lifecycles.
-- **VFX Events:** Screen shake, shockwaves, and flash effects triggered deterministically via events.
+A dual-target rendering pipeline:
+- **Dual-Target Renderer:** WebGL (`WebGLRenderer`) as standard default, with first-class opt-in support for Three.js WebGPU / TSL (Three Shading Language). Post-processing passes (bloom, SSAO, FXAA via `EffectComposer`) are a **planned, post-1.0 addition** and are not implemented in the current `renderoni/vfx` build.
+- **Particle Bursts (Event/Stub Surface — Rendering Planned):** `game.vfx.spawnParticles()` allocates a `THREE.InstancedMesh` and emits a deterministic `vfx.particles` event for headless/gameplay-logic consumption, but the burst does not yet write instance transforms, so no particles are visually rendered in the current build. Full GPU-instanced particle rendering is planned for a future release.
+- **VFX Events:** Screen shake (fully implemented, deterministic via the seeded PRNG) and `vfx.particles`/`vfx.screenShake` events triggered via the event bus.
 
-### 7.5 Networking Subsystem (`renderoni/network`)
+### 7.5 Networking Subsystem (`renderoni/network`) — Planned, Post-1.0
+
+> Not part of the current 0.9 beta public exports or `tsup` build entries. Preserved here as the original design target for a future release.
+
 A transport-agnostic networking layer built on top of Renderoni’s deterministic action stream:
 - **Pluggable Transports:** Official adapters for WebSockets, WebRTC, Colyseus, and PartyKit.
 - **Dual Architecture Support:**
@@ -339,7 +350,7 @@ Renderoni provides production-grade character controller presets backed by a uni
 ```
            +---------------------------------------+
            |       Input Abstraction Layer         |
-           | (PointerLock, Keyboard, Gamepad, Touch|
+           | (PointerLock, Keyboard, Touch         |
            +-------------------+-------------------+
                                |
            +-------------------v-------------------+
@@ -354,7 +365,7 @@ Renderoni provides production-grade character controller presets backed by a uni
            +---------------------------------------+
 ```
  
-- **Unified Input Abstraction:** Supports first-person `PointerLockControls` with mouse-look smoothing, keyboard WASD/arrow bindings, analog gamepad sticks, and mobile virtual touch joysticks without direct DOM listener coupling in gameplay code.
+- **Unified Input Abstraction:** Supports first-person `PointerLockControls` with mouse-look smoothing, keyboard WASD/arrow bindings, and mobile virtual touch joysticks without direct DOM listener coupling in gameplay code. Gamepad support is planned for a future release and is not implemented in 0.9.
 - **`kccPlayer` (Kinematic Character Controller):** Built on Rapier’s native `KinematicCharacterController`. Features automatic stair stepping, slope sliding limits, ground snapping, jump buffering, coyote time, and direct integration with animation root motion.
 - **`dynamicPlayer` (Rigid-Body Physics Controller):** For physics-driven games (marbles, roll-a-ball, vehicles, and ragdolls) utilizing direct torque, impulses, and contact-friction forces.
 
@@ -362,10 +373,10 @@ Renderoni provides production-grade character controller presets backed by a uni
 
 ## 10. Agent-Native Protocol & Built-in MCP Server (`renderoni/mcp`)
 
-Renderoni natively implements the **Model Context Protocol (MCP)** and JSON-RPC over `stdio` and `SSE`, allowing autonomous agents (Cursor, Claude, Devin, Antigravity) to attach to a live or headless game session with zero setup.
+Renderoni natively implements the **Model Context Protocol (MCP)** and JSON-RPC over `stdio`, allowing autonomous agents (Cursor, Claude, Devin, Antigravity) to attach to a live or headless game session with zero setup.
 
 ```
-+------------------+         MCP stdio / SSE         +-------------------+
++------------------+           MCP stdio            +-------------------+
 |  AI Coding Agent | <=============================> |  Renderoni Core   |
 | (Claude/Cursor)  |   tools: describe, observe,     | (Headless / Live) |
 +------------------+          act, step, verify      +-------------------+
@@ -700,8 +711,8 @@ The MVP is a focused vertical slice proving the dual-buffer kernel, the 5 modula
    - **Animation:** Deterministic state machine (idle/walk/run) + presentation bone mixer.
    - **Audio:** Event-driven emitter with headless event logger and Web Audio sink.
    - **UI:** Reactive state store + 3D screen anchor projection.
-   - **VFX:** Instanced particle burst emitter + screen shake.
-   - **Network:** Pluggable transport interface + local loopback / WebSocket client adapter.
+   - **VFX:** Screen shake (implemented) + particle burst event/stub surface (rendering planned for a future release).
+   - **Network:** Pluggable transport interface + local loopback / WebSocket client adapter. *(Deferred to post-1.0; not part of the 0.9 beta build.)*
 5. **Asset Manager:** Manifest loader with ref-counted GPU disposal and headless mock buffers.
 6. **Agent & Testing:** Built-in MCP server (`renderoni/mcp`), Tier 0 Markdown observation projection, and Vitest custom matchers (`@renderoni/testing`).
 
@@ -733,13 +744,13 @@ The MVP is a focused vertical slice proving the dual-buffer kernel, the 5 modula
 | # | Topic | Resolution | Justification |
 |---|---|---|---|
 | **1** | Package Distribution | **Single primary package with subpath exports** | Guarantees single-dependency install while bundlers tree-shake unused subsystems. |
-| **2** | Networking Paradigm | **Pluggable Transport Abstraction** | Supports both Authoritative Server + Prediction and Deterministic Rollback via the core action stream. |
+| **2** | Networking Paradigm | **Pluggable Transport Abstraction** *(post-1.0)* | Supports both Authoritative Server + Prediction and Deterministic Rollback via the core action stream. |
 | **3** | Animation Model | **Hybrid State Machine + Bone Interpolation** | Deterministic state machine drives Rapier physics; Three.js `AnimationMixer` interpolates bones in presentation. |
 | **4** | UI / HUD Architecture | **Reactive Store + 3D Screen Anchors** | Framework-agnostic; works seamlessly with Vanilla HTML, React, Vue, and Svelte. |
 | **5** | Rendering Pipeline | **Dual-Target: WebGL default + WebGPU opt-in** | Provides rock-solid stability in current browsers while future-proofing for Three.js TSL / WebGPU shaders. |
 | **6** | Character Controller | **Rapier Kinematic Character Controller (KCC)** | Eliminates slope/stair sticking bugs and integrates directly with root motion deltas. |
 | **7** | Asset Management | **Unified Manifest with Ref-Counted GPU Disposal** | Prevents VRAM leaks and enables automatic headless mock buffers. |
-| **8** | AI Agent Integration | **Built-in Model Context Protocol (MCP) Server** | Allows instant stdio/SSE socket pairing for Cursor, Claude, Devin, and Antigravity agents. |
+| **8** | AI Agent Integration | **Built-in Model Context Protocol (MCP) Server** | Allows instant `stdio` pairing for Cursor, Claude, Devin, and Antigravity agents. |
 | **9** | State Hashing | **$Q20.12$ Fixed-Point Integer Canopy + XXH3** | Eliminates WASM SIMD/FMA float divergence across CPU architectures. |
 | **10** | Testing Framework | **Dual-Engine: JSON AST (`check()`) + Vitest Matchers** | Delivers optimal ergonomics for both machine agents and human developers. |
 | **11** | Package Name | **`renderoni`** (Fallback: `@renderoni/core`) | Secure primary npm namespace; configure subpath exports in `package.json`. |
@@ -750,4 +761,4 @@ The MVP is a focused vertical slice proving the dual-buffer kernel, the 5 modula
 
 Renderoni will be developed as the standard **deterministic 3D simulation, gameplay, and AI evaluation framework for Three.js and Rapier**.
 
-By combining a rigorous dual-buffer deterministic physics kernel with batteries-included modular subsystems (Animation, Audio, UI, VFX, Networking), an asset management pipeline, reference game archetype benchmarks, and a built-in MCP server, Renderoni bridges the gap between high-performance 3D web games and autonomous AI-driven development.
+By combining a rigorous dual-buffer deterministic physics kernel with batteries-included modular subsystems (Animation, Audio, UI, VFX — with Networking planned for post-1.0), an asset management pipeline, reference game archetype benchmarks, and a built-in MCP server, Renderoni bridges the gap between high-performance 3D web games and autonomous AI-driven development.

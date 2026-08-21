@@ -10,6 +10,7 @@ export * from './core/index.js';
 export * from './presets/index.js';
 export * from './input/index.js';
 export { RenderoniEngine, type RenderoniConfig } from './core/engine.js';
+export { RENDERONI_VERSION } from './version.js';
 
 export async function createRenderoni(config: RenderoniConfig = {}): Promise<RenderoniEngine> {
   const engine = new RenderoniEngine(config);

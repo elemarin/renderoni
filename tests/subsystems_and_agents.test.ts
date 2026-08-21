@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { Type } from '@sinclair/typebox';
 import { createRenderoni } from '../src/index.js';
 import { body, kccPlayer } from '../src/presets/index.js';
 import { AssetManager } from '../src/assets/index.js';
@@ -6,10 +7,10 @@ import { animation } from '../src/animation/index.js';
 import { audio } from '../src/audio/index.js';
 import { ui } from '../src/ui/index.js';
 import { vfx } from '../src/vfx/index.js';
-import { network, LoopbackTransport } from '../src/network/index.js';
 import { ObservationEngine } from '../src/core/observations.js';
 import { createMCPServer } from '../src/mcp/index.js';
 import { ReplayRecorder } from '../src/replays/index.js';
+import { evaluateCheck } from '../src/testing/check.js';
 import '../src/testing/matchers.js';
 
 describe('Modular Subsystems (L1) & Agent Tooling (L2)', () => {
@@ -125,29 +126,6 @@ describe('Modular Subsystems (L1) & Agent Tooling (L2)', () => {
     });
   });
 
-  describe('Network Subsystem', () => {
-    it('transmits frames between loopback transport peers and subsystem', async () => {
-      const transportA = new LoopbackTransport();
-      const transportB = new LoopbackTransport();
-      transportA.connectPeer(transportB);
-
-      const game = await createRenderoni({
-        mode: 'headless',
-        subsystems: [network({ transport: transportA })],
-      });
-
-      let receivedPacket: any = null;
-      transportB.onMessage((data) => {
-        receivedPacket = JSON.parse(data.toString());
-      });
-
-      (game as any).network.sendFrame({ tick: 120, actions: [{ name: 'jump' }] });
-      expect(receivedPacket).toEqual({ tick: 120, actions: [{ name: 'jump' }] });
-
-      game.dispose();
-    });
-  });
-
   describe('Tier 0 Observation Economics & Agent Protocol', () => {
     it('produces high-density Markdown observation under 500 bytes (Gate 4)', async () => {
       const game = await createRenderoni({ mode: 'headless', seed: 42 });
@@ -160,6 +138,20 @@ describe('Modular Subsystems (L1) & Agent Tooling (L2)', () => {
       expect(obs.markdown).toContain('# Tick: 10');
       expect(obs.markdown).toContain('hero: pos[');
       expect(obs.bytes).toBeLessThan(500); // Guarantees <=500 byte budget!
+
+      game.dispose();
+    });
+
+    it('enforces the UTF-8 byte budget with a deterministic overflow marker', async () => {
+      const game = await createRenderoni({ mode: 'headless', seed: 42 });
+      for (let i = 0; i < 48; i++) {
+        game.add(body({ id: `dense-entity-${i}-界`, position: [i, i, i] }));
+      }
+
+      const obs = ObservationEngine.generateTier0(game);
+      expect(obs.bytes).toBeLessThanOrEqual(500);
+      expect(new TextEncoder().encode(obs.markdown).length).toBe(obs.bytes);
+      expect(obs.markdown).toContain('… [truncated]');
 
       game.dispose();
     });
@@ -232,6 +224,93 @@ describe('Modular Subsystems (L1) & Agent Tooling (L2)', () => {
         },
       });
       expect(checkRes.content[0].text).toContain('"passed":true');
+
+      game.dispose();
+    });
+
+    it('rejects malformed tool requests with MCP tool errors and does not queue unknown actions', async () => {
+      const game = await createRenderoni({ mode: 'headless', seed: 42 });
+      game.actions.register({ name: 'test.accept', handle: () => undefined, schema: { type: 'object' } });
+      const mcp = createMCPServer({ game });
+
+      const describeRes = await mcp.handleRequest({
+        method: 'tools/call',
+        params: { name: 'describe' },
+      });
+      expect(JSON.parse(describeRes.content[0].text).actions).toContainEqual({
+        name: 'test.accept',
+        schema: { type: 'object' },
+      });
+
+      const invalidCalls = [
+        { name: 'act', arguments: {} },
+        { name: 'act', arguments: { name: 'unknown.action' } },
+        { name: 'act', arguments: { name: 'test.accept', payload: undefined } },
+        { name: 'step', arguments: { ticks: -1 } },
+        { name: 'step', arguments: { ticks: 1.5 } },
+        { name: 'observe', arguments: { tier: 2 } },
+        { name: 'observe', arguments: { tier: '0' } },
+        { name: 'check', arguments: {} },
+        { name: 'check', arguments: { assertions: [{ op: 'unknownOp' }] } },
+      ];
+
+      for (const params of invalidCalls) {
+        const result = await mcp.handleRequest({ method: 'tools/call', params });
+        expect(result.isError).toBe(true);
+      }
+      expect(game.tick).toBe(0);
+      expect(evaluateCheck(game, [{ op: 'unknownOp' }]).failures).toEqual([
+        'Unsupported assertion op: unknownOp',
+      ]);
+
+      game.dispose();
+    });
+
+    it('accepts JSON primitive action payloads and enforces registered action schemas', async () => {
+      const game = await createRenderoni({ mode: 'headless', seed: 42, loop: true });
+      const received: unknown[] = [];
+      game.actions.register({ name: 'test.json', handle: (payload) => received.push(payload) });
+      game.actions.register({
+        name: 'test.string',
+        handle: () => undefined,
+        schema: Type.String(),
+      });
+      const mcp = createMCPServer({ game });
+
+      for (const payload of ['reason', 7, null]) {
+        const result = await mcp.handleRequest({
+          method: 'tools/call',
+          params: { name: 'act', arguments: { name: 'test.json', payload } },
+        });
+        expect(result.isError).toBeUndefined();
+      }
+      game.step(1);
+      expect(received).toEqual(['reason', 7, null]);
+
+      const schemaRejected = await mcp.handleRequest({
+        method: 'tools/call',
+        params: { name: 'act', arguments: { name: 'test.string', payload: 7 } },
+      });
+      expect(schemaRejected.isError).toBe(true);
+
+      const undefinedPayload = await mcp.handleRequest({
+        method: 'tools/call',
+        params: { name: 'act', arguments: { name: 'test.json', payload: undefined } },
+      });
+      expect(undefinedPayload.isError).toBe(true);
+
+      await mcp.handleRequest({
+        method: 'tools/call',
+        params: { name: 'act', arguments: { name: 'loop.start' } },
+      });
+      game.step(1);
+      const win = await mcp.handleRequest({
+        method: 'tools/call',
+        params: { name: 'act', arguments: { name: 'loop.win', payload: 'Escaped' } },
+      });
+      expect(win.isError).toBeUndefined();
+      game.step(1);
+      expect(game.loop.outcome).toBe('Escaped');
 
       game.dispose();
     });

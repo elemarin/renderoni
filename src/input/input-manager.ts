@@ -15,9 +15,15 @@ export interface LookDelta {
   dy: number;
 }
 
+export interface LookVector {
+  x: number;
+  y: number;
+}
+
 export class InputManager {
   private moveVector: InputVector2D = { x: 0, z: 0 };
   private lookDelta: LookDelta = { dx: 0, dy: 0 };
+  private lookVector: LookVector = { x: 0, y: 0 };
   private buttons: Map<string, boolean> = new Map();
   private buttonPresses: Set<string> = new Set();
   private isListening = false;
@@ -127,6 +133,21 @@ export class InputManager {
     this.lookDelta.dy += dy;
   }
 
+  setLookVector(x: number, y: number): void {
+    const len = Math.hypot(x, y);
+    if (len > 1.0) {
+      this.lookVector.x = x / len;
+      this.lookVector.y = y / len;
+    } else {
+      this.lookVector.x = x;
+      this.lookVector.y = y;
+    }
+  }
+
+  getLookVector(): LookVector {
+    return { ...this.lookVector };
+  }
+
   attachMobileControls(options: MobileControlsOptions = {}): MobileControls {
     this.mobileControls?.dispose();
     this.mobileControls = new MobileControls(this, options);
@@ -143,6 +164,7 @@ export class InputManager {
   reset(): void {
     this.moveVector = { x: 0, z: 0 };
     this.lookDelta = { dx: 0, dy: 0 };
+    this.lookVector = { x: 0, y: 0 };
     this.buttons.clear();
     this.buttonPresses.clear();
   }
