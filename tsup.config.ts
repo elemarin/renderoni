@@ -14,6 +14,7 @@ export default defineConfig({
     'testing/index': 'src/testing/index.ts',
     'testing/matchers': 'src/testing/matchers.ts',
     'input/index': 'src/input/index.ts',
+    'editor/index': 'src/editor/index.ts',
   },
   format: ['esm'],
   dts: true,
@@ -22,4 +23,7 @@ export default defineConfig({
   treeshake: true,
   splitting: true,
   target: 'es2022',
+  // Dynamically imported only by `renderoni editor`; never bundle it into the
+  // core engine output so consumers who don't use the editor stay lean.
+  external: ['@github/copilot-sdk'],
 });

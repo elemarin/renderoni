@@ -12,7 +12,7 @@ import type { RenderoniEngine } from '../core/engine.js';
 import { RENDERONI_VERSION } from '../version.js';
 import { sfx } from './audio-sfx.js';
 
-export type GameMode = 'home' | 'studio' | 'psx' | 'flight' | 'quickstart';
+export type GameMode = 'home' | 'psx' | 'flight' | 'quickstart';
 
 export interface GameMetadata {
   id: GameMode;
@@ -74,28 +74,6 @@ interface QuickstartGameScene extends DemoScene {
 }
 
 export const GAMES_METADATA: Record<string, GameMetadata> = {
-  studio: {
-    id: 'studio',
-    title: 'Model Studio',
-    subtitle: 'Preview Lab for Game Props',
-    genre: 'PROMPT-TO-SCENE LAB',
-    badge: '🎨 3D MODEL STUDIO',
-    accentColor: '#38bdf8',
-    themeColorHex: 0x0284c7,
-    description: 'Preview reconstructed 3D models, frame details, add annotation pins, and capture clean PNGs.',
-    features: [
-      '🕹️ Manual Orbit/Frame/Reset Controls (Drag/Scroll)',
-      '📐 Wireframe & Rapier Physics Collider Boundary Visualizer',
-      '📍 Click-to-place Annotation Pins saved per Model',
-      '🖼️ Clean PNG Copy/Download and Annotation JSON Export',
-    ],
-    controls: [
-      { key: 'Mouse Drag', desc: 'Orbit & Rotate Model' },
-      { key: 'Scroll Wheel', desc: 'Zoom In / Out' },
-      { key: 'Click Model', desc: 'Place Annotation Pin' },
-    ],
-    quickActions: [],
-  },
   psx: {
     id: 'psx',
     title: 'Echoes of Blackwood',
@@ -398,16 +376,8 @@ class PlaygroundApp {
     document.getElementById('loop-home')?.addEventListener('click', () => {
       this.switchGame('home');
     });
-    document.getElementById('btn-nav-studio')?.addEventListener('click', () => {
-      this.launchSelectedGame('studio');
-    });
     document.querySelectorAll('.shelf-item').forEach((el) => {
       el.addEventListener('click', () => {
-        const mode = (el as HTMLElement).dataset.mode as GameMode | undefined;
-        if (mode === 'studio') {
-          this.launchSelectedGame('studio');
-          return;
-        }
         const index = Number((el as HTMLElement).dataset.index);
         if (Number.isFinite(index)) this.selectAlbumCard(index);
       });
@@ -596,7 +566,7 @@ class PlaygroundApp {
 
   private getModeFromRoute(): GameMode {
     const raw = window.location.hash.replace(/^#\/?/, '').split('/')[0] as GameMode;
-    return raw === 'studio' || GAME_ORDER.includes(raw) ? raw : 'home';
+    return GAME_ORDER.includes(raw) ? raw : 'home';
   }
 
   private setRouteMode(mode: GameMode): void {
@@ -1017,16 +987,8 @@ class PlaygroundApp {
       this.showLoading(mode);
 
       let nextGame: DemoScene | null = null;
-      let activateStudio = false;
       try {
-        if (mode === 'studio') {
-          const { ModelStudioScene } = await import('./model-studio.js');
-          if (token !== this.loadingToken) return;
-          const studio = new ModelStudioScene(this.canvas);
-          nextGame = studio;
-          await studio.init({ activate: false });
-          activateStudio = true;
-        } else if (mode === 'psx') {
+        if (mode === 'psx') {
           const { EchoesOfBlackwoodGame } = await import('./games/echoes-of-blackwood/game.js');
           if (token !== this.loadingToken) return;
           nextGame = new EchoesOfBlackwoodGame(this.canvas);
@@ -1040,16 +1002,13 @@ class PlaygroundApp {
           nextGame = new QuickstartGame(this.canvas);
         }
         if (!nextGame) return;
-        if (!activateStudio) await nextGame.init();
+        await nextGame.init();
         if (token !== this.loadingToken) {
           nextGame.dispose();
           return;
         }
         this.currentGame = nextGame;
         nextGame = null;
-        if (activateStudio) {
-          (this.currentGame as DemoScene & { activate: () => void }).activate();
-        }
         if (mode === 'psx') this.mountPsxHUD();
         if (mode === 'flight') this.mountFlightHUD();
         if (mode === 'quickstart') this.mountQuickstartHUD();
@@ -1120,6 +1079,7 @@ class PlaygroundApp {
           <span><kbd>WASD</kbd> Walk</span>
           <span><kbd>Mouse</kbd> Look</span>
           <span><kbd>Shift</kbd> Run</span>
+          <span><kbd>Space</kbd> Jump</span>
           <span><kbd>F</kbd> Flashlight</span>
           <span><kbd>E</kbd> Interact</span>
           <span><kbd>ESC</kbd> Menu</span>
@@ -1224,7 +1184,7 @@ class PlaygroundApp {
     if (this.activeMode === 'home') {
       if (raw.startsWith('launch.')) {
         const target = raw.replace('launch.', '') as GameMode;
-        if (target === 'studio' || GAME_ORDER.includes(target)) {
+        if (GAME_ORDER.includes(target)) {
           this.launchSelectedGame(target);
           this.logActionDispatch(`launch.${target}`, true);
           this.actionInput.value = '';

@@ -111,3 +111,65 @@ whole scene to author gameplay.
 - Do not write generated meshes directly into `THREE.Scene` — use
   `proceduralModel` / `mountSceneInventory` so Rapier + the transform pipeline
   own the object.
+
+## Factory contract (binding — CLI agent and in-app editor both follow this)
+
+This is the exact contract every generated model/terrain factory MUST satisfy,
+whether it's produced by a coding-agent session or by the `renderoni editor`'s
+Copilot SDK turn. Both surfaces read this section as their source of truth —
+do not fork or duplicate these rules elsewhere.
+
+1. **Self-contained, zero imports beyond `three`.** `import * as THREE from
+   'three'` only. Never import another project file, sibling module, or
+   relative path (no `createPortraitTexture is not defined` style errors).
+   If a texture is needed, define a small local canvas/DataTexture helper
+   function in the same file.
+2. **Exact exported signature, zero required arguments:**
+   ```ts
+   export function create<PascalCaseName>Model(): THREE.Object3D
+   export function create<PascalCaseName>Terrain(): THREE.Object3D
+   ```
+   Never require `(engine, x, y, z)` or any other parameters — every factory
+   must be independently callable and previewable with no arguments.
+3. **Must return a real `THREE.Object3D`** (a `THREE.Group`, `THREE.Mesh`, or
+   subclass) directly — never a texture, material, plain object, or
+   `undefined`. Multiple meshes go into one `THREE.Group` that gets returned.
+4. **Models vs. terrain are conceptually distinct** (see
+   `docs/architecture/levels.md`):
+   - **Model** = a single placeable prop/item a player interacts with
+     individually (key, clock, chair, door). Never a whole room or building.
+   - **Terrain** = the static environment shell (floor, ceiling, walls,
+     ground) a room or area sits inside. Prefer one room/hallway
+     segment/ground patch per factory so pieces can be mixed and re-tiled,
+     rather than one giant multi-room structure.
+5. **No `Math.random()` / `Date.now()` / `performance.now()` /
+   `requestAnimationFrame()`.** Use a small deterministic local hash/seed
+   function baked in at construction time if pseudo-randomness is needed.
+6. Keep model factories under ~120 lines, terrain factories under ~150 lines.
+   Respond with exactly one fenced code block, no prose outside the fence.
+
+### Example: correct, fully self-contained model with an inline texture
+
+```ts
+import * as THREE from 'three';
+
+function createInlineWoodTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = '#5c3a21';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = '#3e2612';
+  for (let y = 0; y < 64; y += 8) ctx.fillRect(0, y, 64, 1);
+  return new THREE.CanvasTexture(canvas);
+}
+
+export function createSimpleCrateModel(): THREE.Object3D {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ map: createInlineWoodTexture() });
+  const box = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+  group.add(box);
+  return group;
+}
+```

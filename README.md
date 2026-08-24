@@ -136,28 +136,24 @@ The server exposes five tools for coding agents:
 
 ---
 
-## 🖼️ Prompt-to-Scene
+## 🧑‍🎨 In-App Editor
 
-Don't have your coding agent write giant scene graphs. Use a concise SceneInventory JSON, build objects with [img2threejs](https://github.com/img2threejs/img2threejs), and mount them.
+Generate models, terrain, and levels without leaving the browser. `renderoni editor`
+starts a local tool backed by the GitHub Copilot SDK for live, in-editor
+generation, grounded in the same rules your coding agent already follows
+(see `.agents/skills/prompt-to-scene`), so the CLI and the editor stay in sync.
 
-```ts
-import { createRenderoni } from 'renderoni';
-import { kccPlayer, light } from 'renderoni/presets';
-import { mountSceneInventory, type SceneInventory } from 'renderoni/scene';
-
-const inventory: SceneInventory = {
-  version: 1,
-  prompt: 'stone courtyard with a crate and a coin',
-  elements: [
-    { id: 'crate', factory: 'woodCrate', kind: 'prop', position: [0, 0.5, 0], collider: { shape: 'box', size: [1, 1, 1] } },
-  ],
-};
-
-const game = await createRenderoni({ mode: 'headless', seed: 42 });
-game.add(light({ type: 'directional', position: [12, 20, 8] }));
-mountSceneInventory(game, inventory, {});
-game.add(kccPlayer({ id: 'hero', position: [0, 1.5, 6] }));
+```bash
+npx renderoni@beta editor
 ```
+
+- **Models / Terrain tabs** — prompt (plus an optional reference image) into a
+  previewed `() => THREE.Object3D` factory, compared side-by-side against the
+  current on-disk version before you save.
+- **Levels tab** — prompt into a compact `SceneInventory` JSON, mountable with
+  `mountSceneInventory` (`renderoni/scene`).
+- Reconstruction under the hood follows [img2threejs](https://github.com/img2threejs/img2threejs)
+  conventions.
 
 ---
 

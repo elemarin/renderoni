@@ -3,8 +3,8 @@
  */
 
 import * as THREE from 'three';
-import { model, type EntityInstance } from '../../../../presets/index.js';
-import type { RenderoniEngine } from '../../../../core/engine.js';
+import { model, type EntityInstance } from '../../../../../presets/index.js';
+import type { RenderoniEngine } from '../../../../../core/engine.js';
 
 export function createCobwebGroup(): THREE.Group {
   const group = new THREE.Group();

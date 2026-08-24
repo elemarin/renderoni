@@ -24,6 +24,12 @@ if (command === 'mcp') {
     transport: 'stdio',
     createGame: () => createRenderoni({ mode: 'headless' }),
   });
+} else if (command === 'editor') {
+  const { startEditorServer } = await import('../dist/editor/index.js');
+  const portArg = args.find((a) => a.startsWith('--port='));
+  const port = portArg ? Number(portArg.split('=')[1]) : undefined;
+  const { url } = await startEditorServer({ port, projectRoot: process.cwd() });
+  console.log(`🍝 Renderoni Editor running at ${url}`);
 } else if (command === '--version' || command === '-v') {
   console.log(`renderoni v${version}`);
 } else {
@@ -31,8 +37,10 @@ if (command === 'mcp') {
 🍝 Renderoni — The Agent-Native 3D Game Engine for TypeScript
 
 Usage:
-  renderoni mcp         Start the Model Context Protocol (MCP) server over stdio
-  renderoni --version   Print the current version
-  renderoni --help      Show this help message
+  renderoni mcp             Start the Model Context Protocol (MCP) server over stdio
+  renderoni editor          Start the local Copilot-powered content editor (models/terrain/levels)
+  renderoni editor --port=N Start the editor on a specific port (default 4747)
+  renderoni --version       Print the current version
+  renderoni --help          Show this help message
 `);
 }

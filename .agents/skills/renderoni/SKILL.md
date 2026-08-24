@@ -330,3 +330,39 @@ mountSceneInventory(game, inventory, { woodCrate: createWoodCrateModel });
 ```
 
 Full agent recipe: `.agents/skills/prompt-to-scene/SKILL.md`.
+
+---
+
+## 11. In-App Editor (`renderoni editor`)
+
+`renderoni editor` starts a local server + tabbed browser UI (Models / Terrain
+/ Levels) that drives the **GitHub Copilot SDK** (`@github/copilot-sdk`, an
+`optionalDependency`) to generate the same kind of content a coding-agent
+session produces via the Prompt-to-Scene skill — but as a live, single-turn,
+in-browser tool for iterating on one asset at a time.
+
+- Each tab sends one prompt (+ optional reference image, + optional existing
+  file contents for "revise in place") through a single Copilot turn.
+- **The editor's system prompt is generated from these same skill files at
+  runtime** (`src/editor/prompts.ts` loads and condenses
+  `.agents/skills/prompt-to-scene/SKILL.md`'s "Factory contract" section) —
+  it is not a hand-maintained duplicate. If you update the factory contract
+  above, the editor picks it up automatically; do not hardcode a second copy
+  of these rules anywhere else.
+- Models/Terrain tabs return a `() => THREE.Object3D` factory, live-previewed
+  in the browser via a dynamic `Function` sandboxed to a `THREE` binding —
+  which is exactly why the factory contract's "zero imports, zero arguments,
+  must return `THREE.Object3D`" rules are non-negotiable for both surfaces.
+- The Levels tab returns a `SceneInventory` JSON compatible with
+  `parseSceneInventory` / `mountSceneInventory` (`renderoni/scene`), same
+  shape as section 10 above.
+- Generated output can be saved into the caller's project via `/api/save`,
+  which only writes under the directory `renderoni editor` was started from.
+- The Copilot SDK spawns/talks to the local `copilot` CLI over JSON-RPC, so it
+  only runs in Node (`src/editor/copilot-session.ts`), never in the browser.
+
+Use whichever surface fits: the skill for a coding-agent session authoring a
+whole game end-to-end, the editor for a human iterating on one asset at a
+time in a live preview — both must produce interchangeable, drop-in-place
+factory files, so there is exactly one contract (this section +
+`.agents/skills/prompt-to-scene/SKILL.md`) governing both.

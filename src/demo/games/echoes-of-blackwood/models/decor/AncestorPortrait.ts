@@ -3,9 +3,9 @@
  */
 
 import * as THREE from 'three';
-import { model, type EntityInstance } from '../../../../presets/index.js';
-import type { RenderoniEngine } from '../../../../core/engine.js';
-import { createPortraitTexture } from '../../../materials.js';
+import { model, type EntityInstance } from '../../../../../presets/index.js';
+import type { RenderoniEngine } from '../../../../../core/engine.js';
+import { createPortraitTexture } from '../../../../materials.js';
 
 export function createAncestorPortraitGroup(variant: number = 0): THREE.Group {
   const group = new THREE.Group();

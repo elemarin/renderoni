@@ -4,10 +4,10 @@
  */
 
 import * as THREE from 'three';
-import { model, type EntityInstance } from '../../../../presets/index.js';
-import type { RenderoniEngine } from '../../../../core/engine.js';
-import { createWoodTexture } from '../../../materials.js';
-import { horrorSfx } from '../audio.js';
+import { model, type EntityInstance } from '../../../../../presets/index.js';
+import type { RenderoniEngine } from '../../../../../core/engine.js';
+import { createWoodTexture } from '../../../../materials.js';
+import { horrorSfx } from '../../audio.js';
 
 export interface ManorDoorInstance {
   id: string;

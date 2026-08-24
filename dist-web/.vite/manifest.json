@@ -1,21 +1,6 @@
 {
-  "_AerobaticPlane-DBIx3W-_.js": {
-    "file": "assets/AerobaticPlane-DBIx3W-_.js",
-    "name": "AerobaticPlane",
-    "imports": [
-      "_index-DI230zwg.js"
-    ]
-  },
-  "_Cobweb-cWbL7g6T.js": {
-    "file": "assets/Cobweb-cWbL7g6T.js",
-    "name": "Cobweb",
-    "imports": [
-      "_index-DI230zwg.js",
-      "_model-CehrexQT.js"
-    ]
-  },
-  "_index-DI230zwg.js": {
-    "file": "assets/index-DI230zwg.js",
+  "_index-BGqR6qst.js": {
+    "file": "assets/index-BGqR6qst.js",
     "name": "index",
     "imports": [
       "index.html"
@@ -24,48 +9,40 @@
       "node_modules/nipplejs/dist/index.mjs"
     ]
   },
-  "_kcc-player-DpSMCCFj.js": {
-    "file": "assets/kcc-player-DpSMCCFj.js",
+  "_kcc-player-CDNLE7yQ.js": {
+    "file": "assets/kcc-player-CDNLE7yQ.js",
     "name": "kcc-player",
     "imports": [
-      "_index-DI230zwg.js"
+      "_index-BGqR6qst.js"
     ]
   },
-  "_light-9fk3wv7f.js": {
-    "file": "assets/light-9fk3wv7f.js",
+  "_light-Bv8qYn42.js": {
+    "file": "assets/light-Bv8qYn42.js",
     "name": "light",
     "imports": [
-      "_index-DI230zwg.js"
+      "_index-BGqR6qst.js"
     ]
   },
-  "_model-CehrexQT.js": {
-    "file": "assets/model-CehrexQT.js",
-    "name": "model",
-    "imports": [
-      "_index-DI230zwg.js"
-    ]
-  },
-  "_vanilla-RR39dyKQ.js": {
-    "file": "assets/vanilla-RR39dyKQ.js",
+  "_vanilla-x7RD7FiW.js": {
+    "file": "assets/vanilla-x7RD7FiW.js",
     "name": "vanilla",
     "imports": [
-      "_index-DI230zwg.js"
+      "_index-BGqR6qst.js"
     ]
   },
   "index.html": {
-    "file": "assets/index-Dbgk0NQH.js",
+    "file": "assets/index-D2a0fMdA.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
     "dynamicImports": [
       "src/demo/home-scene.ts",
-      "src/demo/model-studio.ts",
       "src/demo/games/echoes-of-blackwood/game.ts",
       "src/demo/games/skyward-courier/game.ts",
       "src/demo/quickstart-game.ts"
     ],
     "css": [
-      "assets/index-CxYnOst7.css"
+      "assets/index-06AJ46hV.css"
     ]
   },
   "node_modules/nipplejs/dist/index.mjs": {
@@ -75,67 +52,50 @@
     "isDynamicEntry": true
   },
   "src/demo/games/echoes-of-blackwood/game.ts": {
-    "file": "assets/game--XHTuwVT.js",
+    "file": "assets/game-DeE_dm-N.js",
     "name": "game",
     "src": "src/demo/games/echoes-of-blackwood/game.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_index-DI230zwg.js",
-      "_vanilla-RR39dyKQ.js",
-      "_Cobweb-cWbL7g6T.js",
-      "_model-CehrexQT.js",
-      "_kcc-player-DpSMCCFj.js",
+      "_index-BGqR6qst.js",
+      "_vanilla-x7RD7FiW.js",
+      "_kcc-player-CDNLE7yQ.js",
       "index.html"
     ]
   },
   "src/demo/games/skyward-courier/game.ts": {
-    "file": "assets/game-BuIPIWmL.js",
+    "file": "assets/game-uXSs3zad.js",
     "name": "game",
     "src": "src/demo/games/skyward-courier/game.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_index-DI230zwg.js",
-      "_vanilla-RR39dyKQ.js",
-      "_AerobaticPlane-DBIx3W-_.js",
-      "_model-CehrexQT.js",
-      "_light-9fk3wv7f.js",
+      "_index-BGqR6qst.js",
+      "_vanilla-x7RD7FiW.js",
+      "_light-Bv8qYn42.js",
       "index.html"
     ]
   },
   "src/demo/home-scene.ts": {
-    "file": "assets/home-scene-B_LaL4Av.js",
+    "file": "assets/home-scene-Dt-Ju2Kq.js",
     "name": "home-scene",
     "src": "src/demo/home-scene.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_index-DI230zwg.js",
-      "_light-9fk3wv7f.js",
+      "_index-BGqR6qst.js",
+      "_light-Bv8qYn42.js",
       "index.html"
     ]
   },
-  "src/demo/model-studio.ts": {
-    "file": "assets/model-studio-DuSyrcih.js",
-    "name": "model-studio",
-    "src": "src/demo/model-studio.ts",
-    "isDynamicEntry": true,
-    "imports": [
-      "_index-DI230zwg.js",
-      "_Cobweb-cWbL7g6T.js",
-      "_AerobaticPlane-DBIx3W-_.js",
-      "index.html",
-      "_model-CehrexQT.js"
-    ]
-  },
   "src/demo/quickstart-game.ts": {
-    "file": "assets/quickstart-game-Ch-mNW8J.js",
+    "file": "assets/quickstart-game-BY1qxhXf.js",
     "name": "quickstart-game",
     "src": "src/demo/quickstart-game.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_index-DI230zwg.js",
+      "_index-BGqR6qst.js",
       "index.html",
-      "_light-9fk3wv7f.js",
-      "_kcc-player-DpSMCCFj.js"
+      "_light-Bv8qYn42.js",
+      "_kcc-player-CDNLE7yQ.js"
     ]
   }
 }

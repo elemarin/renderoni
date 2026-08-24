@@ -20,29 +20,80 @@ function sealTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
 
 export function createWoodTexture(options: { base?: string; dark?: string } = {}): THREE.CanvasTexture {
   const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
+  canvas.width = 512;
+  canvas.height = 512;
   const ctx = canvas.getContext('2d', { alpha: false })!;
 
   const base = options.base ?? '#3e2723';
   const dark = options.dark ?? '#1b0000';
 
   ctx.fillStyle = base;
-  ctx.fillRect(0, 0, 256, 256);
+  ctx.fillRect(0, 0, 512, 512);
 
-  // Rich Wood Planks & Grain
-  for (let y = 0; y < 256; y += 32) {
+  // Herringbone-free wide planks with per-plank tint, long grain streaks & knots
+  const plankH = 42;
+  let seed = 1337;
+  const rand = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+
+  for (let y = 0, row = 0; y < 512; y += plankH, row++) {
+    // Seam line between planks
     ctx.fillStyle = dark;
-    ctx.fillRect(0, y, 256, 3);
+    ctx.fillRect(0, y, 512, 2);
 
-    for (let x = 0; x < 256; x += 16) {
-      ctx.fillStyle = (x + y) % 32 === 0 ? '#4e342e' : '#2d1500';
-      ctx.fillRect(x, y + 3, 14, 29);
+    // Stagger plank seams per row (brick-bond look)
+    const stagger = (row % 2) * 64;
+    const plankW = 128;
+    for (let x = -stagger; x < 512; x += plankW) {
+      const tint = rand();
+      const r = 0x3e + Math.floor((tint - 0.5) * 24);
+      const g = 0x27 + Math.floor((tint - 0.5) * 16);
+      const b = 0x23 + Math.floor((tint - 0.5) * 10);
+      ctx.fillStyle = `rgb(${Math.max(0, r)},${Math.max(0, g)},${Math.max(0, b)})`;
+      ctx.fillRect(Math.max(0, x), y + 2, plankW - 3, plankH - 4);
+
+      // Vertical plank end-seam
+      ctx.fillStyle = dark;
+      ctx.fillRect(Math.max(0, x) + plankW - 3, y + 2, 3, plankH - 4);
+
+      // Long grain streaks
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = 1;
+      for (let s = 0; s < 5; s++) {
+        const gy = y + 4 + rand() * (plankH - 8);
+        ctx.beginPath();
+        ctx.moveTo(Math.max(0, x) + 2, gy);
+        ctx.bezierCurveTo(
+          Math.max(0, x) + plankW * 0.3,
+          gy + (rand() - 0.5) * 4,
+          Math.max(0, x) + plankW * 0.7,
+          gy + (rand() - 0.5) * 4,
+          Math.max(0, x) + plankW - 4,
+          gy
+        );
+        ctx.stroke();
+      }
+
+      // Occasional knot
+      if (rand() < 0.15) {
+        const kx = Math.max(0, x) + 20 + rand() * (plankW - 40);
+        const ky = y + plankH / 2;
+        const grad = ctx.createRadialGradient(kx, ky, 0, kx, ky, 6);
+        grad.addColorStop(0, 'rgba(20,10,5,0.6)');
+        grad.addColorStop(1, 'rgba(20,10,5,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.ellipse(kx, ky, 6, 4, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
   const tex = sealTexture(canvas);
-  tex.repeat.set(2, 2);
+  tex.anisotropy = 8;
+  tex.repeat.set(3, 3);
   return tex;
 }
 
@@ -150,33 +201,126 @@ export function createCarpetTexture(): THREE.CanvasTexture {
   canvas.height = 512;
   const ctx = canvas.getContext('2d', { alpha: false })!;
 
-  // Dark Victorian Crimson Worn Carpet
-  ctx.fillStyle = '#3b0a11';
+  // William Morris-inspired Victorian rug: deep crimson field, ivory floral
+  // border with scrolling vines, worn/aged for the manor's PSX horror look.
+  const field = '#7a1f1a';
+  const fieldDark = '#5e1512';
+  const ivory = '#d9c9a3';
+  const ivoryDark = '#bfa876';
+  const slate = '#39485a';
+  const gold = '#9c6b2e';
+
+  ctx.fillStyle = fieldDark;
   ctx.fillRect(0, 0, 256, 512);
 
-  // Faded Center Wear & Tear
-  for (let y = 0; y < 512; y += 4) {
-    ctx.fillStyle = y % 8 === 0 ? '#4a0e17' : '#34080e';
-    ctx.fillRect(24, y, 208, 4);
+  let seed = 7331;
+  const rand = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+
+  // Border band (ivory, with vine scroll)
+  const borderW = 22;
+  ctx.fillStyle = ivory;
+  ctx.fillRect(0, 0, 256, borderW);
+  ctx.fillRect(0, 512 - borderW, 256, borderW);
+  ctx.fillRect(0, 0, borderW, 512);
+  ctx.fillRect(256 - borderW, 0, borderW, 512);
+
+  // Thin outline rules around the border
+  ctx.strokeStyle = '#2b1a10';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(6, 6, 244, 500);
+  ctx.strokeRect(borderW, borderW, 256 - borderW * 2, 512 - borderW * 2);
+
+  // Vine scroll along top/bottom borders
+  for (let x = 8; x < 256 - 8; x += 20) {
+    ctx.strokeStyle = slate;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, borderW / 2, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, 512 - borderW / 2, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = gold;
+    ctx.beginPath();
+    ctx.ellipse(x, borderW / 2, 3, 2, rand() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x, 512 - borderW / 2, 3, 2, rand() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Vine scroll along left/right borders
+  for (let y = 8; y < 512 - 8; y += 20) {
+    ctx.strokeStyle = slate;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(borderW / 2, y, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(256 - borderW / 2, y, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = gold;
+    ctx.beginPath();
+    ctx.ellipse(borderW / 2, y, 3, 2, rand() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(256 - borderW / 2, y, 3, 2, rand() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // Distressed/Worn threadbare patches (like reference photo)
-  ctx.fillStyle = '#2a070c';
+  // Inner field: crimson ground
+  ctx.fillStyle = field;
+  ctx.fillRect(borderW + 2, borderW + 2, 256 - (borderW + 2) * 2, 512 - (borderW + 2) * 2);
+
+  // Repeating lattice of small floral medallions across the field (classic
+  // Morris "diamond trellis" motif), plus subtle worn/faded patches.
+  const cell = 42;
+  for (let y = borderW + cell / 2; y < 512 - borderW; y += cell) {
+    for (let x = borderW + cell / 2; x < 256 - borderW; x += cell) {
+      const jitter = (rand() - 0.5) * 4;
+
+      // Trellis diamond outline
+      ctx.strokeStyle = 'rgba(57,72,90,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, y - cell / 2);
+      ctx.lineTo(x + cell / 2, y);
+      ctx.lineTo(x, y + cell / 2);
+      ctx.lineTo(x - cell / 2, y);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Small ivory/gold flower at each node
+      ctx.fillStyle = ivoryDark;
+      ctx.beginPath();
+      ctx.arc(x + jitter, y + jitter, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = gold;
+      ctx.beginPath();
+      ctx.arc(x + jitter, y + jitter, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Leaf accents
+      ctx.fillStyle = 'rgba(57,72,90,0.7)';
+      ctx.beginPath();
+      ctx.ellipse(x + jitter - 6, y + jitter, 3.5, 1.6, Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(x + jitter + 6, y + jitter, 3.5, 1.6, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Worn/threadbare patches for the horror-manor aged look
+  ctx.fillStyle = 'rgba(30,8,7,0.35)';
   ctx.beginPath();
-  ctx.ellipse(128, 120, 45, 18, 0, 0, Math.PI * 2);
+  ctx.ellipse(90, 140, 42, 20, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(128, 360, 55, 24, 0, 0, Math.PI * 2);
+  ctx.ellipse(160, 380, 50, 26, 0, 0, Math.PI * 2);
   ctx.fill();
-
-  // Frayed Gold Borders
-  ctx.fillStyle = '#78350f';
-  ctx.fillRect(18, 0, 4, 512);
-  ctx.fillRect(234, 0, 4, 512);
-
-  ctx.fillStyle = '#b45309';
-  ctx.fillRect(20, 0, 2, 512);
-  ctx.fillRect(234, 0, 2, 512);
 
   const tex = sealTexture(canvas);
   tex.repeat.set(1, 8);

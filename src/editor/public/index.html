@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🍝 Renderoni Editor</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <!--
+    Document-wide import map so both the engine's own pre-built bundle
+    (served from /vendor/dist, see server.ts) AND the blob-URL modules the
+    live preview transpiles on the fly can resolve these bare npm specifiers
+    to a CDN — versions pinned to match this package's own dependencies.
+  -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.170.0",
+        "@sinclair/typebox": "https://esm.sh/@sinclair/typebox@0.34.52",
+        "@dimforge/rapier3d-compat": "https://esm.sh/@dimforge/rapier3d-compat@0.14.0",
+        "xxhash-wasm": "https://esm.sh/xxhash-wasm@1.1.0",
+        "zustand": "https://esm.sh/zustand@5.0.15",
+        "nipplejs": "https://esm.sh/nipplejs@1.0.4"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <h1><span class="logo-mark">🍝</span> Renderoni Editor</h1>
+    <div id="status" class="status">checking Copilot…</div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <section class="asset-group active" data-sidebar-group="model">
+        <div class="asset-group-head">
+          <h2>Models</h2>
+          <button class="new-btn" data-new="model">+ New</button>
+        </div>
+        <div class="asset-list" data-asset-list="model">
+          <p class="empty-hint">Loading…</p>
+        </div>
+      </section>
+
+      <section class="asset-group" data-sidebar-group="structure">
+        <div class="asset-group-head">
+          <h2>Structure</h2>
+          <button class="new-btn" data-new="structure">+ New</button>
+        </div>
+        <div class="asset-list" data-asset-list="structure">
+          <p class="empty-hint">Loading…</p>
+        </div>
+      </section>
+
+      <section class="asset-group" data-sidebar-group="terrain">
+        <div class="asset-group-head">
+          <h2>Terrain</h2>
+          <button class="new-btn" data-new="terrain">+ New</button>
+        </div>
+        <div class="asset-list" data-asset-list="terrain">
+          <p class="empty-hint">Loading…</p>
+        </div>
+      </section>
+
+      <section class="asset-group" data-sidebar-group="level">
+        <div class="asset-group-head">
+          <h2>Levels</h2>
+          <button class="new-btn" data-new="level">+ New</button>
+        </div>
+        <div class="asset-list" data-asset-list="levels">
+          <p class="empty-hint">Loading…</p>
+        </div>
+      </section>
+    </aside>
+
+    <main class="workspace">
+      <nav class="tabs">
+        <button class="tab-btn active" data-tab="model">Models</button>
+        <button class="tab-btn" data-tab="structure">Structure</button>
+        <button class="tab-btn" data-tab="terrain">Terrain</button>
+        <button class="tab-btn" data-tab="level">Levels</button>
+      </nav>
+
+      <section class="panel active" data-panel="model">
+        <div class="editing-banner" data-editing-banner hidden>
+          <span class="editing-banner-icon">✎</span>
+          <span>Iterating on <code data-editing-path></code></span>
+          <button class="link-btn" data-action="discard">start new instead</button>
+        </div>
+        <div class="form-col">
+          <label>Prompt</label>
+          <textarea data-field="prompt" placeholder="A weathered wooden crate with iron bands"></textarea>
+          <label>Reference image (optional)</label>
+          <div class="file-drop" data-file-drop>
+            <input type="file" accept="image/*" data-field="image" />
+            <span class="file-drop-label" data-file-drop-label>Drop an image or click to browse</span>
+          </div>
+          <button class="btn-primary" data-action="generate">
+            <span data-btn-label>Generate</span>
+          </button>
+          <div class="save-row" data-save-row>
+            <label data-save-row-new-label>Save as (relative path)</label>
+            <input type="text" data-field="savePath" placeholder="src/demo/games/my-game/models/WoodCrate.ts" />
+            <div class="save-actions">
+              <button class="btn-secondary" data-action="save" disabled data-save-label>Save to project</button>
+              <button class="btn-ghost" data-action="save-as-new" hidden>Save as new…</button>
+            </div>
+            <span class="save-status" data-save-status></span>
+          </div>
+        </div>
+        <div class="output-col">
+          <div class="compare-toggle" data-compare-toggle hidden>
+            <button class="compare-toggle-btn active" data-compare="split">Compare</button>
+            <button class="compare-toggle-btn" data-compare="new">New only</button>
+          </div>
+          <div class="view-toggle" data-view-toggle>
+            <button class="view-toggle-btn active" data-view="preview">Preview</button>
+            <button class="view-toggle-btn" data-view="code">Code</button>
+          </div>
+          <div class="preview-grid" data-view-pane="preview" data-preview-grid>
+            <div class="preview-pane" data-preview-pane="current" hidden>
+              <div class="preview-pane-label">Current</div>
+              <div class="preview" data-preview="current"></div>
+            </div>
+            <div class="preview-pane" data-preview-pane="new">
+              <div class="preview-pane-label" data-preview-new-label>Preview</div>
+              <div class="preview" data-preview="new"></div>
+            </div>
+          </div>
+          <pre class="code" data-code data-view-pane="code" hidden></pre>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="structure">
+        <div class="editing-banner" data-editing-banner hidden>
+          <span class="editing-banner-icon">✎</span>
+          <span>Iterating on <code data-editing-path></code></span>
+          <button class="link-btn" data-action="discard">start new instead</button>
+        </div>
+        <div class="form-col">
+          <label>Prompt</label>
+          <textarea data-field="prompt" placeholder="A paneled hallway wall segment with a doorway"></textarea>
+          <label>Reference image (optional)</label>
+          <div class="file-drop" data-file-drop>
+            <input type="file" accept="image/*" data-field="image" />
+            <span class="file-drop-label" data-file-drop-label>Drop an image or click to browse</span>
+          </div>
+          <button class="btn-primary" data-action="generate">
+            <span data-btn-label>Generate</span>
+          </button>
+          <div class="save-row" data-save-row>
+            <label data-save-row-new-label>Save as (relative path)</label>
+            <input type="text" data-field="savePath" placeholder="src/demo/games/my-game/models/structure/HallwayWall.ts" />
+            <div class="save-actions">
+              <button class="btn-secondary" data-action="save" disabled data-save-label>Save to project</button>
+              <button class="btn-ghost" data-action="save-as-new" hidden>Save as new…</button>
+            </div>
+            <span class="save-status" data-save-status></span>
+          </div>
+        </div>
+        <div class="output-col">
+          <div class="compare-toggle" data-compare-toggle hidden>
+            <button class="compare-toggle-btn active" data-compare="split">Compare</button>
+            <button class="compare-toggle-btn" data-compare="new">New only</button>
+          </div>
+          <div class="view-toggle" data-view-toggle>
+            <button class="view-toggle-btn active" data-view="preview">Preview</button>
+            <button class="view-toggle-btn" data-view="code">Code</button>
+          </div>
+          <div class="preview-grid" data-view-pane="preview" data-preview-grid>
+            <div class="preview-pane" data-preview-pane="current" hidden>
+              <div class="preview-pane-label">Current</div>
+              <div class="preview" data-preview="current"></div>
+            </div>
+            <div class="preview-pane" data-preview-pane="new">
+              <div class="preview-pane-label" data-preview-new-label>Preview</div>
+              <div class="preview" data-preview="new"></div>
+            </div>
+          </div>
+          <pre class="code" data-code data-view-pane="code" hidden></pre>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="terrain">
+        <div class="editing-banner" data-editing-banner hidden>
+          <span class="editing-banner-icon">✎</span>
+          <span>Iterating on <code data-editing-path></code></span>
+          <button class="link-btn" data-action="discard">start new instead</button>
+        </div>
+        <div class="form-col">
+          <label>Prompt</label>
+          <textarea data-field="prompt" placeholder="Rolling grassy hills with a dirt path"></textarea>
+          <label>Reference image (optional)</label>
+          <div class="file-drop" data-file-drop>
+            <input type="file" accept="image/*" data-field="image" />
+            <span class="file-drop-label" data-file-drop-label>Drop an image or click to browse</span>
+          </div>
+          <button class="btn-primary" data-action="generate">
+            <span data-btn-label>Generate</span>
+          </button>
+          <div class="save-row" data-save-row>
+            <label data-save-row-new-label>Save as (relative path)</label>
+            <input type="text" data-field="savePath" placeholder="src/demo/games/my-game/models/terrain/HillsTerrain.ts" />
+            <div class="save-actions">
+              <button class="btn-secondary" data-action="save" disabled data-save-label>Save to project</button>
+              <button class="btn-ghost" data-action="save-as-new" hidden>Save as new…</button>
+            </div>
+            <span class="save-status" data-save-status></span>
+          </div>
+        </div>
+        <div class="output-col">
+          <div class="compare-toggle" data-compare-toggle hidden>
+            <button class="compare-toggle-btn active" data-compare="split">Compare</button>
+            <button class="compare-toggle-btn" data-compare="new">New only</button>
+          </div>
+          <div class="view-toggle" data-view-toggle>
+            <button class="view-toggle-btn active" data-view="preview">Preview</button>
+            <button class="view-toggle-btn" data-view="code">Code</button>
+          </div>
+          <div class="preview-grid" data-view-pane="preview" data-preview-grid>
+            <div class="preview-pane" data-preview-pane="current" hidden>
+              <div class="preview-pane-label">Current</div>
+              <div class="preview" data-preview="current"></div>
+            </div>
+            <div class="preview-pane" data-preview-pane="new">
+              <div class="preview-pane-label" data-preview-new-label>Preview</div>
+              <div class="preview" data-preview="new"></div>
+            </div>
+          </div>
+          <pre class="code" data-code data-view-pane="code" hidden></pre>
+        </div>
+      </section>
+
+      <section class="panel" data-panel="level">
+        <div class="editing-banner" data-editing-banner hidden>
+          <span class="editing-banner-icon">✎</span>
+          <span>Iterating on <code data-editing-path></code></span>
+          <button class="link-btn" data-action="discard">start new instead</button>
+        </div>
+        <div class="form-col">
+          <label>Prompt</label>
+          <textarea data-field="prompt" placeholder="A courtyard with a crate, lantern, tree, and well"></textarea>
+          <label>Available factory keys (comma separated, optional)</label>
+          <input type="text" data-field="context" placeholder="woodCrate, lantern, tree, well" />
+          <button class="btn-primary" data-action="generate">
+            <span data-btn-label>Generate</span>
+          </button>
+          <div class="save-row" data-save-row>
+            <label data-save-row-new-label>Save as (relative path)</label>
+            <input type="text" data-field="savePath" placeholder="src/demo/games/my-game/scene-inventory.json" />
+            <div class="save-actions">
+              <button class="btn-secondary" data-action="save" disabled data-save-label>Save to project</button>
+              <button class="btn-ghost" data-action="save-as-new" hidden>Save as new…</button>
+            </div>
+            <span class="save-status" data-save-status></span>
+          </div>
+        </div>
+        <div class="output-col">
+          <div class="view-toggle" data-view-toggle>
+            <button class="view-toggle-btn active" data-view="preview">Preview</button>
+            <button class="view-toggle-btn" data-view="code">Code</button>
+          </div>
+          <div class="level-view" data-view-pane="preview">
+            <canvas class="level-plot" data-level-plot width="360" height="360"></canvas>
+            <div class="level-table-wrap">
+              <table class="level-table" data-level-table>
+                <thead><tr><th>id</th><th>factory</th><th>kind</th><th>position</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <pre class="code" data-code data-view-pane="code" hidden></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

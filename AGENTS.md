@@ -54,3 +54,27 @@ When connected over MCP (`bin/renderoni.js mcp`), use:
 - **`act`**: Dispatch typed gameplay actions (`{ name: string, payload?: any }`).
 - **`step`**: Advance simulation by $N$ fixed ticks.
 - **`check`**: Run AST assertions.
+
+---
+
+## 🧑‍🎨 Renderoni Editor (`src/editor/`)
+
+`renderoni editor` starts a standalone local server + tabbed web UI (Models /
+Terrain / Levels) that drives the **GitHub Copilot SDK** (`@github/copilot-sdk`,
+an `optionalDependency`) for live, in-browser content generation:
+
+- Each tab sends one prompt (+ optional reference image) through a single
+  Copilot turn with a tab-specific system prompt (`src/editor/prompts.ts`),
+  and expects exactly one fenced code/JSON block back.
+- Models/Terrain tabs return a `() => THREE.Object3D` factory, live-previewed
+  in the browser via a dynamic `Function` sandboxed to a `THREE` binding.
+- The Levels tab returns a `SceneInventory` JSON compatible with
+  `parseSceneInventory` / `mountSceneInventory` (`renderoni/scene`).
+- Generated output can be saved into the caller's project via `/api/save`,
+  which only writes under the directory `renderoni editor` was started from.
+- The Copilot SDK spawns/talks to the local `copilot` CLI over JSON-RPC, so it
+  only runs in Node (`src/editor/copilot-session.ts`), never in the browser.
+
+This is a live, in-app alternative to the file-based `.agents/skills/prompt-to-scene`
+agent workflow — use whichever fits: the skill for a coding-agent session
+authoring a whole game, the editor for a human iterating on one asset at a time.

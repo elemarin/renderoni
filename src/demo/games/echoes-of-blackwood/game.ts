@@ -15,7 +15,7 @@ import { horrorSfx } from './audio.js';
 import { buildManorArchitecture, type ManorArchitectureResult } from './models/ManorHallway.js';
 import { buildGrandfatherClockModel, type ClockModelResult } from './models/GrandfatherClock.js';
 import { buildFlashlightRig, type FlashlightRig } from './models/Flashlight.js';
-import { buildQuestItems, type QuestItemsResult } from './models/Items.js';
+import { buildQuestItems, type QuestItemsResult } from './models/items/QuestItems.js';
 import { clockHandRotations } from './models/VictorianWallClock.js';
 
 export interface HorrorTelemetry {
@@ -87,7 +87,7 @@ export class EchoesOfBlackwoodGame {
         height: 1.4,
         radius: 0.35,
         moveSpeed: 4.0,
-        jumpSpeed: 0,
+        jumpSpeed: 6.5,
         gravity: 15.0,
         state: { flashlightOn: true },
       })
@@ -255,11 +255,8 @@ export class EchoesOfBlackwoodGame {
       camera.quaternion.setFromEuler(new THREE.Euler(this.pitchAngle, this.yawAngle, 0, 'YXZ'));
     }
 
-    // 4. Animate Key & Crest Idle Spins
-    const keyObj = this.items?.keyEntity.native.three?.object;
-    if (keyObj && keyObj.visible) {
-      keyObj.rotation.y += dt * 2.0;
-    }
+    // 4. Animate Crest Idle Spin (key now rests statically in its pedestal
+    // instead of spinning, so it doesn't rotate through the tray/shaft).
     const crestObj = this.items?.crestEntity.native.three?.object;
     if (crestObj && crestObj.visible) {
       crestObj.rotation.y += dt * 1.5;
@@ -403,8 +400,8 @@ export class EchoesOfBlackwoodGame {
       return;
     }
 
-    // 3. Key Pedestal (Room 2: [8, 1.35, -6])
-    if (isFacing(8, 1.35, -6, 6.0)) {
+    // 3. Key Pedestal (Room 2: [8, 0.88, -6])
+    if (isFacing(8, 0.88, -6, 6.0)) {
       if (!s.hasKey) {
         s.setHoverPrompt('[ E ] Take Clock Key');
       } else {
@@ -464,6 +461,11 @@ export class EchoesOfBlackwoodGame {
         e.preventDefault();
         if (!this.engine.loop.playing) return;
         this.tryInteract();
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        if (!this.engine.loop.playing) return;
+        this.playerEntity?.actions.jump();
       }
       this.keys[e.code] = true;
     };

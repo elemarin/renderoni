@@ -56,11 +56,16 @@
     "./input": {
       "types": "./dist/input/index.d.ts",
       "import": "./dist/input/index.js"
+    },
+    "./editor": {
+      "types": "./dist/editor/index.d.ts",
+      "import": "./dist/editor/index.js"
     }
   },
   "files": [
     "dist",
     "bin",
+    ".agents",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",
@@ -86,7 +91,8 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsup",
+    "build": "tsup && npm run copy:editor-assets",
+    "copy:editor-assets": "node -e \"require('fs').cpSync('src/editor/public','dist/editor/public',{recursive:true})\"",
     "build:web": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -136,6 +142,9 @@
     "nipplejs": "^1.0.4",
     "xxhash-wasm": "^1.1.0",
     "zustand": "^5.0.15"
+  },
+  "optionalDependencies": {
+    "@github/copilot-sdk": "^1.0.11"
   },
   "peerDependencies": {
     "@dimforge/rapier3d-compat": ">=0.13.0",
