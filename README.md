@@ -15,7 +15,7 @@ Renderoni is an open-source 3D web game engine. It wires Three.js and Rapier int
 
 ## 📦 Install & Quickstart
 
-Install the beta release. (Note: npm package is not yet published in this repo worktree, so consider these commands the beta release contract).
+Install the beta release:
 
 ```bash
 npm install renderoni@beta three @dimforge/rapier3d-compat
