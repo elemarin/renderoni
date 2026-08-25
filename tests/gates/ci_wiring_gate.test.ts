@@ -91,8 +91,8 @@ describe('CI wiring: the aggregate beta gate', () => {
       'determinism',
       'mcp',
       'lifecycle',
-      'tests',
       'build',
+      'tests',
       'readme',
       'package',
       'build-web',
@@ -100,6 +100,7 @@ describe('CI wiring: the aggregate beta gate', () => {
       'release-contract',
     ]);
     // The build has to precede anything that consumes dist/.
+    expect(ids.indexOf('build')).toBeLessThan(ids.indexOf('tests'));
     expect(ids.indexOf('build')).toBeLessThan(ids.indexOf('readme'));
     expect(ids.indexOf('build')).toBeLessThan(ids.indexOf('package'));
     expect(ids.indexOf('build-web')).toBeLessThan(ids.indexOf('budget'));
