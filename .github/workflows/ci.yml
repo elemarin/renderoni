@@ -48,6 +48,9 @@ jobs:
           # the pinned digest, instead of silently downgrading to shape checks.
           RENDERONI_REQUIRE_EXACT_HASH: ${{ (runner.os == 'Linux' && runner.arch == 'X64') && '1' || '0' }}
 
+      - name: Build package
+        run: npm run build
+
       - name: Test suite
         run: npm test
 
