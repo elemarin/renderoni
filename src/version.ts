@@ -5,4 +5,4 @@
  * runtime, so this constant mirrors its `"version"` field. Keep both values in
  * sync on every release (a package-contract test enforces this).
  */
-export const RENDERONI_VERSION = '0.9.0-beta.1';
+export const RENDERONI_VERSION = '1.0.0';

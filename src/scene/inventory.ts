@@ -61,8 +61,8 @@ export function parseSceneInventory(input: unknown): SceneInventory {
   if (typeof rec.prompt !== 'string' || rec.prompt.length === 0) {
     throw new Error('Scene inventory requires a prompt');
   }
-  if (!Array.isArray(rec.elements) || rec.elements.length === 0) {
-    throw new Error('Scene inventory requires at least one element');
+  if (!Array.isArray(rec.elements)) {
+    throw new Error('Scene inventory requires an elements array');
   }
 
   const elements = rec.elements.map((raw, index) => parseElement(raw, index));

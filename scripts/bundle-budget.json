@@ -5,59 +5,54 @@
     "manifest": "dist-web/.vite/manifest.json",
     "document": "dist-web/index.html",
     "compression": "node:zlib gzipSync, default level (matches the sizes Vite prints)",
-    "baselineRecordedAt": "2026-08-20",
+    "baselineRecordedAt": "2026-08-25",
     "baselineToolchain": "vite 5.4.21 production build, Node 22, linux x64"
   },
   "notes": [
-    "Initial load = the entry chunk plus every chunk it imports statically, plus the entry CSS and the HTML document. Everything else (home scene, each game, Model Studio, three/Rapier, nipplejs) is fetched on demand.",
+    "Initial load = the entry chunk plus every chunk it imports statically, plus the entry CSS and the HTML document. Everything else (home scene, each game, three/Rapier) is fetched on demand.",
     "The engine vendor chunk (three + Rapier + Renderoni core, ~900 kB gzip) must stay out of the initial graph. maxInitialChunkRawBytes is the tripwire for that.",
-    "Frame rate is not measured here. 45 FPS on mid/high phones is a product target that is checked by hand on real devices; see docs/beta-release-checklist.md.",
+    "Frame rate is not measured here. 60 FPS on desktop browsers is the target.",
     "Limits are deliberately above the baseline so ordinary work does not fail CI, while tolerancePercent still fails a meaningful regression. Lower maxBytes as the shell gets smaller."
   ],
   "defaultTolerancePercent": 15,
   "maxInitialChunkRawBytes": 131072,
   "maxInitialJsChunks": 4,
-  "mustStayLazy": [
-    {
-      "module": "node_modules/nipplejs/dist/index.mjs",
-      "why": "Touch sticks are loaded only after a real touch, so desktop and keyboard users never download nipplejs."
-    }
-  ],
+  "mustStayLazy": [],
   "budgets": [
     {
       "id": "initial-js-gzip",
       "label": "Initial console shell JS (entry + static imports, gzip)",
-      "baselineBytes": 16255,
+      "baselineBytes": 15791,
       "maxBytes": 20480
     },
     {
       "id": "initial-css-gzip",
       "label": "Initial CSS (gzip)",
-      "baselineBytes": 7998,
+      "baselineBytes": 7431,
       "maxBytes": 12288
     },
     {
       "id": "initial-html-gzip",
       "label": "index.html document (gzip)",
-      "baselineBytes": 5215,
+      "baselineBytes": 5150,
       "maxBytes": 8192
     },
     {
       "id": "initial-total-gzip",
       "label": "Total initial load: HTML + shell JS + CSS (gzip)",
-      "baselineBytes": 29468,
+      "baselineBytes": 28372,
       "maxBytes": 36864
     },
     {
       "id": "largest-lazy-chunk-gzip",
       "label": "Largest lazy chunk, currently three + Rapier + engine (gzip)",
-      "baselineBytes": 923833,
+      "baselineBytes": 923446,
       "maxBytes": 1048576
     },
     {
       "id": "all-js-gzip",
       "label": "Every emitted JS chunk together (gzip)",
-      "baselineBytes": 980446,
+      "baselineBytes": 968024,
       "maxBytes": 1153434
     }
   ]

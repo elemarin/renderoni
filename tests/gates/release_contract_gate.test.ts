@@ -48,9 +48,9 @@ describe('Release gate: dist-tag rule', () => {
     expect(outcomes).toEqual(['threw', 'threw', 'threw', 'threw', 'threw']);
   });
 
-  it('resolves this repository to the beta tag today', () => {
-    expect(packageJson.version).toMatch(/^0\.9\.0-beta\.\d+$/);
-    expect(callScript('m.resolveDistTag(' + JSON.stringify(packageJson.version) + ')')).toBe('beta');
+  it('resolves this repository to the latest tag for 1.0.0 release', () => {
+    expect(packageJson.version).toMatch(/^1\.0\.0$/);
+    expect(callScript('m.resolveDistTag(' + JSON.stringify(packageJson.version) + ')')).toBe('latest');
   });
 });
 
@@ -116,7 +116,7 @@ describe('Release gate: package metadata and support files', () => {
     expect(readFileSync(resolve(root, 'LICENSE'), 'utf8')).toContain('MIT');
     expect(readFileSync(resolve(root, 'CHANGELOG.md'), 'utf8')).toContain(packageJson.version);
     expect(readFileSync(resolve(root, 'SECURITY.md'), 'utf8').toLowerCase()).toContain('vulnerability');
-    expect(readFileSync(resolve(root, 'SUPPORT.md'), 'utf8')).toContain('renderoni@beta');
+    expect(readFileSync(resolve(root, 'SUPPORT.md'), 'utf8')).toContain('renderoni');
   });
 
   it('never publishes sources, tests or the console build', () => {

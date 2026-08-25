@@ -2,7 +2,7 @@
  * Renderoni Input Manager
  *
  * Provides a unified abstraction layer mapping Keyboard WASD, Mouse / PointerLock,
- * Touch joysticks, Gamepads, and programmatic agent actions to continuous vectors and discrete buttons.
+ * and programmatic agent actions to continuous vectors and discrete buttons.
  */
 
 export interface InputVector2D {
@@ -27,7 +27,6 @@ export class InputManager {
   private buttons: Map<string, boolean> = new Map();
   private buttonPresses: Set<string> = new Set();
   private isListening = false;
-  private mobileControls?: MobileControls;
 
   private cleanupListeners: Array<() => void> = [];
 
@@ -148,12 +147,6 @@ export class InputManager {
     return { ...this.lookVector };
   }
 
-  attachMobileControls(options: MobileControlsOptions = {}): MobileControls {
-    this.mobileControls?.dispose();
-    this.mobileControls = new MobileControls(this, options);
-    return this.mobileControls;
-  }
-
   consumeLookDelta(): LookDelta {
     const delta = { ...this.lookDelta };
     this.lookDelta.dx = 0;
@@ -170,8 +163,6 @@ export class InputManager {
   }
 
   dispose(): void {
-    this.mobileControls?.dispose();
-    this.mobileControls = undefined;
     for (const cleanup of this.cleanupListeners) {
       cleanup();
     }
@@ -179,4 +170,3 @@ export class InputManager {
     this.isListening = false;
   }
 }
-import { MobileControls, type MobileControlsOptions } from './mobile-controls.js';

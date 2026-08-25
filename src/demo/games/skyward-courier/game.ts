@@ -161,7 +161,7 @@ export class SkywardCourierGame {
     if (!plane) return;
 
     const keys = this.keys;
-    const mobileMove = this.engine.input.getMoveVector();
+    const programmaticMove = this.engine.input.getMoveVector();
     if (this.engine.input.consumeButtonPress('engine')) this.startEngine();
     if (this.engine.input.consumeButtonPress('view')) this.toggleView();
 
@@ -215,12 +215,12 @@ export class SkywardCourierGame {
       if (onGround) rotDelta.y -= 1.2 * dt;
       else rotDelta.z -= 2.4 * controlEff * dt;
     }
-    if (Math.abs(mobileMove.z) > 0.05) {
-      rotDelta.x += mobileMove.z * (onGround ? 0.9 : 1.6) * controlEff * dt;
+    if (Math.abs(programmaticMove.z) > 0.05) {
+      rotDelta.x += programmaticMove.z * (onGround ? 0.9 : 1.6) * controlEff * dt;
     }
-    if (Math.abs(mobileMove.x) > 0.05) {
-      if (onGround) rotDelta.y -= mobileMove.x * 1.2 * dt;
-      else rotDelta.z -= mobileMove.x * 2.4 * controlEff * dt;
+    if (Math.abs(programmaticMove.x) > 0.05) {
+      if (onGround) rotDelta.y -= programmaticMove.x * 1.2 * dt;
+      else rotDelta.z -= programmaticMove.x * 2.4 * controlEff * dt;
     }
     if (keys['KeyQ']) rotDelta.y += 1.2 * controlEff * dt;
     if (keys['KeyE']) rotDelta.y -= 1.2 * controlEff * dt;
@@ -350,15 +350,6 @@ export class SkywardCourierGame {
 
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
-    this.engine.input.attachMobileControls({
-      buttons: [
-        { name: 'throttle', label: 'GO', ariaLabel: 'Hold for throttle' },
-        { name: 'brake', label: 'BRAKE' },
-        { name: 'engine', label: 'START', ariaLabel: 'Toggle engine' },
-        { name: 'view', label: 'VIEW', ariaLabel: 'Change camera view' },
-      ],
-      joystickColor: '#38bdf8',
-    });
     this.unbind.push(() => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);

@@ -1,52 +1,49 @@
-/**
- * Thin wrapper around `@github/copilot-sdk`. Isolated in its own module so
- * the SDK is only ever imported lazily (dynamic `import()`), keeping it out
- * of the engine's default dependency graph for consumers who never run
- * `renderoni editor`.
- */
-
-import { buildSystemPrompt, defaultFenceLanguage, type EditorTab } from './prompts.js';
+import { buildSystemPrompt, defaultFenceLanguage, type AssetKind } from './prompts.js';
 
 export interface GenerateRequest {
-  tab: EditorTab;
-  /** User's natural-language prompt. */
+  tab: AssetKind | string;
   prompt: string;
-  /** Optional data URL (`data:<mime>;base64,<data>`) reference image. */
   imageDataUrl?: string;
-  /** Optional extra context, e.g. available factory keys for the level tab. */
   context?: string;
-  /**
-   * Existing file contents to revise in place, for the "iterate on an
-   * existing asset" flow. When set, the prompt asks Copilot to edit this
-   * source rather than create something new.
-   */
   existingCode?: string;
 }
 
 export interface GenerateResult {
-  /** Full assistant response text. */
   raw: string;
-  /** Extracted code/JSON from the first fenced block. */
   code: string;
-  /** Fence language tag, e.g. "ts" or "json". */
   language: string;
 }
 
-// The SDK type is intentionally `any` here — it is only resolved at runtime
-// via dynamic import so this module has zero static dependency on the SDK.
+export interface CopilotStatus {
+  connected: boolean;
+  authenticated: boolean;
+  login?: string;
+  message?: string;
+}
+
 let clientPromise: Promise<any> | null = null;
 
-async function getClient(): Promise<any> {
+export async function getClient(): Promise<any> {
   if (!clientPromise) {
     clientPromise = (async () => {
-      const { CopilotClient } = await import('@github/copilot-sdk');
-      return new CopilotClient();
+      let mod: any;
+      try {
+        mod = await import('@github/copilot-sdk');
+      } catch (err: any) {
+        if (err?.code === 'ERR_MODULE_NOT_FOUND' || err?.message?.includes('Cannot find package')) {
+          throw new Error(
+            'Optional dependency "@github/copilot-sdk" is not installed. Install it with: npm install -D @github/copilot-sdk'
+          );
+        }
+        throw err;
+      }
+      return new mod.CopilotClient();
     })();
   }
   return clientPromise;
 }
 
-function parseImageAttachment(imageDataUrl: string): { type: 'blob'; data: string; mimeType: string } {
+export function parseImageAttachment(imageDataUrl: string): { type: 'blob'; data: string; mimeType: string } {
   const match = /^data:([^;]+);base64,(.*)$/s.exec(imageDataUrl);
   if (!match) {
     throw new Error('imageDataUrl must be a base64 data URL (data:<mime>;base64,<data>)');
@@ -55,20 +52,13 @@ function parseImageAttachment(imageDataUrl: string): { type: 'blob'; data: strin
   return { type: 'blob', data, mimeType };
 }
 
-function extractCodeBlock(raw: string, fallbackLanguage: string): { code: string; language: string } {
+export function extractCodeBlock(raw: string, fallbackLanguage: string): { code: string; language: string } {
   const match = /```([a-zA-Z0-9_-]*)\r?\n([\s\S]*?)```/.exec(raw);
   if (!match) {
     return { code: raw.trim(), language: fallbackLanguage };
   }
   const [, language, code] = match;
   return { code: code.trim(), language: language || fallbackLanguage };
-}
-
-export interface CopilotStatus {
-  connected: boolean;
-  authenticated: boolean;
-  login?: string;
-  message?: string;
 }
 
 export async function checkCopilotStatus(): Promise<CopilotStatus> {
@@ -83,7 +73,7 @@ export async function checkCopilotStatus(): Promise<CopilotStatus> {
       login: auth.login,
       message: auth.statusMessage,
     };
-  } catch (err) {
+  } catch (err: any) {
     return {
       connected: false,
       authenticated: false,
@@ -97,9 +87,7 @@ export async function generate(req: GenerateRequest): Promise<GenerateResult> {
   const session = await client.createSession({
     model: 'auto',
     clientName: 'renderoni-editor',
-    systemMessage: { mode: 'append', content: buildSystemPrompt(req.tab) },
-    // Disable tool calls — the editor only wants a single text turn back,
-    // never file edits or shell commands run on the operator's behalf.
+    systemMessage: { mode: 'append', content: buildSystemPrompt(req.tab as AssetKind) },
     availableTools: [],
   });
 
@@ -107,7 +95,7 @@ export async function generate(req: GenerateRequest): Promise<GenerateResult> {
     const attachments = req.imageDataUrl ? [parseImageAttachment(req.imageDataUrl)] : undefined;
     const parts = [req.context, req.prompt];
     if (req.existingCode) {
-      const fence = defaultFenceLanguage(req.tab);
+      const fence = defaultFenceLanguage(req.tab as AssetKind);
       parts.push(
         `Here is the CURRENT implementation. Revise it according to the request above. ` +
           `Keep the same exported name(s) and overall shape unless the request says otherwise. ` +
@@ -117,7 +105,7 @@ export async function generate(req: GenerateRequest): Promise<GenerateResult> {
     const userPrompt = parts.filter(Boolean).join('\n\n');
     const response = await session.sendAndWait({ prompt: userPrompt, attachments }, 180_000);
     const raw: string = response?.data?.content ?? '';
-    const { code, language } = extractCodeBlock(raw, defaultFenceLanguage(req.tab));
+    const { code, language } = extractCodeBlock(raw, defaultFenceLanguage(req.tab as AssetKind));
     return { raw, code, language };
   } finally {
     await session.disconnect();

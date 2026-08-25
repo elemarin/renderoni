@@ -17,6 +17,7 @@ import { buildGrandfatherClockModel, type ClockModelResult } from './models/Gran
 import { buildFlashlightRig, type FlashlightRig } from './models/Flashlight.js';
 import { buildQuestItems, type QuestItemsResult } from './models/items/QuestItems.js';
 import { clockHandRotations } from './models/VictorianWallClock.js';
+import { ParticleEmitter } from '../../../vfx/index.js';
 
 export interface HorrorTelemetry {
   questStatus: string;
@@ -36,6 +37,7 @@ export class EchoesOfBlackwoodGame {
   private clockModel: ClockModelResult | null = null;
   private items: QuestItemsResult | null = null;
   private doors: ManorArchitectureResult | null = null;
+  private dustEmitter: ParticleEmitter | null = null;
 
   // First-Person Camera & Movement State
   private playerPos = new THREE.Vector3(0, 1.55, 6);
@@ -43,7 +45,6 @@ export class EchoesOfBlackwoodGame {
   private pitchAngle = 0.0;
   private isLocked = false;
   private isMouseDown = false;
-  private lastPointerWasTouch = false;
   private mouseDragFallback = false;
   private keys: Record<string, boolean> = {};
   private unbindInput: Array<() => void> = [];
@@ -111,6 +112,23 @@ export class EchoesOfBlackwoodGame {
 
     // 5. Build Quest Items (Desk, Key, Crest, Gate)
     this.items = buildQuestItems(this.engine);
+
+    // Atmospheric dust particles floating in the manor halls
+    this.dustEmitter = new ParticleEmitter(250);
+    const dustMesh = this.dustEmitter.getMesh();
+    if (dustMesh) {
+      scene.add(dustMesh);
+    }
+    this.dustEmitter.spawnBurst({
+      position: [0, 1.5, 0],
+      count: 120,
+      spread: [12, 3, 20],
+      lifetime: 10.0,
+      speed: 0.05,
+      color: 0x94a3b8,
+      startScale: 0.03,
+      endScale: 0.015,
+    });
 
     // 6. Register Action Handlers for Agent & UI
     this.setupActions();
@@ -205,7 +223,7 @@ export class EchoesOfBlackwoodGame {
   private update(dt: number): void {
     if ((window as unknown as { __renderoniPaused?: boolean }).__renderoniPaused || !this.engine.loop.playing) return;
     const keys = this.keys;
-    const mobileMove = this.engine.input.getMoveVector();
+    const programmaticMove = this.engine.input.getMoveVector();
     const lookDelta = this.engine.input.consumeLookDelta();
     const lookVector = this.engine.input.getLookVector();
     this.yawAngle -= lookDelta.dx * 0.004 + lookVector.x * 2.4 * dt;
@@ -226,8 +244,8 @@ export class EchoesOfBlackwoodGame {
     const rightX = Math.cos(this.yawAngle);
     const rightZ = -Math.sin(this.yawAngle);
 
-    let dirX = forwardX * mobileMove.z + rightX * mobileMove.x;
-    let dirZ = forwardZ * mobileMove.z + rightZ * mobileMove.x;
+    let dirX = forwardX * programmaticMove.z + rightX * programmaticMove.x;
+    let dirZ = forwardZ * programmaticMove.z + rightZ * programmaticMove.x;
     if (keys['KeyW'] || keys['ArrowUp']) { dirX += forwardX; dirZ += forwardZ; }
     if (keys['KeyS'] || keys['ArrowDown']) { dirX -= forwardX; dirZ -= forwardZ; }
     if (keys['KeyD']) { dirX += rightX; dirZ += rightZ; }
@@ -277,6 +295,9 @@ export class EchoesOfBlackwoodGame {
         gateObj.position.y += dt * 4.0;
       }
     }
+
+    // 7. Update atmospheric dust particles
+    this.dustEmitter?.update(dt, this.engine.native.camera);
 
     this.updateProximityInteractions();
   }
@@ -474,10 +495,6 @@ export class EchoesOfBlackwoodGame {
       this.keys[e.code] = false;
     };
 
-    const onPointerDown = (event: PointerEvent) => {
-      this.lastPointerWasTouch = event.pointerType === 'touch';
-    };
-
     const onMouseDown = () => {
       if (this.mouseDragFallback) this.isMouseDown = true;
     };
@@ -509,7 +526,7 @@ export class EchoesOfBlackwoodGame {
         return;
       }
       if (!this.engine.loop.playing) return;
-      if (!this.isLocked && !this.lastPointerWasTouch) {
+      if (!this.isLocked) {
         this.mouseDragFallback = false;
         try {
           void this.canvas.requestPointerLock().catch(() => {
@@ -528,16 +545,7 @@ export class EchoesOfBlackwoodGame {
     window.addEventListener('mousemove', onMouseMove);
     document.addEventListener('pointerlockchange', onPointerLockChange);
     document.addEventListener('pointerlockerror', onPointerLockError);
-    this.canvas.addEventListener('pointerdown', onPointerDown);
     this.canvas.addEventListener('click', onClick);
-    this.engine.input.attachMobileControls({
-      lookElement: this.canvas,
-      buttons: [
-        { name: 'interact', label: 'USE', ariaLabel: 'Interact' },
-        { name: 'flashlight', label: 'LIGHT', ariaLabel: 'Toggle flashlight' },
-      ],
-      joystickColor: '#ef4444',
-    });
 
     this.unbindInput.push(() => {
       window.removeEventListener('keydown', onKeyDown);
@@ -547,7 +555,6 @@ export class EchoesOfBlackwoodGame {
       window.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('pointerlockchange', onPointerLockChange);
       document.removeEventListener('pointerlockerror', onPointerLockError);
-      this.canvas.removeEventListener('pointerdown', onPointerDown);
       this.canvas.removeEventListener('click', onClick);
     });
   }
@@ -591,6 +598,7 @@ export class EchoesOfBlackwoodGame {
 
   dispose(): void {
     for (const unbind of this.unbindInput) unbind();
+    this.dustEmitter?.dispose();
     this.engine.dispose();
   }
 }

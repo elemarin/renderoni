@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "id": "inner_sanctum",
+  "prompt": "Deep sanctuary with glowing crystal altar",
+  "seed": 202,
+  "elements": [
+    {
+      "id": "sanctum_floor",
+      "factory": "createStoneFloor",
+      "kind": "terrain",
+      "position": [0, 0, 0],
+      "collider": { "shape": "box", "size": [14, 0.2, 14] }
+    },
+    {
+      "id": "crystal_altar",
+      "factory": "createSanctumAltar",
+      "kind": "prop",
+      "position": [0, 0.5, -4],
+      "collider": { "shape": "box", "size": [2, 1, 2] },
+      "role": "objective"
+    }
+  ]
+}

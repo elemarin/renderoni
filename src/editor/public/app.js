@@ -214,7 +214,7 @@ function resolveEngineVendorUrl(specifier, dir) {
  * per-import rewriting — left untouched here since the browser's native
  * module loader already knows where to fetch them from. */
 const IMPORT_MAPPED_SPECIFIERS = new Set([
-  'three', '@sinclair/typebox', '@dimforge/rapier3d-compat', 'xxhash-wasm', 'zustand', 'nipplejs',
+  'three', '@sinclair/typebox', '@dimforge/rapier3d-compat', 'xxhash-wasm', 'zustand',
 ]);
 
 /** Recursively resolves a module's relative imports into real Blob-URL ES

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "id": "dungeon_entrance",
+  "prompt": "Stone dungeon entrance with torches and iron gate",
+  "seed": 101,
+  "elements": [
+    {
+      "id": "entrance_floor",
+      "factory": "createStoneFloor",
+      "kind": "terrain",
+      "position": [0, 0, 0],
+      "collider": { "shape": "box", "size": [10, 0.2, 10] }
+    },
+    {
+      "id": "rusty_key",
+      "factory": "createKeyPickup",
+      "kind": "pickup",
+      "position": [2, 0.5, 2],
+      "collider": { "shape": "sphere", "radius": 0.4, "sensor": true },
+      "role": "key_pickup"
+    }
+  ]
+}

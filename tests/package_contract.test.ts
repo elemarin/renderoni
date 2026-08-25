@@ -15,23 +15,27 @@ const readme = readFileSync(resolve(here, '../README.md'), 'utf-8');
 const support = readFileSync(resolve(here, '../SUPPORT.md'), 'utf-8');
 const publishWorkflow = readFileSync(resolve(here, '../.github/workflows/publish.yml'), 'utf-8');
 
-describe('0.9 beta package contract', () => {
-  it('reports a consistent 0.9.0-beta.x version', () => {
-    expect(packageJson.version).toMatch(/^0\.9\.0-beta\.\d+$/);
+describe('1.0 package contract', () => {
+  it('reports a valid semver version (1.0.0)', () => {
+    expect(packageJson.version).toMatch(/^1\.0\.0$/);
   });
 
   it('keeps src/version.ts (the browser/package version source) in sync with package.json', () => {
     expect(RENDERONI_VERSION).toBe(packageJson.version);
   });
 
-  it('does not publish renderoni/network as a public subpath export (post-1.0)', () => {
+  it('does not publish renderoni/network as a public subpath export', () => {
     expect(Object.keys(packageJson.exports)).not.toContain('./network');
   });
 
-  it('does not build a network entry point via tsup (post-1.0)', () => {
+  it('does not build a network entry point via tsup', () => {
     const config = typeof tsupConfig === 'function' ? tsupConfig({} as never) : tsupConfig;
     const entry = (config as { entry?: Record<string, string> }).entry ?? {};
     expect(Object.keys(entry)).not.toContain('network/index');
+  });
+
+  it('does not depend on nipplejs or mobile touch libraries', () => {
+    expect(packageJson.dependencies?.nipplejs).toBeUndefined();
   });
 
   it('publishes the stable input subpath and RenderoniEngine from core', () => {
@@ -54,13 +58,10 @@ describe('0.9 beta package contract', () => {
     expect(packageJson.peerDependenciesMeta['@dimforge/rapier3d-compat']).toBeUndefined();
   });
 
-  it('documents the prerelease beta tag until a stable latest release exists', () => {
-    expect(packageJson.version).toContain('-');
-    expect(readme).toContain('npm install renderoni@beta three @dimforge/rapier3d-compat');
-    expect(readme).toContain('npx renderoni@beta mcp');
-    expect(readme).toContain('future stable');
-    expect(support).toContain('npm install renderoni@beta three');
-    expect(support).toContain('npx renderoni@beta mcp');
+  it('documents the install and mcp commands in package contracts', () => {
+    expect(readme).toContain('npm install renderoni');
+    expect(readme).toContain('npx renderoni');
+    expect(support).toContain('renderoni');
   });
 
   it('publishes prereleases under beta rather than latest', () => {

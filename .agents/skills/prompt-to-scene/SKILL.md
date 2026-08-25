@@ -71,25 +71,37 @@ grass.
 
 ### 3. Reconstruct unique objects
 
+You can generate or scaffold factories using the Renderoni CLI:
+
+```bash
+# Generate a model factory from prompt with Copilot
+renderoni generate model "weathered wooden crate with iron bands" -o src/demo/games/<game>/models/WoodCrate.ts
+
+# Or scaffold an offline zero-turn boilerplate factory immediately
+renderoni add model WoodCrate -o src/demo/games/<game>/models/WoodCrate.ts
+```
+
 For each key from `uniqueFactories(inventory)`:
 
 1. Crop or isolate that object from the scene image when possible.
-2. Invoke the **img2threejs** skill on that crop.
+2. Generate using `renderoni generate model "<prompt>"` or invoke the **img2threejs** skill on that crop.
 3. Save `createXxxModel()` to `src/demo/games/<game>/models/<Factory>.ts`.
-   That folder is the img2threejs drop zone — one object per file, next to
+   That folder is the model drop zone — one object per file, next to
    `state.ts` / `game.ts` so reconstruction stays out of the tick loop.
 4. Register `{ [factory]: createXxxModel }` or `engine.add(model({ object: createXxxModel() }))`.
 
-If img2threejs is unavailable, `mountSceneInventory` already falls back to
+If generation is unavailable, `mountSceneInventory` already falls back to
 colored primitives from the collider hint so gameplay can be tested first.
 
 ### 4. Mount in Renderoni
 
+You can mount directly or via `SceneManager` in a multi-scene `GameDefinition`:
+
 ```ts
 import { createRenderoni } from 'renderoni';
 import { kccPlayer, light } from 'renderoni/presets';
-import { mountSceneInventory } from 'renderoni/scene';
-import { createWoodCrateModel } from './generated/woodCrate.js';
+import { mountSceneInventory, SceneManager } from 'renderoni/scene';
+import { createWoodCrateModel } from './models/WoodCrate.js';
 
 const game = await createRenderoni({ mode: 'headless', seed: 42 });
 game.add(light({ type: 'directional', position: [12, 20, 8] }));

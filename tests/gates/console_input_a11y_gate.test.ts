@@ -1,24 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { InputManager, MobileControls } from '../../src/input/index.js';
+import { InputManager } from '../../src/input/index.js';
 
 /**
  * Console input and accessibility gate.
  *
  * There is no browser automation in this repository, so this gate checks what
  * can be checked honestly and cheaply: the console markup keeps its keyboard
- * and screen-reader affordances, the keyboard routes stay wired, and the touch
- * sticks stay lazy. Real browsers and real phones are covered by hand in
- * docs/beta-release-checklist.md.
+ * and screen-reader affordances, the keyboard routes stay wired, and programmatic
+ * vectors remain deterministic. Real browsers and real devices are covered by hand.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../..');
 const html = readFileSync(resolve(root, 'index.html'), 'utf8');
 const consoleShell = readFileSync(resolve(root, 'src/demo/main.ts'), 'utf8');
-const mobileControls = readFileSync(resolve(root, 'src/input/mobile-controls.ts'), 'utf8');
 const checklist = readFileSync(resolve(root, 'docs/beta-release-checklist.md'), 'utf8');
 
 describe('Accessibility gate: console markup', () => {
@@ -86,55 +84,46 @@ describe('Accessibility gate: keyboard routes', () => {
   });
 });
 
-describe('Touch gate: sticks stay lazy and labelled', () => {
-  it('does nothing at all without a DOM, so headless and server runs never load nipplejs', () => {
+describe('Input gate: deterministic programmatic and desktop input', () => {
+  it('operates headlessly without a DOM or window context', () => {
     const input = new InputManager();
-    const controls = new MobileControls(input);
-
-    expect(controls.active).toBe(false);
-    expect(() => controls.dispose()).not.toThrow();
+    expect(input.getMoveVector()).toEqual({ x: 0, z: 0 });
+    expect(input.getLookVector()).toEqual({ x: 0, y: 0 });
+    expect(() => input.dispose()).not.toThrow();
   });
 
-  it('loads nipplejs only inside activation, which a real touch triggers', () => {
-    expect(mobileControls).not.toMatch(/^import .*['"]nipplejs['"]/m);
-    expect(mobileControls).toContain("await import('nipplejs')");
-    expect(mobileControls).toMatch(/addEventListener\('pointerdown'/);
-    expect(mobileControls).toMatch(/addEventListener\('touchstart'/);
-    expect(mobileControls).toContain("event.pointerType === 'touch'");
+  it('clamps normalized move and look vectors to unit length', () => {
+    const input = new InputManager();
+    input.setMoveVector(3, 4);
+    const move = input.getMoveVector();
+    expect(Math.hypot(move.x, move.z)).toBeCloseTo(1.0, 5);
+    expect(move.x).toBeCloseTo(0.6, 5);
+    expect(move.z).toBeCloseTo(0.8, 5);
 
-    // Activation happens once and unbinds itself.
-    expect(mobileControls).toContain('if (this.activated || this.disposed) return;');
+    input.setLookVector(10, 0);
+    expect(input.getLookVector()).toEqual({ x: 1, y: 0 });
   });
 
-  it('builds two sticks plus action buttons, all with screen-reader labels', () => {
-    expect(mobileControls).toContain("moveStick.setAttribute('aria-label', 'Movement joystick')");
-    expect(mobileControls).toContain("lookStick.setAttribute('aria-label', 'Look joystick')");
-    expect(mobileControls).toContain("root.setAttribute('aria-label', 'Touch game controls')");
-    expect(mobileControls).toMatch(/button\.setAttribute\('aria-label', config\.ariaLabel \?\? config\.label\)/);
+  it('handles button presses and consumption deterministically', () => {
+    const input = new InputManager();
+    expect(input.isButtonPressed('jump')).toBe(false);
+    expect(input.consumeButtonPress('jump')).toBe(false);
+
+    input.setButton('jump', true);
+    expect(input.isButtonPressed('jump')).toBe(true);
+    expect(input.consumeButtonPress('jump')).toBe(true);
+    expect(input.consumeButtonPress('jump')).toBe(false);
+    expect(input.isButtonPressed('jump')).toBe(true);
+
+    input.setButton('jump', false);
+    expect(input.isButtonPressed('jump')).toBe(false);
   });
 
-  it('keeps nipplejs in its own lazy chunk in the built console', () => {
-    const manifestPath = resolve(root, 'dist-web/.vite/manifest.json');
-    if (!existsSync(manifestPath)) {
-      // The built console is checked by the budget gate after `npm run build:web`.
-      expect(readFileSync(resolve(root, 'scripts/bundle-budget.json'), 'utf8')).toContain('nipplejs');
-      return;
-    }
-
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-    const entryKey = Object.keys(manifest).find((key) => manifest[key].isEntry)!;
-    const initial = new Set<string>();
-    const visit = (key: string) => {
-      if (initial.has(key) || !manifest[key]) return;
-      initial.add(key);
-      for (const imported of manifest[key].imports ?? []) visit(imported);
-    };
-    visit(entryKey);
-
-    const nipple = Object.keys(manifest).find((key) => key.includes('nipplejs'));
-    expect(nipple).toBeDefined();
-    expect(manifest[nipple!].isDynamicEntry).toBe(true);
-    expect(initial.has(nipple!)).toBe(false);
+  it('consumes and resets look deltas', () => {
+    const input = new InputManager();
+    input.addLookDelta(5, -3);
+    expect(input.consumeLookDelta()).toEqual({ dx: 5, dy: -3 });
+    expect(input.consumeLookDelta()).toEqual({ dx: 0, dy: 0 });
   });
 });
 

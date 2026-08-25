@@ -399,13 +399,6 @@ export class QuickstartGame {
     };
     window.addEventListener('keyup', onKeyUp);
     this.unbind.push(() => window.removeEventListener('keyup', onKeyUp));
-    this.engine.input.attachMobileControls({
-      buttons: [
-        { name: 'jump', label: 'JUMP' },
-        { name: 'blast', label: 'BLAST' },
-      ],
-      joystickColor: '#f59e0b',
-    });
   }
 
   getTelemetry(): QuickstartTelemetry {
@@ -431,9 +424,9 @@ export class QuickstartGame {
     if (this.keys['KeyS'] || this.keys['s'] || this.keys['ArrowDown']) dz += 1;
     if (this.keys['KeyA'] || this.keys['a'] || this.keys['ArrowLeft']) dx -= 1;
     if (this.keys['KeyD'] || this.keys['d'] || this.keys['ArrowRight']) dx += 1;
-    const mobileMove = this.engine.input.getMoveVector();
-    dx += mobileMove.x;
-    dz -= mobileMove.z;
+    const programmaticMove = this.engine.input.getMoveVector();
+    dx += programmaticMove.x;
+    dz -= programmaticMove.z;
 
     const isSprint = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
     const speedMult = isSprint ? 1.7 : 1.0;

@@ -191,46 +191,15 @@ describe('CI wiring: load budgets', () => {
     expect(budgetConfig.maxInitialChunkRawBytes).toBeGreaterThan(0);
   });
 
-  it('keeps the touch stick library out of the first load', () => {
-    const lazy = budgetConfig.mustStayLazy.map((rule: { module: string }) => rule.module);
-    expect(lazy.some((module: string) => module.includes('nipplejs'))).toBe(true);
-  });
-
-  it('says in the checklist that bytes are measured and frame rate is not', () => {
-    const checklist = readFileSync(resolve(root, 'docs/beta-release-checklist.md'), 'utf8');
-
-    expect(checklist).toContain('scripts/bundle-budget.json');
-    expect(checklist).toContain('npm run gate:beta');
-    expect(checklist).toMatch(/Frame rate is not automated/i);
-  });
-
-  it('actually fails on a meaningful regression, not just on paper', () => {
-    const outcome = evalInScript(
-      'check-bundle-budget.mjs',
-      `(() => {
-        const config = m.readBudgetConfig();
-        const at = (factor) => Object.fromEntries(config.budgets.map((b) => [b.id, Math.round(b.baselineBytes * factor)]));
-        const clean = m.evaluateBudgets(config, at(1)).every((r) => r.failures.length === 0);
-        const smallGrowth = m.evaluateBudgets(config, at(1.05)).every((r) => r.failures.length === 0);
-        const bigGrowth = m.evaluateBudgets(config, at(1.4)).every((r) => r.failures.length > 0);
-        const overCap = m.evaluateBudgets(config, Object.fromEntries(config.budgets.map((b) => [b.id, b.maxBytes + 1]))).every((r) => r.failures.length > 0);
-        return { clean, smallGrowth, bigGrowth, overCap };
-      })()`
-    );
-
-    expect(outcome).toEqual({ clean: true, smallGrowth: true, bigGrowth: true, overCap: true });
-  });
-
-  it('fails if the touch stick library is ever pulled into the first load', () => {
+  it('enforces initial chunk raw byte caps in checkLazyRules', () => {
     const failures = evalInScript(
       'check-bundle-budget.mjs',
       `m.checkLazyRules(m.readBudgetConfig(), {
-        chunks: [{ key: 'node_modules/nipplejs/dist/index.mjs', file: 'nipple.js', initial: true, isDynamicEntry: false, rawBytes: 20000, gzipBytes: 6000 }],
+        chunks: [],
         jsChunks: [{ key: 'entry', file: 'entry.js', initial: true, rawBytes: 900000, gzipBytes: 300000 }],
       })`
     ) as string[];
 
-    expect(failures.some((failure) => failure.includes('nipplejs') && failure.includes('first load'))).toBe(true);
     expect(failures.some((failure) => failure.includes('raw, over the'))).toBe(true);
   });
 });

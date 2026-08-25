@@ -17,10 +17,13 @@ This skill provides comprehensive architectural guidelines, Three.js optimizatio
 4. [Three.js Performance & Optimization Mastery](#4-threejs-performance--optimization-mastery)
 5. [Rapier Physics & Character Controller Best Practices](#5-rapier-physics--character-controller-best-practices)
 6. [Game Architecture & Declarative Presets](#6-game-architecture--declarative-presets)
-7. [Camera, Input & Audio Systems](#7-camera-input--audio-systems)
-8. [VFX, Particles & Juice](#8-vfx-particles--juice)
-9. [Headless Testing & Agent Verification](#9-headless-testing--agent-verification)
-10. [Prompt-to-Scene (img2threejs)](#10-prompt-to-scene-img2threejs)
+7. [Runtime Scene Hierarchy & SceneManager](#7-runtime-scene-hierarchy--scenemanager-renderoniscene)
+8. [Camera, Input & Audio Systems](#8-camera-input--audio-systems)
+9. [VFX, Particles & Juice](#9-vfx-particles--juice-renderonivfx)
+10. [Headless Testing & Agent Verification](#10-headless-testing--agent-verification)
+11. [Prompt-to-Scene & CLI Tooling](#11-prompt-to-scene--cli-tooling)
+12. [In-App Editor](#12-in-app-editor-renderoni-editor)
+13. [Reference Showcase: Echoes of Blackwood](#13-reference-showcase-echoes-of-blackwood-psx-horror-archetype)
 
 ---
 
@@ -265,30 +268,67 @@ export const turret = definePreset<TurretOptions>('turret', (options, ctx) => {
 
 ---
 
-## 7. Camera, Input & Audio Systems
+## 7. Runtime Scene Hierarchy & SceneManager (`renderoni/scene`)
+
+Renderoni 1.0 supports structured multi-scene progression with deterministic lifecycle management and persistent cross-scene state:
+
+```ts
+import { createRenderoni } from 'renderoni';
+import { SceneManager, type GameDefinition, type SceneDefinition } from 'renderoni/scene';
+
+const game = await createRenderoni({ mode: 'interactive', canvas });
+const manager = new SceneManager(game);
+
+const sceneA: SceneDefinition = {
+  id: 'courtyard',
+  setup: (ctx) => {
+    // Spawns tracked for automatic RAII teardown on scene exit
+    ctx.spawn(body({ id: 'fountain', shape: 'cylinder', size: [1.5, 1], type: 'fixed' }));
+  },
+};
+
+const gameDef: GameDefinition = {
+  id: 'manor-quest',
+  startLevel: 'level_1',
+  persistentEntities: ['hero_player'], // Preserved across scene transitions
+  levels: [
+    { id: 'level_1', startScene: 'courtyard', scenes: [sceneA, sceneB] }
+  ],
+};
+
+await manager.loadGame(gameDef);
+
+// Teleport persistent entities to target entry point with automatic physics sync
+await manager.switchScene('hallway', { entryPoint: 'from_courtyard' });
+```
+
+---
+
+## 8. Camera, Input & Audio Systems
 
 ### 🎥 Camera Modes:
 - **Smooth 3rd-Person Chase**: Use spherical coordinates (`theta`, `phi`, `radius`) lerped smoothly towards the player's position + offset.
 - **Cockpit / First-Person**: Attach camera directly to the player's eye socket or cockpit anchor with zero rotational lag.
-- **Screen Shake**: Add high-frequency, decaying random displacement to camera target during explosions/hits using `ctx.prng`.
+- **Screen Shake**: Add high-frequency, decaying random displacement to camera target during explosions/hits using engine PRNG and `ScreenShake`.
 
-### 🔊 Web Audio Best Practices:
-- Use procedural audio synthesis (OscillatorNode + GainNode envelope) for lightweight, zero-latency SFX without loading heavy MP3 assets.
-- Resume `AudioContext` automatically on the first user interaction (`pointerdown` or `keydown`).
+### 🔊 Audio Subsystem (`renderoni/audio`):
+- **Dual-Mode**: Interactive browser mode uses Web Audio with one-shot user gesture autoplay resume (`pointerdown`/`keydown`) and HRTF 3D spatial panning; headless mode records deterministic event logs without touching the DOM.
+- **Procedural Clips & Buffers**: Register procedural sound synthesizers or AudioBuffers using `engine.audio.registerClip(name, synth)`.
 
 ---
 
-## 8. VFX, Particles & Juice
+## 9. VFX, Particles & Juice (`renderoni/vfx`)
 
-- **Particle Pools**: Maintain a pre-allocated pool of $100\text{--}500$ particle objects. Never create/destroy meshes during particle emission; activate and reset existing particles from the pool.
+- **Structure-of-Arrays (SoA) Particle Pool**: Preallocated TypedArray buffers with zero heap allocation during gameplay and `THREE.InstancedMesh` billboard rendering.
 - **Visual Feedback ("Juice")**:
+  - `emitter.spawnBurst({ position, count, speed, color, lifetime })`
+  - Screen shake via `engine.vfx.screenShake(intensity, durationSeconds)`.
   - Hit stop / frame freeze ($50\text{ms}$).
-  - Squash & Stretch scale tweens on jump/land.
   - Floating damage numbers projected via Renderoni UI anchors (`ui().anchor()`).
 
 ---
 
-## 9. Headless Testing & Agent Verification
+## 10. Headless Testing & Agent Verification
 
 Renderoni tests run in pure Node.js in $<10\text{ms}$ with Vitest:
 
@@ -318,9 +358,21 @@ test('hero triggers sensor and verifies determinism hash', async () => {
 
 ---
 
-## 10. Prompt-to-Scene (img2threejs)
+## 11. Prompt-to-Scene & CLI Tooling
 
-Do not one-shot a whole game. Keep a compact `SceneInventory` in context, reconstruct each unique `factory` with [img2threejs](https://github.com/img2threejs/img2threejs), then mount:
+Renderoni provides both CLI automation and agent workflows to generate 3D assets and levels:
+
+```bash
+# Generate a model factory from prompt with Copilot
+renderoni generate model "weathered brass lantern" -o models/Lantern.ts
+
+# Offline zero-turn template scaffolding (100% offline)
+renderoni add model Chest -o models/Chest.ts
+renderoni add scene Courtyard -o scenes/courtyard.json
+renderoni add level Chapter1 -o levels/chapter1.json
+```
+
+Mounting scene inventories:
 
 ```ts
 import { mountSceneInventory } from 'renderoni/scene';
@@ -333,36 +385,22 @@ Full agent recipe: `.agents/skills/prompt-to-scene/SKILL.md`.
 
 ---
 
-## 11. In-App Editor (`renderoni editor`)
+## 12. In-App Editor (`renderoni editor`)
 
-`renderoni editor` starts a local server + tabbed browser UI (Models / Terrain
-/ Levels) that drives the **GitHub Copilot SDK** (`@github/copilot-sdk`, an
-`optionalDependency`) to generate the same kind of content a coding-agent
-session produces via the Prompt-to-Scene skill — but as a live, single-turn,
-in-browser tool for iterating on one asset at a time.
+`renderoni editor` starts a local server + tabbed browser UI (Models / Terrain / Levels) that drives the **GitHub Copilot SDK** (`@github/copilot-sdk`) to generate interchangeable, drop-in-place Three.js factories and scene manifests.
 
-- Each tab sends one prompt (+ optional reference image, + optional existing
-  file contents for "revise in place") through a single Copilot turn.
-- **The editor's system prompt is generated from these same skill files at
-  runtime** (`src/editor/prompts.ts` loads and condenses
-  `.agents/skills/prompt-to-scene/SKILL.md`'s "Factory contract" section) —
-  it is not a hand-maintained duplicate. If you update the factory contract
-  above, the editor picks it up automatically; do not hardcode a second copy
-  of these rules anywhere else.
-- Models/Terrain tabs return a `() => THREE.Object3D` factory, live-previewed
-  in the browser via a dynamic `Function` sandboxed to a `THREE` binding —
-  which is exactly why the factory contract's "zero imports, zero arguments,
-  must return `THREE.Object3D`" rules are non-negotiable for both surfaces.
-- The Levels tab returns a `SceneInventory` JSON compatible with
-  `parseSceneInventory` / `mountSceneInventory` (`renderoni/scene`), same
-  shape as section 10 above.
-- Generated output can be saved into the caller's project via `/api/save`,
-  which only writes under the directory `renderoni editor` was started from.
-- The Copilot SDK spawns/talks to the local `copilot` CLI over JSON-RPC, so it
-  only runs in Node (`src/editor/copilot-session.ts`), never in the browser.
+---
 
-Use whichever surface fits: the skill for a coding-agent session authoring a
-whole game end-to-end, the editor for a human iterating on one asset at a
-time in a live preview — both must produce interchangeable, drop-in-place
-factory files, so there is exactly one contract (this section +
-`.agents/skills/prompt-to-scene/SKILL.md`) governing both.
+## 13. Reference Showcase: Echoes of Blackwood (PSX Horror Archetype)
+
+[`src/demo/games/echoes-of-blackwood/`](file:///home/estebanleandro/git/renderoni/src/demo/games/echoes-of-blackwood/) serves as the production-grade reference implementation for first-person narrative puzzle games in Renderoni:
+
+- **Architecture**: Modular pure TypeScript structure separating procedural models (`models/`), narrative state (`state.ts`), audio synthesis (`audio.ts`), and game loop (`game.ts`).
+- **Procedural Models**:
+  - `models/ManorHallway.ts`: Atmospheric Victorian manor corridors, arched doorways, sconces, and animated door hinges.
+  - `models/GrandfatherClock.ts`: Ornate clock puzzle with interactive minute/hour hands (3:00 $\to$ 11:45) triggering a secret bookcase door.
+  - `models/Flashlight.ts`: Handheld 3D flashlight viewmodel with volumetric spot cone and battery toggle.
+  - `models/items/QuestItems.ts`: Study desk with leather journal, brass winding key, heraldic Blackwood crest, and wrought iron escape gate.
+- **Atmosphere & VFX**: Preallocated Structure-of-Arrays (SoA) dust particle pool (`ParticleEmitter`) floating through corridors and dynamic flickering lighting.
+- **Audio**: Modular procedural sound effects synthesizer for page turns, item pickup chimes, clock bells, and wooden door creaks.
+- **Testing**: Deterministic AST assertion and puzzle progression test harness in `tests/echoes_of_blackwood.test.ts` and `tests/archetypes/psx_horror.test.ts`.
