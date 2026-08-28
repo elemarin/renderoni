@@ -141,12 +141,9 @@ export class FlightHUD {
       if (telemetry.hasCargoAttached) {
         this.elMagnetBtn.textContent = '🧲 Sling: LATCHED (F to Drop)';
         this.elMagnetBtn.className = 'hud-pill interactive active';
-      } else if (telemetry.magneticLatchArmed) {
-        this.elMagnetBtn.textContent = '🧲 Sling: ARMED (F)';
-        this.elMagnetBtn.className = 'hud-pill interactive';
       } else {
-        this.elMagnetBtn.textContent = '🧲 Sling: OFF (F)';
-        this.elMagnetBtn.className = 'hud-pill interactive danger';
+        this.elMagnetBtn.textContent = '🧲 Sling: READY (Auto-Latch)';
+        this.elMagnetBtn.className = 'hud-pill interactive';
       }
     }
 

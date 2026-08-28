@@ -23,7 +23,7 @@ export class MagneticSlingSystem {
 
   // Sling Properties
   slingLength: number = 1.4;
-  magneticRadius: number = 5.5; // Generous 5.5m magnetic suction radius!
+  magneticRadius: number = 8.5; // High-strength 8.5m magnetic latch radius!
   springStiffness: number = 700.0;
   springDamping: number = 40.0;
 
@@ -63,7 +63,7 @@ export class MagneticSlingSystem {
     anchorObject: THREE.Object3D,
     scene: THREE.Scene,
     slingLength: number = 1.4,
-    magneticRadius: number = 5.5
+    magneticRadius: number = 8.5
   ) {
     this.world = world;
     this.aircraftBody = aircraftBody;
@@ -136,12 +136,13 @@ export class MagneticSlingSystem {
   }
 
   toggleArm(armed?: boolean): void {
-    this.isArmed = armed !== undefined ? armed : !this.isArmed;
-    if (!this.isArmed && this.latchedParcel) {
+    if (this.latchedParcel) {
       this.dropCargo();
-    } else if (this.isArmed) {
-      this.dropCooldown = 0; // Immediate re-arm when manually pressed
+      return;
     }
+    // When no cargo is latched, magnet always stays armed and resets cooldown
+    this.isArmed = true;
+    this.dropCooldown = 0;
     this.updateMagnetMaterial();
   }
 
@@ -162,7 +163,7 @@ export class MagneticSlingSystem {
     );
 
     this.lastDroppedParcel = dropped;
-    this.dropCooldown = 3.5; // 3.5s cooldown so it doesn't instantly re-snap!
+    this.dropCooldown = 2.5; // 2.5s cooldown so it doesn't instantly re-snap to the dropped item
     this.latchedParcel = null;
     this.updateMagnetMaterial();
     this.onDrop?.(dropped);
@@ -274,7 +275,7 @@ export class MagneticSlingSystem {
 
         if (dist < this.magneticRadius) {
           // Powerful Magnetic Pull toward the Electromagnet Head!
-          const pullFactor = (1 - dist / this.magneticRadius) * 28.0;
+          const pullFactor = Math.max(16.0, (1 - dist / this.magneticRadius) * 55.0);
           const dirX = (magnetPos.x - pPos.x) / dist;
           const dirY = (magnetPos.y - pPos.y) / dist;
           const dirZ = (magnetPos.z - pPos.z) / dist;
@@ -282,14 +283,14 @@ export class MagneticSlingSystem {
           parcel.body.applyImpulse(
             {
               x: dirX * pullFactor * dt,
-              y: dirY * pullFactor * dt,
+              y: (dirY * pullFactor + 6.0) * dt,
               z: dirZ * pullFactor * dt,
             },
             true
           );
 
-          // Snap Latch Threshold (0.95m)
-          if (dist < 0.95) {
+          // Generous snap latch threshold (2.5m) for easy cockpit-view pickup
+          if (dist < 2.5) {
             this.attachCargo(parcel);
             break;
           }

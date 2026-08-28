@@ -139,6 +139,7 @@
   "license": "MIT",
   "dependencies": {
     "@sinclair/typebox": "^0.34.14",
+    "renderoni": "^1.0.0",
     "xxhash-wasm": "^1.1.0",
     "zustand": "^5.0.15"
   },
