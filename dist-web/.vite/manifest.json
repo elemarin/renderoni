@@ -31,7 +31,7 @@
     ]
   },
   "index.html": {
-    "file": "assets/index-Z3Wf9Mpz.js",
+    "file": "assets/index-83uWlAvz.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -42,7 +42,7 @@
       "src/demo/quickstart-game.ts"
     ],
     "css": [
-      "assets/index-DJ-5BTNi.css"
+      "assets/index-BrZRUBzM.css"
     ]
   },
   "src/demo/games/alpendrop/game.ts": {
@@ -82,7 +82,7 @@
     ]
   },
   "src/demo/quickstart-game.ts": {
-    "file": "assets/quickstart-game-B9MLFvui.js",
+    "file": "assets/quickstart-game-DhpRwrgV.js",
     "name": "quickstart-game",
     "src": "src/demo/quickstart-game.ts",
     "isDynamicEntry": true,
