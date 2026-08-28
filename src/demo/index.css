@@ -1817,8 +1817,9 @@ body.in-game .top-nav.home-only { display: none !important; }
 .hud-controls-banner {
   position: fixed;
   bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%) translateY(0);
+  left: 0;
+  right: 0;
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1829,26 +1830,27 @@ body.in-game .top-nav.home-only { display: none !important; }
   border: 1px solid rgba(245, 158, 11, 0.5);
   border-radius: 9999px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(245, 158, 11, 0.18);
-  padding: 8px 16px;
+  padding: 8px 18px;
   color: #f8fafc;
   font-size: 0.82rem;
   z-index: 95;
   pointer-events: auto;
   opacity: 0;
+  transform: translateY(12px);
   transition: opacity 0.35s ease, transform 0.35s ease;
   width: max-content;
-  max-width: min(960px, 92vw);
+  max-width: min(960px, calc(100vw - 32px));
   box-sizing: border-box;
 }
 
 .hud-controls-banner.visible {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
 }
 
 .hud-controls-banner.fade-out {
   opacity: 0;
-  transform: translateX(-50%) translateY(12px);
+  transform: translateY(12px);
   pointer-events: none;
 }
 
@@ -2086,19 +2088,13 @@ body.in-game .top-nav.home-only { display: none !important; }
     min-height: 44px;
     padding: 6px 10px;
   }
-  .hud-controls-banner,
-  .flight-controls-banner,
-  .qs-controls-banner {
-    left: max(10px, env(safe-area-inset-left));
-    right: max(10px, env(safe-area-inset-right));
-    bottom: calc(82px + env(safe-area-inset-bottom));
-    transform: none;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px;
-    padding: 6px 8px;
-    font-size: 0.72rem;
-    animation: none;
+  .hud-controls-banner {
+    bottom: calc(24px + env(safe-area-inset-bottom));
+    width: max-content;
+    max-width: calc(100vw - 20px);
+    padding: 6px 12px;
+    font-size: 0.76rem;
+    border-radius: 16px;
   }
   .flight-bottom-slider-bar {
     left: max(10px, env(safe-area-inset-left));
