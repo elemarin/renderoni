@@ -69,18 +69,23 @@ export class QuickstartGame {
     await this.engine.init();
 
     const scene = this.engine.native.scene;
+    const camera = this.engine.native.camera;
     scene.background = new THREE.Color(0x38bdf8);
-    scene.fog = new THREE.FogExp2(0x38bdf8, 0.012);
+    scene.fog = new THREE.Fog(0x38bdf8, 40, 140);
 
     // 1. Lighting
-    this.engine.add(light({ type: 'directional', intensity: 2.6, position: [30, 50, 20] }));
-    this.engine.add(light({ type: 'ambient', intensity: 0.7, color: 0xffffff }));
+    this.engine.add(light({ type: 'directional', intensity: 1.4, position: [30, 50, 20] }));
+    this.engine.add(light({ type: 'ambient', intensity: 0.4, color: 0xffffff }));
 
     // 2. Arena Arena Floor & Boundary Walls
     this.buildArenaEnvironment();
 
     // 3. Spawn Hero KCC Player
     this.spawnHero();
+
+    // Set initial camera position immediately behind hero
+    camera.position.set(0, 1.2 + 6.5, 10 + 14);
+    camera.lookAt(0, 1.2 + 1.2, 10);
 
     // 4. Build Obstacle Course: Platforms, Ramps & Trampolines
     this.buildObstacleCourse();

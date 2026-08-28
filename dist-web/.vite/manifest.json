@@ -1,86 +1,97 @@
 {
-  "_index-XCAYoxTK.js": {
-    "file": "assets/index-XCAYoxTK.js",
+  "_engine-CJMXxu92.js": {
+    "file": "assets/engine-CJMXxu92.js",
+    "name": "engine"
+  },
+  "_index-1ieoVVvP.js": {
+    "file": "assets/index-1ieoVVvP.js",
+    "name": "index",
+    "imports": [
+      "_engine-CJMXxu92.js"
+    ]
+  },
+  "_index-Cnt2xlfM.js": {
+    "file": "assets/index-Cnt2xlfM.js",
     "name": "index"
   },
-  "_kcc-player-DvZjpprs.js": {
-    "file": "assets/kcc-player-DvZjpprs.js",
+  "_kcc-player-Ofi0XzwU.js": {
+    "file": "assets/kcc-player-Ofi0XzwU.js",
     "name": "kcc-player",
     "imports": [
-      "_index-XCAYoxTK.js"
+      "_engine-CJMXxu92.js",
+      "_index-Cnt2xlfM.js"
     ]
   },
-  "_light-q_2pY-7B.js": {
-    "file": "assets/light-q_2pY-7B.js",
+  "_light-DRSEid2M.js": {
+    "file": "assets/light-DRSEid2M.js",
     "name": "light",
     "imports": [
-      "_index-XCAYoxTK.js"
-    ]
-  },
-  "_vanilla-B8Iv34dU.js": {
-    "file": "assets/vanilla-B8Iv34dU.js",
-    "name": "vanilla",
-    "imports": [
-      "_index-XCAYoxTK.js"
+      "_engine-CJMXxu92.js",
+      "_index-Cnt2xlfM.js"
     ]
   },
   "index.html": {
-    "file": "assets/index-__HEpT2l.js",
+    "file": "assets/index-DIE9FGKv.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
     "dynamicImports": [
       "src/demo/home-scene.ts",
+      "src/demo/games/alpendrop/game.ts",
       "src/demo/games/echoes-of-blackwood/game.ts",
-      "src/demo/games/skyward-courier/game.ts",
       "src/demo/quickstart-game.ts"
     ],
     "css": [
-      "assets/index-06AJ46hV.css"
+      "assets/index-Cl92zSXe.css"
+    ]
+  },
+  "src/demo/games/alpendrop/game.ts": {
+    "file": "assets/game-BK4n7cwA.js",
+    "name": "game",
+    "src": "src/demo/games/alpendrop/game.ts",
+    "isDynamicEntry": true,
+    "imports": [
+      "_engine-CJMXxu92.js",
+      "_index-1ieoVVvP.js"
+    ],
+    "css": [
+      "assets/game-CIiUBi2l.css"
     ]
   },
   "src/demo/games/echoes-of-blackwood/game.ts": {
-    "file": "assets/game-CKK2gyaT.js",
+    "file": "assets/game-CgOeBwtv.js",
     "name": "game",
     "src": "src/demo/games/echoes-of-blackwood/game.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_index-XCAYoxTK.js",
-      "_vanilla-B8Iv34dU.js",
-      "_kcc-player-DvZjpprs.js"
-    ]
-  },
-  "src/demo/games/skyward-courier/game.ts": {
-    "file": "assets/game-DQGeKEDX.js",
-    "name": "game",
-    "src": "src/demo/games/skyward-courier/game.ts",
-    "isDynamicEntry": true,
-    "imports": [
-      "_index-XCAYoxTK.js",
-      "_vanilla-B8Iv34dU.js",
-      "_light-q_2pY-7B.js"
+      "_engine-CJMXxu92.js",
+      "_index-Cnt2xlfM.js",
+      "_index-1ieoVVvP.js",
+      "_kcc-player-Ofi0XzwU.js"
     ]
   },
   "src/demo/home-scene.ts": {
-    "file": "assets/home-scene-BazgO5Zh.js",
+    "file": "assets/home-scene-CZiX2Qr_.js",
     "name": "home-scene",
     "src": "src/demo/home-scene.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_index-XCAYoxTK.js",
-      "_light-q_2pY-7B.js"
+      "_engine-CJMXxu92.js",
+      "_light-DRSEid2M.js",
+      "_index-Cnt2xlfM.js"
     ]
   },
   "src/demo/quickstart-game.ts": {
-    "file": "assets/quickstart-game-DDDSHjMA.js",
+    "file": "assets/quickstart-game-YtDXSeIU.js",
     "name": "quickstart-game",
     "src": "src/demo/quickstart-game.ts",
     "isDynamicEntry": true,
     "imports": [
-      "_index-XCAYoxTK.js",
+      "_engine-CJMXxu92.js",
       "index.html",
-      "_light-q_2pY-7B.js",
-      "_kcc-player-DvZjpprs.js"
+      "_light-DRSEid2M.js",
+      "_index-Cnt2xlfM.js",
+      "_kcc-player-Ofi0XzwU.js"
     ]
   }
 }

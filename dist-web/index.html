@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="./assets/index-__HEpT2l.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-06AJ46hV.css">
+    <script type="module" crossorigin src="./assets/index-DIE9FGKv.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Cl92zSXe.css">
   </head>
   <body>
     <!-- 3D WebGL Canvas -->
@@ -35,8 +35,65 @@
         
         <div class="carousel-viewport">
           <div id="album-track" class="album-track">
-            <!-- Card 0: PSX Horror -->
-            <article class="album-card" data-index="0" data-game="psx">
+            <!-- Card 0: AlpenDrop (First & Flagship Demo!) -->
+            <article class="album-card active" data-index="0" data-game="alpendrop">
+              <div class="card-artwork alpendrop-art">
+                <svg viewBox="0 0 400 240" class="art-svg" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <linearGradient id="alpenBg" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#0284c7" />
+                      <stop offset="55%" stop-color="#38bdf8" />
+                      <stop offset="100%" stop-color="#fef08a" />
+                    </linearGradient>
+                    <linearGradient id="alpenSnow" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#ffffff" />
+                      <stop offset="100%" stop-color="#e2e8f0" />
+                    </linearGradient>
+                    <linearGradient id="alpenRock" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#475569" />
+                      <stop offset="100%" stop-color="#1e293b" />
+                    </linearGradient>
+                  </defs>
+                  <!-- Sky & Alpine Sun -->
+                  <rect width="400" height="240" fill="url(#alpenBg)" />
+                  <circle cx="200" cy="190" r="85" fill="#fef08a" fill-opacity="0.6" />
+                  <!-- Distant Alpine Peaks (Matterhorn style) -->
+                  <polygon points="60,240 130,90 200,240" fill="url(#alpenRock)" />
+                  <polygon points="110,135 130,90 150,135 130,125" fill="url(#alpenSnow)" />
+                  <polygon points="160,240 250,60 340,240" fill="url(#alpenRock)" />
+                  <polygon points="220,120 250,60 280,120 250,105" fill="url(#alpenSnow)" />
+                  <polygon points="290,240 360,110 430,240" fill="url(#alpenRock)" />
+                  <polygon points="340,150 360,110 380,150" fill="url(#alpenSnow)" />
+                  <!-- Pine Forest Valley -->
+                  <path d="M0 215 Q80 180 180 205 T400 195 L400 240 L0 240 Z" fill="#065f46" />
+                  <path d="M0 225 Q120 205 240 220 T400 215 L400 240 L0 240 Z" fill="#047857" />
+                  <!-- Delivery Drone with Magnetic Sling & Parcel -->
+                  <g transform="translate(200, 85) scale(1.15)">
+                    <!-- Drone Arms & Motors -->
+                    <line x1="-32" y1="-14" x2="32" y2="14" stroke="#0f172a" stroke-width="4" stroke-linecap="round" />
+                    <line x1="-32" y1="14" x2="32" y2="-14" stroke="#0f172a" stroke-width="4" stroke-linecap="round" />
+                    <!-- Rotor Blur Discs -->
+                    <ellipse cx="-32" cy="-14" rx="14" ry="4" fill="#38bdf8" fill-opacity="0.7" />
+                    <ellipse cx="32" cy="14" rx="14" ry="4" fill="#38bdf8" fill-opacity="0.7" />
+                    <ellipse cx="-32" cy="14" rx="14" ry="4" fill="#38bdf8" fill-opacity="0.7" />
+                    <ellipse cx="32" cy="-14" rx="14" ry="4" fill="#38bdf8" fill-opacity="0.7" />
+                    <!-- Drone Central Pod & LED -->
+                    <ellipse cx="0" cy="0" rx="16" ry="10" fill="#dc2626" />
+                    <circle cx="0" cy="0" r="4" fill="#ffffff" />
+                    <!-- Winch Cable & Electro-Magnet -->
+                    <line x1="0" y1="10" x2="0" y2="38" stroke="#facc15" stroke-width="2.5" />
+                    <rect x="-6" y="38" width="12" height="6" rx="2" fill="#1e293b" />
+                    <!-- Parcel (Strudel Box / Cheese Wheel) -->
+                    <rect x="-10" y="44" width="20" height="15" rx="3" fill="#d97706" stroke="#b45309" stroke-width="1.5" />
+                    <line x1="-10" y1="51.5" x2="10" y2="51.5" stroke="#fef08a" stroke-width="2" />
+                  </g>
+                </svg>
+              </div>
+              <h2 class="card-title">AlpenDrop</h2>
+            </article>
+
+            <!-- Card 1: PSX Horror -->
+            <article class="album-card" data-index="1" data-game="psx">
               <div class="card-artwork psx-art">
                 <svg viewBox="0 0 400 240" class="art-svg" preserveAspectRatio="xMidYMid slice">
                   <defs>
@@ -83,58 +140,7 @@
               <h2 class="card-title">Echoes of Blackwood</h2>
             </article>
 
-            <!-- Card 1: Flight -->
-            <article class="album-card" data-index="1" data-game="flight">
-              <div class="card-artwork flight-art">
-                <svg viewBox="0 0 400 240" class="art-svg" preserveAspectRatio="xMidYMid slice">
-                  <defs>
-                    <linearGradient id="flightBg" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stop-color="#0369a1" />
-                      <stop offset="50%" stop-color="#38bdf8" />
-                      <stop offset="100%" stop-color="#fbbf24" />
-                    </linearGradient>
-                    <linearGradient id="sunRay" x1="0%" y1="100%" x2="100%" y2="0%">
-                      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.7" />
-                      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <!-- Sky & Sunset -->
-                  <rect width="400" height="240" fill="url(#flightBg)" />
-                  <circle cx="200" cy="180" r="90" fill="#fef08a" fill-opacity="0.5" />
-                  <!-- Sun Rays -->
-                  <polygon points="200,180 50,0 120,0" fill="url(#sunRay)" />
-                  <polygon points="200,180 280,0 350,0" fill="url(#sunRay)" />
-                  <!-- Distant Islands -->
-                  <path d="M0 210 Q60 180 140 210 T280 200 Q340 175 400 210 L400 240 L0 240 Z" fill="#047857" />
-                  <path d="M80 240 Q130 195 200 225 T320 215 L400 240 L0 240 Z" fill="#065f46" />
-                  <rect y="225" width="400" height="15" fill="#0284c7" />
-                  <!-- Clouds -->
-                  <ellipse cx="60" cy="90" rx="45" ry="18" fill="#ffffff" fill-opacity="0.8" />
-                  <ellipse cx="90" cy="80" rx="35" ry="22" fill="#ffffff" fill-opacity="0.9" />
-                  <ellipse cx="330" cy="110" rx="55" ry="20" fill="#ffffff" fill-opacity="0.7" />
-                  <!-- Airplane Silhouette Banking -->
-                  <g transform="translate(180, 85) rotate(-18) scale(1.1)">
-                    <!-- Fuselage -->
-                    <ellipse cx="0" cy="0" rx="42" ry="9" fill="#0f172a" />
-                    <circle cx="42" cy="0" r="3" fill="#f59e0b" />
-                    <!-- Wings -->
-                    <path d="M-6 -3 L-24 -48 L6 -48 L10 -3 Z" fill="#1e293b" />
-                    <path d="M-6 3 L-24 48 L6 48 L10 3 Z" fill="#1e293b" />
-                    <!-- Tail -->
-                    <path d="M-36 0 L-48 -20 L-38 -20 L-30 0 Z" fill="#b91c1c" />
-                    <path d="M-36 0 L-46 -12 L-40 -12 L-32 0 Z" fill="#0f172a" />
-                    <!-- Propeller blur -->
-                    <ellipse cx="44" cy="0" rx="2" ry="24" fill="#ffffff" fill-opacity="0.6" />
-                    <!-- Wingtip Trails -->
-                    <path d="M-24 -48 Q-70 -54 -120 -60" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7" />
-                    <path d="M-24 48 Q-70 54 -120 60" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7" />
-                  </g>
-                </svg>
-              </div>
-              <h2 class="card-title">Skyward Courier</h2>
-            </article>
-            <!-- Card 2 was Monolith; removed -->
-            <!-- Card 4: Quickstart -->
+            <!-- Card 2: Quickstart -->
             <article class="album-card" data-index="2" data-game="quickstart">
               <div class="card-artwork quickstart-art">
                 <svg viewBox="0 0 400 240" class="art-svg" preserveAspectRatio="xMidYMid slice">
@@ -183,8 +189,8 @@
 
       <!-- Carousel Pagination Dots -->
       <div id="album-dots" class="album-dots-container">
-        <button class="album-dot active" data-index="0" title="Echoes of Blackwood"></button>
-        <button class="album-dot" data-index="1" title="Skyward Courier"></button>
+        <button class="album-dot active" data-index="0" title="AlpenDrop"></button>
+        <button class="album-dot" data-index="1" title="Echoes of Blackwood"></button>
         <button class="album-dot" data-index="2" title="Golden Quickstart"></button>
       </div>
 
@@ -192,13 +198,13 @@
         <button id="btn-launch-game" type="button">Play</button>
       </div>
       <nav id="game-shelf" class="game-shelf" aria-label="Library">
-        <button type="button" class="shelf-item active" data-index="0" data-mode="psx">
+        <button type="button" class="shelf-item active" data-index="0" data-mode="alpendrop">
+          <span class="shelf-art alpendrop-art"></span>
+          <span>AlpenDrop</span>
+        </button>
+        <button type="button" class="shelf-item" data-index="1" data-mode="psx">
           <span class="shelf-art psx-art"></span>
           <span>Echoes</span>
-        </button>
-        <button type="button" class="shelf-item" data-index="1" data-mode="flight">
-          <span class="shelf-art flight-art"></span>
-          <span>Skyward</span>
         </button>
         <button type="button" class="shelf-item" data-index="2" data-mode="quickstart">
           <span class="shelf-art quickstart-art"></span>
@@ -208,7 +214,7 @@
       <div hidden>
         <span id="spotlight-badge"></span>
         <span id="spotlight-genre"></span>
-        <span id="spotlight-title">Echoes of Blackwood</span>
+        <span id="spotlight-title">AlpenDrop</span>
         <span id="spotlight-subtitle"></span>
         <span id="spotlight-desc"></span>
         <div id="spotlight-features"></div>

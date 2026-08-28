@@ -12,7 +12,7 @@ import type { RenderoniEngine } from '../core/engine.js';
 import { RENDERONI_VERSION } from '../version.js';
 import { sfx } from './audio-sfx.js';
 
-export type GameMode = 'home' | 'psx' | 'flight' | 'quickstart';
+export type GameMode = 'home' | 'alpendrop' | 'psx' | 'quickstart';
 
 export interface GameMetadata {
   id: GameMode;
@@ -48,18 +48,22 @@ interface PsxGameScene extends DemoScene {
   getHoverPrompt(): string | null;
 }
 
-interface FlightGameScene extends DemoScene {
-  setThrottle(percent: number): void;
+interface AlpendropGameScene extends DemoScene {
   getTelemetry(): {
+    vehicleName: string;
     speedKmh: number;
     altitudeM: number;
     verticalSpeedMs: number;
     throttlePercent: number;
-    flightPhase: string;
-    phaseLabel: string;
-    ringsCleared: number;
-    totalRings: number;
-    objective: string;
+    batteryPercent: number;
+    pitchDeg: number;
+    rollDeg: number;
+    yawDeg: number;
+    isAirborne: boolean;
+    isStalling: boolean;
+    windSpeedMs: number;
+    hasCargoAttached: boolean;
+    viewMode: string;
   };
 }
 
@@ -74,6 +78,40 @@ interface QuickstartGameScene extends DemoScene {
 }
 
 export const GAMES_METADATA: Record<string, GameMetadata> = {
+  alpendrop: {
+    id: 'alpendrop',
+    title: 'AlpenDrop',
+    subtitle: 'Cozy Alpine Drone & RC Plane Delivery Agency',
+    genre: 'COZY AERIAL DELIVERY SIM',
+    badge: '🚁 MULTIROTOR & RC PLANE',
+    accentColor: '#38bdf8',
+    themeColorHex: 0x0284c7,
+    description: 'Pilot nimble multirotor drones and agile RC gliders through a breathtaking 960m alpine mountain archipelago. Latch fragile deliveries with your electro-magnetic winch cable, ride ridge thermals, deliver strudels and cheese wheels across three bustling towns, and expand your postal fleet.',
+    features: [
+      '🚁 6-DOF Multirotor Drone & RC Airplane Flight Dynamics with Gyro Assists',
+      '🧲 Physics-Driven Electro-Magnetic Sling Cable with Fragility Impact Damage',
+      '🏔️ Expansive 960m Alpine Valley with 3 Bustling Towns & Summit Helipads',
+      '💨 Dynamic 3D Thermal Updrafts, Mountain Ridge Winds & FPV Cockpit Camera',
+    ],
+    controls: [
+      { key: 'Shift / Space', desc: 'Throttle Up (Climb / Accelerate)' },
+      { key: 'Ctrl / C', desc: 'Throttle Down / Cycle Camera View' },
+      { key: 'W / S', desc: 'Pitch Forward / Back' },
+      { key: 'A / D', desc: 'Roll Bank Left / Right' },
+      { key: 'Q / E', desc: 'Yaw Rudder Left / Right' },
+      { key: 'F', desc: 'Arm / Release Magnetic Sling Cable' },
+      { key: 'H', desc: 'Open Post Office Jobs & Agency Hangar' },
+      { key: 'R', desc: 'Reset Aircraft to Helipad' },
+    ],
+    quickActions: [
+      { label: '🧲 Sling / Drop (F)', action: 'cargo.toggleMagnet' },
+      { label: '🎥 View Mode (C)', action: 'flight.cycleCamera' },
+      { label: '🧭 Dev Assists (O)', action: 'flight.toggleDevAssist' },
+      { label: '⚡ Max Throttle', action: 'flight.setThrottle', payload: 1.0 },
+      { label: '🛑 Idle Throttle', action: 'flight.setThrottle', payload: 0.0 },
+      { label: '🔄 Reset Aircraft (R)', action: 'flight.reset' },
+    ],
+  },
   psx: {
     id: 'psx',
     title: 'Echoes of Blackwood',
@@ -103,40 +141,6 @@ export const GAMES_METADATA: Record<string, GameMetadata> = {
       { label: '🛡️ Pickup Crest', action: 'quest.pickupCrest' },
       { label: '🚪 Escape Gate', action: 'quest.unlockGate' },
       { label: '🔦 Flashlight (F)', action: 'player.toggleFlashlight' },
-    ],
-  },
-  flight: {
-    id: 'flight',
-    title: 'Skyward Courier',
-    subtitle: 'Island Airport Takeoff & Runway Landing',
-    genre: 'AUTHENTIC FLIGHT SIM',
-    badge: '✈️ 6-DOF AERODYNAMICS',
-    accentColor: '#38bdf8',
-    themeColorHex: 0x0284c7,
-    description: 'Experience the thrill of a complete flight lifecycle! Start your engine (I), taxi down the 400m asphalt runway, rotate at 80 km/h for takeoff, navigate through aerial checkpoint rings, and flare for a smooth runway touchdown with tire smoke & brakes.',
-    features: [
-      '🛫 Realistic Runway Takeoff Roll & Engine Start Ignition (I)',
-      '🛬 Smooth Runway Landing, Tire Screech SFX & Wheel Brakes (B)',
-      '🏆 6 Aerial Checkpoint Rings across Tropical Island Valleys',
-      '💨 Wingtip Vapor Trails & Dual Cockpit/Chase Camera Views (C)',
-    ],
-    controls: [
-      { key: 'I', desc: 'Start Engine (Ignition)' },
-      { key: 'Shift / Ctrl', desc: 'Throttle Up / Down' },
-      { key: 'W / S', desc: 'Pitch Down / Stick Pull (Rotate)' },
-      { key: 'A / D', desc: 'Steer on Ground / Bank in Air' },
-      { key: 'B', desc: 'Hold Wheel Brakes (Ground)' },
-      { key: 'Space', desc: 'Afterburner Turbo Boost' },
-      { key: 'C', desc: 'Toggle Cockpit / Chase View' },
-      { key: 'R', desc: 'Reset to Runway Threshold' },
-    ],
-    quickActions: [
-      { label: '🔑 Start Engine (I)', action: 'flight.startEngine' },
-      { label: '⚡ Max Throttle (Z)', action: 'flight.setThrottle', payload: { percent: 100 } },
-      { label: '🛑 Idle Throttle (X)', action: 'flight.setThrottle', payload: { percent: 0 } },
-      { label: '🛑 Wheel Brakes (B)', action: 'flight.setBrakes' },
-      { label: '🎥 View (C)', action: 'flight.toggleView' },
-      { label: '🔄 Reset to Runway (R)', action: 'flight.reset' },
     ],
   },
   quickstart: {
@@ -171,7 +175,7 @@ export const GAMES_METADATA: Record<string, GameMetadata> = {
   },
 };
 
-const GAME_ORDER: GameMode[] = ['psx', 'flight', 'quickstart'];
+const GAME_ORDER: GameMode[] = ['alpendrop', 'psx', 'quickstart'];
 
 class PlaygroundApp {
   private activeMode: GameMode = 'home';
@@ -988,14 +992,14 @@ class PlaygroundApp {
 
       let nextGame: DemoScene | null = null;
       try {
-        if (mode === 'psx') {
+        if (mode === 'alpendrop') {
+          const { AlpenDropGame } = await import('./games/alpendrop/game.js');
+          if (token !== this.loadingToken) return;
+          nextGame = new AlpenDropGame(this.canvas);
+        } else if (mode === 'psx') {
           const { EchoesOfBlackwoodGame } = await import('./games/echoes-of-blackwood/game.js');
           if (token !== this.loadingToken) return;
           nextGame = new EchoesOfBlackwoodGame(this.canvas);
-        } else if (mode === 'flight') {
-          const { SkywardCourierGame } = await import('./games/skyward-courier/game.js');
-          if (token !== this.loadingToken) return;
-          nextGame = new SkywardCourierGame(this.canvas);
         } else if (mode === 'quickstart') {
           const { QuickstartGame } = await import('./quickstart-game.js');
           if (token !== this.loadingToken) return;
@@ -1008,10 +1012,19 @@ class PlaygroundApp {
           return;
         }
         this.currentGame = nextGame;
+        if (this.currentGame?.engine?.loop?.phase === 'ready') {
+          this.currentGame.engine.loop.start();
+        }
         nextGame = null;
-        if (mode === 'psx') this.mountPsxHUD();
-        if (mode === 'flight') this.mountFlightHUD();
-        if (mode === 'quickstart') this.mountQuickstartHUD();
+        if (mode === 'alpendrop') {
+          this.mountAlpendropHUD();
+        } else if (mode === 'psx') {
+          this.hudContainer.style.display = 'block';
+          this.mountPsxHUD();
+        } else if (mode === 'quickstart') {
+          this.hudContainer.style.display = 'block';
+          this.mountQuickstartHUD();
+        }
         this.resizeActiveScene();
 
         const meta = GAMES_METADATA[mode];
@@ -1024,7 +1037,12 @@ class PlaygroundApp {
   }
 
   private showLoading(mode: GameMode): void {
+    if (mode === 'alpendrop') {
+      this.hudContainer.style.display = 'none';
+      return;
+    }
     const meta = GAMES_METADATA[mode];
+    this.hudContainer.style.display = 'block';
     this.hudContainer.innerHTML = `
       <div class="launcher-status" role="status" aria-live="polite">
         <div class="status-card">
@@ -1096,53 +1114,9 @@ class PlaygroundApp {
     });
   }
 
-  private mountFlightHUD(): void {
-    this.hudContainer.innerHTML = `
-      <div class="game-hud-layout">
-        <div class="hud-top-bar">
-          <div class="hud-objective-pill">
-            <span class="hud-obj-icon">✈️</span>
-            <span id="flight-quest" class="hud-obj-text">Press [I] to Start Engine, then hold [Shift] for Takeoff power</span>
-          </div>
-          <div class="hud-inventory-bar">
-            <div class="flight-inst"><span class="inst-lbl">SPD</span> <span id="flight-speed" class="inst-val">0 km/h</span></div>
-            <div class="flight-inst"><span class="inst-lbl">ALT</span> <span id="flight-alt" class="inst-val">0 m</span></div>
-            <div class="flight-inst"><span class="inst-lbl">VS</span> <span id="flight-vs" class="inst-val">0.0 m/s</span></div>
-            <div class="flight-inst"><span class="inst-lbl">THR</span> <span id="flight-throttle-val" class="inst-val">0%</span></div>
-            <div class="flight-inst"><span class="inst-lbl">PHASE</span> <span id="flight-state" class="inst-val tag tag-green">PARKED</span></div>
-            <div class="flight-inst"><span class="inst-lbl">RINGS</span> <span id="flight-rings" class="inst-val tag tag-blue">0 / 6</span></div>
-            <button class="btn-pause-chip" id="btn-pause-flight" title="Pause Menu (ESC)">⚙️ ESC</button>
-          </div>
-        </div>
-        <div class="hud-reticle-dot"></div>
-        <div id="flight-controls-banner" class="hud-controls-banner">
-          <span><kbd>I</kbd> Start Engine</span>
-          <span><kbd>Shift/Ctrl</kbd> Throttle</span>
-          <span><kbd>W/S</kbd> Pitch</span>
-          <span><kbd>A/D</kbd> Bank/Steer</span>
-          <span><kbd>B</kbd> Brakes</span>
-          <span><kbd>C</kbd> View</span>
-          <span><kbd>ESC</kbd> Menu</span>
-        </div>
-        <div class="flight-bottom-slider-bar">
-          <label for="flight-throttle">THR:</label>
-          <input id="flight-throttle" type="range" min="0" max="100" value="0" class="flight-slider" />
-        </div>
-      </div>
-    `;
-
-    document.getElementById('btn-pause-flight')?.addEventListener('click', () => {
-      this.setPaused(true);
-    });
-
-    const throttleInput = document.getElementById('flight-throttle') as HTMLInputElement;
-    throttleInput?.addEventListener('input', (e) => {
-      const val = parseFloat((e.target as HTMLInputElement).value) / 100;
-      (this.currentGame as FlightGameScene)?.setThrottle(val);
-      const label = document.getElementById('flight-throttle-val');
-      if (label) label.textContent = `${Math.round(val * 100)}%`;
-      (document.activeElement as HTMLElement)?.blur();
-    });
+  private mountAlpendropHUD(): void {
+    this.hudContainer.style.display = 'none';
+    this.hudContainer.innerHTML = '';
   }
 
   private mountQuickstartHUD(): void {
@@ -1324,30 +1298,26 @@ class PlaygroundApp {
                 this.inspectModal.style.display = 'none';
               }
             }
-          } else if (this.activeMode === 'flight') {
-            const t = (this.currentGame as FlightGameScene).getTelemetry();
-            const spdEl = document.getElementById('flight-speed');
-            const altEl = document.getElementById('flight-alt');
-            const vsEl = document.getElementById('flight-vs');
-            const stateEl = document.getElementById('flight-state');
-            const ringsEl = document.getElementById('flight-rings');
-            const questEl = document.getElementById('flight-quest');
-            const throttleSlider = document.getElementById('flight-throttle') as HTMLInputElement;
-            const throttleVal = document.getElementById('flight-throttle-val');
+          } else if (this.activeMode === 'alpendrop') {
+            const t = (this.currentGame as AlpendropGameScene)?.getTelemetry?.();
+            if (t) {
+              const spdEl = document.getElementById('alpen-speed');
+              const altEl = document.getElementById('alpen-alt');
+              const batEl = document.getElementById('alpen-bat');
+              const cargoEl = document.getElementById('alpen-cargo');
+              const vehEl = document.getElementById('alpen-veh');
+              const viewEl = document.getElementById('alpen-view');
 
-            if (spdEl) spdEl.textContent = `${t.speedKmh} km/h`;
-            if (altEl) altEl.textContent = `${t.altitudeM} m`;
-            if (vsEl) vsEl.textContent = `${t.verticalSpeedMs >= 0 ? '+' : ''}${t.verticalSpeedMs} m/s`;
-            if (questEl) questEl.textContent = t.objective;
-            if (ringsEl) ringsEl.textContent = `${t.ringsCleared} / ${t.totalRings}`;
-            if (stateEl) {
-              stateEl.textContent = t.phaseLabel;
-              stateEl.className = `val tag ${t.flightPhase === 'airborne' ? 'tag-green' : t.flightPhase === 'touchdown' ? 'tag-orange' : 'tag-blue'}`;
+              if (spdEl) spdEl.textContent = `${Math.round(t.speedKmh)} km/h`;
+              if (altEl) altEl.textContent = `${Math.round(t.altitudeM)} m`;
+              if (batEl) batEl.textContent = `${Math.round(t.batteryPercent)}%`;
+              if (vehEl) vehEl.textContent = t.vehicleName;
+              if (viewEl) viewEl.textContent = (t.viewMode || 'cockpit').toUpperCase();
+              if (cargoEl) {
+                cargoEl.textContent = t.hasCargoAttached ? 'LATCHED' : 'READY';
+                cargoEl.className = `inst-val tag ${t.hasCargoAttached ? 'tag-green' : 'tag-blue'}`;
+              }
             }
-            if (throttleSlider && document.activeElement !== throttleSlider) {
-              throttleSlider.value = t.throttlePercent.toString();
-            }
-            if (throttleVal) throttleVal.textContent = `${t.throttlePercent}%`;
           } else if (this.activeMode === 'quickstart') {
             const t = (this.currentGame as QuickstartGameScene).getTelemetry();
             const posEl = document.getElementById('qs-pos');
@@ -1407,7 +1377,10 @@ class PlaygroundApp {
       return;
     }
     const ph = this.currentGame.engine.loop.phase;
-    if (ph === 'playing') {
+    if (ph === 'ready') {
+      this.currentGame.engine.loop.start();
+    }
+    if (ph === 'playing' || ph === 'ready') {
       this.focusedLoopPhase = null;
       if (this.loopOverlay) {
         this.loopOverlay.style.display = 'none';
@@ -1423,19 +1396,13 @@ class PlaygroundApp {
       document.exitPointerLock?.();
       if (this.loopKicker) this.loopKicker.textContent = this.currentGame.engine.loop.title;
       if (this.loopTitle) {
-        this.loopTitle.textContent =
-          ph === 'ready' ? 'Simulation Ready' : ph === 'won' ? 'Victory!' : 'Game Over';
+        this.loopTitle.textContent = ph === 'won' ? 'Victory!' : 'Game Over';
       }
       if (this.loopBody) {
-        const meta = GAMES_METADATA[this.activeMode];
-        const controlText = ph === 'ready' && meta?.controls?.length
-          ? ` Controls: ${meta.controls.map((c) => `${c.key} ${c.desc}`).join(' · ')}`
-          : '';
-        this.loopBody.textContent = this.currentGame.engine.loop.outcome || `${this.currentGame.engine.loop.subtitle}${controlText}`;
+        this.loopBody.textContent = this.currentGame.engine.loop.outcome || this.currentGame.engine.loop.subtitle;
       }
       if (this.loopAction) {
-        this.loopAction.textContent =
-          ph === 'ready' ? '▶ Start Simulation' : '🔄 Play Again';
+        this.loopAction.textContent = '🔄 Play Again';
       }
       if (this.focusedLoopPhase !== ph) {
         this.focusedLoopPhase = ph;
@@ -1446,11 +1413,7 @@ class PlaygroundApp {
     if (this.loopAction) {
       this.loopAction.onclick = () => {
         sfx.playMenuSelect();
-        if (ph === 'ready') {
-          this.currentGame?.engine.loop.start();
-        } else {
-          void this.restartCurrentGame();
-        }
+        void this.restartCurrentGame();
       };
     }
   }

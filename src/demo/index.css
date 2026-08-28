@@ -1615,8 +1615,8 @@ body.in-game .top-nav.home-only { display: none !important; }
   width: 100%;
 }
 .shelf-item span:last-child { padding: 6px 8px; text-align: left; }
+.alpendrop-art { background: linear-gradient(135deg, #0284c7, #38bdf8, #fef08a); }
 .psx-art { background: linear-gradient(135deg, #18040a, #881337); }
-.flight-art { background: linear-gradient(135deg, #0369a1, #fbbf24); }
 .quickstart-art { background: linear-gradient(135deg, #1e1b4b, #f59e0b); }
 
 .home-play { left: auto; right: 48px; bottom: 48px; }

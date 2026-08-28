@@ -1,0 +1,1048 @@
+/* AlpenDrop: Modern Alpine Aero Glass Avionics & UI */
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --glass-bg: rgba(15, 23, 42, 0.88);
+  --glass-border: rgba(245, 158, 11, 0.45);
+  --glass-border-subtle: rgba(148, 163, 184, 0.25);
+  --glass-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --alpine-gold: #facc15;
+  --alpine-amber: #f59e0b;
+  --alpine-green: #22c55e;
+  --alpine-red: #ef4444;
+  --alpine-sky: #38bdf8;
+  --alpine-cream: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0f172a;
+  font-family: 'Outfit', sans-serif;
+  color: #f8fafc;
+}
+
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Master HUD Overlay */
+#ui-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 22px;
+}
+
+.interactive {
+  pointer-events: auto;
+}
+
+/* ==========================================================================
+   TOP BAR: UNIFIED AVIONICS DASHBOARD
+   ========================================================================== */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* 1. Agency Postal Badge */
+.agency-badge {
+  background: var(--glass-bg);
+  border: 1.5px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 8px 14px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.agency-badge:hover {
+  transform: translateY(-2px);
+  border-color: var(--alpine-gold);
+}
+
+.agency-logo {
+  font-size: 24px;
+}
+
+.agency-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.agency-title {
+  font-family: 'Fredoka', cursive;
+  font-size: 14px;
+  color: var(--alpine-gold);
+  font-weight: 600;
+}
+
+.agency-stats {
+  display: flex;
+  gap: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stat-francs {
+  color: var(--alpine-gold);
+}
+
+.stat-stamps {
+  color: var(--alpine-sky);
+}
+
+/* 2. Top Center Cluster */
+.top-center-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.compass-module {
+  background: var(--glass-bg);
+  border: 1.5px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 4px 10px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.compass-tape-pointer {
+  color: var(--alpine-gold);
+  font-size: 9px;
+  line-height: 1;
+  margin-bottom: -2px;
+  filter: drop-shadow(0 0 3px var(--alpine-gold));
+}
+
+#compass-tape-canvas {
+  display: block;
+}
+
+.compass-sub-bar {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  font-size: 10.5px;
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 2px;
+  color: #cbd5e1;
+}
+
+.compass-heading-text {
+  font-weight: 700;
+  color: var(--alpine-gold);
+}
+
+.waypoint-info {
+  color: #94a3b8;
+}
+
+.quest-pill {
+  background: rgba(15, 23, 42, 0.92);
+  border: 1.5px solid var(--alpine-sky);
+  border-radius: 10px;
+  padding: 6px 14px;
+  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.25);
+  backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 480px;
+  text-align: center;
+}
+
+.quest-step-text {
+  font-family: 'Fredoka', cursive;
+  font-size: 14px;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.quest-subtext {
+  font-size: 11.5px;
+  color: #94a3b8;
+}
+
+/* 3. Top Right Cluster (Radar + Controls) */
+.top-right-cluster {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.radar-container {
+  background: var(--glass-bg);
+  border: 1.5px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 4px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#radar-canvas {
+  display: block;
+  border-radius: 10px;
+}
+
+.top-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-pill {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: #f8fafc;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.hud-pill:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: var(--alpine-gold);
+  transform: translateX(-2px);
+}
+
+.hud-pill.active {
+  border-color: var(--alpine-green);
+  color: var(--alpine-green);
+}
+
+/* ==========================================================================
+   BOTTOM BAR: FLIGHT TELEMETRY & TICKET
+   ========================================================================== */
+.bottom-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.flight-deck {
+  background: var(--glass-bg);
+  border: 1.5px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gauges-cluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.gauge-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 54px;
+}
+
+.gauge-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.gauge-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.gauge-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.throttle-deck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  padding-top: 5px;
+}
+
+.throttle-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--alpine-gold);
+}
+
+.throttle-bar-container {
+  width: 150px;
+  height: 8px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.throttle-fill {
+  height: 100%;
+  background: var(--alpine-green);
+  width: 50%;
+  transition: width 0.05s ease;
+}
+
+/* Active Postage Card */
+.postage-ticket {
+  background: var(--glass-bg);
+  border: 1.5px solid var(--glass-border);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(12px);
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ticket-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 4px;
+}
+
+.ticket-title {
+  font-family: 'Fredoka', cursive;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--alpine-gold);
+}
+
+.ticket-stamp {
+  background: var(--alpine-red);
+  color: white;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.ticket-body {
+  font-size: 12.5px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.health-bar-container {
+  width: 100%;
+  height: 10px;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 5px;
+  overflow: hidden;
+  position: relative;
+}
+
+.health-fill {
+  height: 100%;
+  background: var(--alpine-green);
+  width: 100%;
+  transition: width 0.1s ease, background-color 0.2s ease;
+}
+
+.health-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 10px;
+  text-shadow: 0 0 2px rgba(0,0,0,0.8);
+}
+
+.ticket-hint {
+  font-size: 10.5px;
+  color: #94a3b8;
+  text-align: center;
+  margin-top: 2px;
+}
+
+.ticket-hint strong {
+  color: var(--alpine-gold);
+}
+
+/* ==========================================================================
+   MODALS (JOB BOARD, HANGAR, WORKSHOP & RESULTS)
+   ========================================================================== */
+.modal-backdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(10px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.modal-card {
+  background: rgba(15, 23, 42, 0.96);
+  border: 2px solid var(--alpine-amber);
+  border-radius: 20px;
+  padding: 24px 30px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+  max-width: 680px;
+  width: 92%;
+  max-height: 85vh;
+  overflow-y: auto;
+  color: #f8fafc;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1.5px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-title {
+  font-family: 'Fredoka', cursive;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--alpine-gold);
+}
+
+.btn-close {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid var(--glass-border-subtle);
+  border-radius: 8px;
+  color: #cbd5e1;
+  font-size: 18px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background 0.15s ease;
+}
+
+.btn-close:hover {
+  background: var(--alpine-red);
+  color: white;
+}
+
+/* Modal Tabs */
+.modal-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  padding-bottom: 8px;
+}
+
+.modal-tab {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  padding: 8px 16px;
+  color: #cbd5e1;
+  font-family: 'Outfit', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-tab:hover {
+  background: rgba(51, 65, 85, 0.8);
+  color: #ffffff;
+  border-color: var(--alpine-gold);
+}
+
+.modal-tab.active {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  color: #0f172a;
+  font-weight: 700;
+  border-color: var(--alpine-gold);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+/* Grid & Cards */
+.jobs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.modal-item-card {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-item-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--alpine-gold);
+  background: rgba(30, 41, 59, 0.95);
+}
+
+.modal-item-card.equipped {
+  border-color: var(--alpine-green);
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.2);
+}
+
+.modal-item-card.locked {
+  opacity: 0.65;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-title {
+  font-family: 'Fredoka', cursive;
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.card-desc {
+  font-size: 12.5px;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.badge-weight, .badge-tier {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid var(--alpine-amber);
+  color: var(--alpine-gold);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.route-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--alpine-sky);
+  font-weight: 600;
+}
+
+.route-arrow {
+  color: var(--alpine-gold);
+}
+
+.dialogue-quote {
+  font-size: 12.5px;
+  font-style: italic;
+  color: #94a3b8;
+  border-left: 2px solid var(--alpine-gold);
+  padding-left: 8px;
+  margin: 2px 0;
+}
+
+.order-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.5);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.order-specs strong {
+  color: #ffffff;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.reward-pill {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--alpine-gold);
+}
+
+/* Action Buttons */
+.btn-action {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-accept, .btn-buy {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #0f172a;
+}
+
+.btn-accept:hover, .btn-buy:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);
+  filter: brightness(1.1);
+}
+
+.btn-equipped {
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid var(--alpine-green);
+  color: var(--alpine-green);
+  cursor: default;
+}
+
+.btn-locked {
+  background: rgba(51, 65, 85, 0.5);
+  color: #94a3b8;
+  cursor: not-allowed;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.badge-installed {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--alpine-green);
+}
+
+/* Grade Badges */
+.grade-badge {
+  font-family: 'Fredoka', cursive;
+  font-size: 48px;
+  font-weight: 700;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.grade-S {
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #0f172a;
+  border: 3px solid #fef08a;
+}
+
+.grade-A {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  color: #0f172a;
+  border: 3px solid #bbf7d0;
+}
+
+.grade-B {
+  background: linear-gradient(135deg, #38bdf8, #0284c7);
+  color: #ffffff;
+  border: 3px solid #bae6fd;
+}
+
+.grade-C {
+  background: linear-gradient(135deg, #94a3b8, #64748b);
+  color: #ffffff;
+  border: 3px solid #cbd5e1;
+}
+
+/* ==========================================================================
+   FPV DRONE LENS & OSD OVERLAY
+   Only visible in drone cockpit view so the shot reads as a real
+   camera looking out from the airframe rather than a free-flying camera.
+   ========================================================================== */
+#fpv-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+#fpv-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Wide-angle lens: heavy corner vignette plus a warm chromatic fringe */
+.fpv-lens {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 78% 78% at 50% 50%, transparent 42%, rgba(3, 7, 12, 0.55) 82%, rgba(2, 5, 9, 0.9) 100%),
+    radial-gradient(ellipse 96% 96% at 50% 50%, transparent 68%, rgba(120, 190, 255, 0.09) 88%, rgba(255, 120, 90, 0.11) 100%);
+}
+
+/* Greasy smudge across the glass, catching the light off-centre */
+.fpv-smudge {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  background:
+    radial-gradient(ellipse 26% 16% at 27% 34%, rgba(255, 255, 255, 0.11), transparent 70%),
+    radial-gradient(ellipse 18% 12% at 71% 66%, rgba(255, 246, 220, 0.09), transparent 72%),
+    radial-gradient(ellipse 34% 9% at 55% 15%, rgba(200, 230, 255, 0.07), transparent 75%);
+}
+
+/* Hairline scratches etched into the lens coating */
+.fpv-scratches {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: screen;
+  opacity: 0.32;
+}
+
+.fpv-scratches path {
+  fill: none;
+  stroke: rgba(226, 242, 255, 0.75);
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Dust specks stuck to the sensor */
+.fpv-dust span {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(228, 236, 245, 0.2);
+  box-shadow: 0 0 3px rgba(228, 236, 245, 0.28);
+}
+
+/* Recording OSD, mimicking an action-cam burn-in */
+.fpv-osd {
+  position: absolute;
+  top: 92px;
+  left: 26px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: rgba(233, 242, 250, 0.62);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+.fpv-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 168, 158, 0.85);
+}
+
+.fpv-rec i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.9);
+  animation: fpvRec 1.5s steps(1, end) infinite;
+}
+
+@keyframes fpvRec {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0.15; }
+}
+
+/* Centre horizon reticle burned into the camera feed */
+.fpv-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 132px;
+  height: 12px;
+}
+
+.fpv-tick {
+  position: absolute;
+  top: 50%;
+  width: 34px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.fpv-tick-l { left: 0; }
+.fpv-tick-r { right: 0; }
+
+.fpv-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* ==========================================================================
+   MISSION NOTICES
+   Non-blocking, GTA-style "mission passed" cards that slide in over the HUD
+   instead of interrupting the flight with a full-screen modal.
+   ========================================================================== */
+#notice-stack {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  width: max-content;
+  max-width: min(560px, 82vw);
+}
+
+.notice {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  padding: 12px 18px 12px 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1.5px solid var(--glass-border, rgba(245, 158, 11, 0.45));
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(248, 250, 252, 0.08);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  animation: noticeIn 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.notice.leaving {
+  animation: noticeOut 0.45s ease-in forwards;
+}
+
+@keyframes noticeIn {
+  from { transform: translateY(26px) scale(0.94); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes noticeOut {
+  to { transform: translateY(-10px) scale(0.97); opacity: 0; }
+}
+
+/* Grade medallion, stamped on like a postal mark */
+.notice-grade {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  border-radius: 50%;
+  font-family: 'Fredoka', cursive;
+  font-size: 26px;
+  font-weight: 700;
+  color: #ffffff;
+  border: 3px dashed rgba(255, 255, 255, 0.85);
+  background: linear-gradient(135deg, #f59e0b, #b45309);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.28);
+  animation: gradeStamp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes gradeStamp {
+  from { transform: scale(1.7) rotate(-16deg); opacity: 0; }
+  to { transform: scale(1) rotate(-7deg); opacity: 1; }
+}
+
+.notice-grade.grade-S { background: linear-gradient(135deg, #fde047, #ca8a04); }
+.notice-grade.grade-A { background: linear-gradient(135deg, #4ade80, #15803d); }
+.notice-grade.grade-B { background: linear-gradient(135deg, #38bdf8, #0369a1); }
+.notice-grade.grade-C { background: linear-gradient(135deg, #94a3b8, #475569); }
+.notice-grade.grade-F { background: linear-gradient(135deg, #f87171, #b91c1c); }
+
+.notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.notice-title {
+  font-family: 'Fredoka', cursive;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #facc15;
+  line-height: 1.15;
+}
+
+.notice-text {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.notice-payout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.notice-chip {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: #e2e8f0;
+}
+
+.notice-chip.pay {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.notice-chip.stamp {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.36);
+}
+
+/* Call to action prompting the next job */
+.notice-cta {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.28);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notice-key {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+  color: #0f172a;
+  background: #facc15;
+  border-radius: 5px;
+  padding: 2px 7px;
+  box-shadow: 0 2px 0 #a16207;
+  animation: keyPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes keyPulse {
+  0%, 100% { transform: translateY(0); box-shadow: 0 2px 0 #a16207; }
+  50% { transform: translateY(-2px); box-shadow: 0 4px 0 #a16207; }
+}
+
+/* Compact single-line variant for pickups, drops and warnings */
+.notice.slim {
+  align-items: center;
+  padding: 9px 16px;
+  gap: 10px;
+}
+
+.notice.slim .notice-title {
+  font-size: 13.5px;
+}
+
+.notice-icon {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.notice.good { border-color: rgba(34, 197, 94, 0.55); }
+.notice.warn { border-color: rgba(245, 158, 11, 0.6); }
+.notice.bad { border-color: rgba(239, 68, 68, 0.6); }

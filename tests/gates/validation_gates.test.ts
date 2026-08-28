@@ -23,13 +23,16 @@ describe('Renderoni 6 MVP Validation Gates', () => {
 
     hero.actions.move({ x: 1, z: 0 });
 
+    // Warmup step to ensure WASM / JIT compilation is loaded
+    game.step(10);
+
     // Measure simulation step execution time
     const startStep = performance.now();
     game.step(60);
     const stepElapsed = performance.now() - startStep;
     const perTickMs = stepElapsed / 60;
 
-    expect(game).toHaveTick(60);
+    expect(game).toHaveTick(70);
     expect(hero.position[0]).toBeGreaterThan(1.0);
     // Gate 1: Simulation tick in Node.js executes in <10ms
     expect(perTickMs).toBeLessThan(10);
