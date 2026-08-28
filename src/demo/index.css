@@ -1813,26 +1813,89 @@ body.in-game .top-nav.home-only { display: none !important; }
   100% { transform: translate(-50%, -50%) scale(1.04); }
 }
 
-/* Startup Controls Banner */
-.hud-controls-banner, .flight-controls-banner, .qs-controls-banner {
-  position: absolute;
-  bottom: 24px;
+/* Ephemeral Startup Controls Banner */
+.hud-controls-banner {
+  position: fixed;
+  bottom: 28px;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(0);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 9999px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 24px rgba(245, 158, 11, 0.18);
+  padding: 8px 18px;
+  color: #f8fafc;
+  font-size: 0.85rem;
+  z-index: 85;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  max-width: 92vw;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.hud-controls-banner.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.hud-controls-banner.fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+  pointer-events: none;
+}
+
+.hud-controls-banner .banner-items {
   display: flex;
   align-items: center;
   gap: 14px;
-  background: rgba(12, 12, 12, 0.88);
-  border: 2px solid #78716c;
-  box-shadow: var(--pixel-shadow);
-  padding: 8px 18px;
-  color: #e7e5e4;
-  font-size: 1rem;
-  pointer-events: none;
-  animation: bannerFadeOut 1s forwards ease-out 8s;
+  flex-wrap: nowrap;
 }
-@keyframes bannerFadeOut {
-  to { opacity: 0; pointer-events: none; }
+
+.hud-controls-banner span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.hud-controls-banner kbd {
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid #f59e0b;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fef08a;
+  font-family: monospace;
+}
+
+.hud-controls-banner .banner-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  margin-left: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s;
+}
+
+.hud-controls-banner .banner-close-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* Flight slider */

@@ -1025,6 +1025,7 @@ class PlaygroundApp {
           this.hudContainer.style.display = 'block';
           this.mountQuickstartHUD();
         }
+        this.showTemporaryControlsBanner(mode);
         this.resizeActiveScene();
 
         const meta = GAMES_METADATA[mode];
@@ -1034,6 +1035,58 @@ class PlaygroundApp {
         if (token === this.loadingToken) this.showLoadError(mode, err);
       }
     }
+  }
+
+  private showTemporaryControlsBanner(mode: GameMode): void {
+    const banner = document.getElementById('game-controls-banner');
+    if (!banner) return;
+    if (this.controlsBannerTimer) {
+      window.clearTimeout(this.controlsBannerTimer);
+      this.controlsBannerTimer = null;
+    }
+
+    if (mode === 'home') {
+      banner.style.display = 'none';
+      banner.classList.remove('visible', 'fade-out');
+      return;
+    }
+
+    const meta = GAMES_METADATA[mode];
+    if (!meta || !meta.controls?.length) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    const pillsHtml = meta.controls
+      .map((c) => `<span><kbd>${c.key}</kbd> ${c.desc}</span>`)
+      .join('');
+
+    banner.innerHTML = `
+      <div class="banner-items">${pillsHtml}</div>
+      <button class="banner-close-btn" title="Dismiss (Click or press key)" type="button">✕</button>
+    `;
+    banner.classList.remove('fade-out');
+    banner.classList.add('visible');
+    banner.style.display = 'flex';
+
+    const dismiss = () => {
+      banner.classList.add('fade-out');
+      if (this.controlsBannerTimer) {
+        window.clearTimeout(this.controlsBannerTimer);
+        this.controlsBannerTimer = null;
+      }
+      this.controlsBannerTimer = window.setTimeout(() => {
+        banner.style.display = 'none';
+        banner.classList.remove('visible', 'fade-out');
+      }, 500);
+    };
+
+    banner.querySelector('.banner-close-btn')?.addEventListener('click', dismiss, { once: true });
+
+    // Auto-dismiss after 6.5 seconds
+    this.controlsBannerTimer = window.setTimeout(() => {
+      dismiss();
+    }, 6500);
   }
 
   private showLoading(mode: GameMode): void {
@@ -1093,15 +1146,6 @@ class PlaygroundApp {
           </div>
         </div>
         <div class="hud-reticle-dot"></div>
-        <div id="psx-controls-banner" class="hud-controls-banner">
-          <span><kbd>WASD</kbd> Walk</span>
-          <span><kbd>Mouse</kbd> Look</span>
-          <span><kbd>Shift</kbd> Run</span>
-          <span><kbd>Space</kbd> Jump</span>
-          <span><kbd>F</kbd> Flashlight</span>
-          <span><kbd>E</kbd> Interact</span>
-          <span><kbd>ESC</kbd> Menu</span>
-        </div>
       </div>
     `;
 
@@ -1134,15 +1178,6 @@ class PlaygroundApp {
           </div>
         </div>
         <div class="hud-reticle-dot"></div>
-        <div id="qs-controls-banner" class="hud-controls-banner">
-          <span><kbd>WASD</kbd> Move</span>
-          <span><kbd>Space</kbd> Jump</span>
-          <span><kbd>Shift</kbd> Sprint</span>
-          <span><kbd>E</kbd> Blast</span>
-          <span><kbd>B</kbd> Boxes</span>
-          <span><kbd>N</kbd> Spheres</span>
-          <span><kbd>ESC</kbd> Pause</span>
-        </div>
       </div>
     `;
 
