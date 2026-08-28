@@ -225,6 +225,7 @@ class PlaygroundApp {
   private loopTitle!: HTMLElement;
   private loopBody!: HTMLElement;
   private loopAction!: HTMLButtonElement;
+  private controlsBannerTimer: number | null = null;
 
   constructor() {
     this.canvas = document.getElementById('render-canvas') as HTMLCanvasElement;

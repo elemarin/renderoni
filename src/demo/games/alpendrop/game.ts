@@ -37,7 +37,6 @@ const _scratchCamTarget = new THREE.Vector3();
 const _scratchForward = new THREE.Vector3();
 const _scratchUp = new THREE.Vector3();
 const _scratchRight = new THREE.Vector3();
-const _scratchQuat = new THREE.Quaternion();
 const _scratchInterpPos = new THREE.Vector3();
 const _scratchInterpRot = new THREE.Quaternion();
 const _scratchEuler = new THREE.Euler(0, 0, 0, 'YXZ');

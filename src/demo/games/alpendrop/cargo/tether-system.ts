@@ -16,7 +16,6 @@ const _vRelVel = new THREE.Vector3();
 const _vTensionForce = new THREE.Vector3();
 
 export class MagneticSlingSystem {
-  private world: RAPIER.World;
   private aircraftBody: RAPIER.RigidBody;
   private anchorObject: THREE.Object3D;
   private scene: THREE.Scene;
@@ -58,14 +57,13 @@ export class MagneticSlingSystem {
   onDrop?: (parcel: ParcelEntity) => void;
 
   constructor(
-    world: RAPIER.World,
+    _world: RAPIER.World,
     aircraftBody: RAPIER.RigidBody,
     anchorObject: THREE.Object3D,
     scene: THREE.Scene,
     slingLength: number = 1.4,
     magneticRadius: number = 8.5
   ) {
-    this.world = world;
     this.aircraftBody = aircraftBody;
     this.anchorObject = anchorObject;
     this.scene = scene;
@@ -135,7 +133,7 @@ export class MagneticSlingSystem {
     this.magneticRadius = magneticRadius;
   }
 
-  toggleArm(armed?: boolean): void {
+  toggleArm(_armed?: boolean): void {
     if (this.latchedParcel) {
       this.dropCargo();
       return;
