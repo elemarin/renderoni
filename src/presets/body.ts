@@ -6,7 +6,7 @@
 
 import { Type, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import { definePreset, type EntityContext } from './define-preset.js';
 
 export const BodyShapeSchema = Type.Union([
@@ -46,6 +46,8 @@ export const body = definePreset({
   version: 1,
   schema: BodyOptionsSchema,
   create(ctx: EntityContext, options: BodyOptions) {
+    // Throws RND_0412 up front when the engine runs without physics.
+    const R = ctx.native.rapier;
     const shape = options.shape ?? 'box';
     const bodyType = options.type ?? 'fixed';
     const pos = options.position ?? [0, 0, 0];
@@ -58,24 +60,24 @@ export const body = definePreset({
     if (shape === 'sphere') {
       const radius = options.radius ?? (options.size?.[0] ? options.size[0] / 2 : 0.5);
       geometry = new THREE.SphereGeometry(radius, 16, 16);
-      colliderDesc = RAPIER.ColliderDesc.ball(radius);
+      colliderDesc = R.ColliderDesc.ball(radius);
     } else if (shape === 'cylinder') {
       const radius = options.radius ?? 0.5;
       const height = options.size?.[1] ?? 2.0;
       geometry = new THREE.CylinderGeometry(radius, radius, height, 16);
-      colliderDesc = RAPIER.ColliderDesc.cylinder(height / 2, radius);
+      colliderDesc = R.ColliderDesc.cylinder(height / 2, radius);
     } else if (shape === 'capsule') {
       const radius = options.radius ?? 0.5;
       const halfHeight = options.size?.[1] ? options.size[1] / 2 : 1.0;
       geometry = new THREE.CapsuleGeometry(radius, halfHeight * 2, 8, 16);
-      colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
+      colliderDesc = R.ColliderDesc.capsule(halfHeight, radius);
     } else {
       // Default: box
       const sx = options.size?.[0] ?? 1.0;
       const sy = options.size?.[1] ?? 1.0;
       const sz = options.size?.[2] ?? 1.0;
       geometry = new THREE.BoxGeometry(sx, sy, sz);
-      colliderDesc = RAPIER.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2);
+      colliderDesc = R.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2);
     }
 
     const material = new THREE.MeshStandardMaterial({ color });
@@ -93,13 +95,13 @@ export const body = definePreset({
     // 2. Create Rapier Rigid Body & Collider
     let rigidBodyDesc: RAPIER.RigidBodyDesc;
     if (bodyType === 'dynamic') {
-      rigidBodyDesc = RAPIER.RigidBodyDesc.dynamic();
+      rigidBodyDesc = R.RigidBodyDesc.dynamic();
     } else if (bodyType === 'kinematicPositionBased') {
-      rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased();
+      rigidBodyDesc = R.RigidBodyDesc.kinematicPositionBased();
     } else if (bodyType === 'kinematicVelocityBased') {
-      rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicVelocityBased();
+      rigidBodyDesc = R.RigidBodyDesc.kinematicVelocityBased();
     } else {
-      rigidBodyDesc = RAPIER.RigidBodyDesc.fixed();
+      rigidBodyDesc = R.RigidBodyDesc.fixed();
     }
 
     rigidBodyDesc.setTranslation(pos[0], pos[1], pos[2]);
@@ -124,8 +126,8 @@ export const body = definePreset({
     if (options.restitution !== undefined) {
       colliderDesc.setRestitution(options.restitution);
     }
-    colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-    colliderDesc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
+    colliderDesc.setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    colliderDesc.setActiveCollisionTypes(R.ActiveCollisionTypes.ALL);
 
     const collider = ctx.native.world.createCollider(colliderDesc, rigidBody);
 

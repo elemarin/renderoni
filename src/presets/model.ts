@@ -4,7 +4,7 @@
 
 import { Type, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import { definePreset, type EntityContext } from './define-preset.js';
 
 export const ModelOptionsSchema = Type.Object({
@@ -50,19 +50,20 @@ export const model = definePreset({
     let collider: RAPIER.Collider | undefined;
 
     if (physics !== 'none') {
+      const R = ctx.native.rapier;
       const desc =
-        physics === 'dynamic' ? RAPIER.RigidBodyDesc.dynamic() : RAPIER.RigidBodyDesc.fixed();
+        physics === 'dynamic' ? R.RigidBodyDesc.dynamic() : R.RigidBodyDesc.fixed();
       desc.setTranslation(pos[0], pos[1], pos[2]);
       body = ctx.native.world.createRigidBody(desc);
 
       const size = options.colliderSize ?? [1, 1, 1];
       let col: RAPIER.ColliderDesc;
       if (options.colliderShape === 'sphere') {
-        col = RAPIER.ColliderDesc.ball(size[0] ?? 0.5);
+        col = R.ColliderDesc.ball(size[0] ?? 0.5);
       } else if (options.colliderShape === 'cylinder') {
-        col = RAPIER.ColliderDesc.cylinder((size[1] ?? 1) / 2, size[0] ?? 0.5);
+        col = R.ColliderDesc.cylinder((size[1] ?? 1) / 2, size[0] ?? 0.5);
       } else {
-        col = RAPIER.ColliderDesc.cuboid((size[0] ?? 1) / 2, (size[1] ?? 1) / 2, (size[2] ?? 1) / 2);
+        col = R.ColliderDesc.cuboid((size[0] ?? 1) / 2, (size[1] ?? 1) / 2, (size[2] ?? 1) / 2);
       }
       collider = ctx.native.world.createCollider(col, body);
     }

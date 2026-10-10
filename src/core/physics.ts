@@ -5,9 +5,37 @@
  * pair sorting and bulk transform copying to the Canonical Physics Buffer.
  */
 
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import type { DualBufferTransformPipeline } from './transform-buffer.js';
 import { compareCodeUnits } from './hashing.js';
+
+/** The Rapier module namespace, as returned by {@link loadRapier}. */
+export type RapierModule = typeof RAPIER;
+
+let rapierLoad: Promise<RapierModule> | null = null;
+
+/**
+ * Loads and initializes the Rapier WASM runtime once per process.
+ *
+ * Rapier is imported dynamically so bundlers split its ~2 MB inlined WASM into
+ * a chunk that is only fetched when an engine initializes physics; engines
+ * created with `physics: false` never load it. A failed load stays retryable.
+ */
+export function loadRapier(): Promise<RapierModule> {
+  if (!rapierLoad) {
+    rapierLoad = import('@dimforge/rapier3d-compat')
+      .then(async (mod) => {
+        const rapier = ((mod as { default?: RapierModule }).default ?? mod) as RapierModule;
+        await rapier.init();
+        return rapier;
+      })
+      .catch((error: unknown) => {
+        rapierLoad = null;
+        throw error;
+      });
+  }
+  return rapierLoad;
+}
 
 export interface PhysicsWorldConfig {
   gravity?: [number, number, number];
@@ -44,7 +72,7 @@ export interface SyncStats {
 export class PhysicsEngine {
   private _world: RAPIER.World | null = null;
   private _eventQueue: RAPIER.EventQueue | null = null;
-  private isInitialized = false;
+  private _rapier: RapierModule | null = null;
 
   private colliderToEntity: Map<number, string> = new Map();
   private sensorColliders: Set<number> = new Set();
@@ -66,10 +94,7 @@ export class PhysicsEngine {
    * previous world's WASM memory.
    */
   async init(config: PhysicsWorldConfig = {}): Promise<void> {
-    if (!this.isInitialized) {
-      await RAPIER.init();
-      this.isInitialized = true;
-    }
+    const RAPIER = this._rapier ?? (this._rapier = await loadRapier());
 
     if (this._world) return;
 
@@ -84,6 +109,14 @@ export class PhysicsEngine {
     if (config.integrationParameters?.maxCcdSubsteps !== undefined) {
       this._world.integrationParameters.maxCcdSubsteps = config.integrationParameters.maxCcdSubsteps;
     }
+  }
+
+  /** The initialized Rapier module. Throws before {@link PhysicsEngine.init} resolves. */
+  get rapier(): RapierModule {
+    if (!this._rapier) {
+      throw new Error('PhysicsEngine not initialized. Call await physics.init() first.');
+    }
+    return this._rapier;
   }
 
   get hasWorld(): boolean {

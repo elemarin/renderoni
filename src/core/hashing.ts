@@ -39,6 +39,7 @@ import {
   OFFSET_ANGVEL_Y,
   OFFSET_ANGVEL_Z,
 } from './transform-buffer.js';
+import type { WorldDigest } from './worlds.js';
 
 export const SCALE_Q12 = 4096.0; // 2^12
 
@@ -150,11 +151,16 @@ export class StateHasher {
    *
    * Throws when called before {@link StateHasher.init} resolves; a placeholder
    * digest would make an uninitialized engine look deterministic.
+   *
+   * World provider digests are appended after the entity metadata in name
+   * order. With no digests nothing is appended, so games without providers
+   * hash exactly the bytes they always did.
    */
   computeHash(
     entities: StateEntityRecord[],
     transformBuffer: Float32Array,
-    contacts: ContactPairRecord[] = []
+    contacts: ContactPairRecord[] = [],
+    worlds: WorldDigest[] = []
   ): string {
     const h64 = this.h64;
     if (!h64) {
@@ -249,13 +255,58 @@ export class StateHasher {
       sortedEntities.map((entity) => `${entity.id}:${stableStringify(entity.state ?? {})}`).join('|')
     );
     const transformBytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-    const bytes = new Uint8Array(transformBytes.length + metadata.length);
+    const worldBytes = encodeWorldDigests(worlds);
+    const bytes = new Uint8Array(transformBytes.length + metadata.length + worldBytes.length);
     bytes.set(transformBytes);
     bytes.set(metadata, transformBytes.length);
+    bytes.set(worldBytes, transformBytes.length + metadata.length);
     const hashBigInt = h64(bytes);
     return '0x' + hashBigInt.toString(16).padStart(16, '0');
   }
 
+}
+
+/**
+ * Encodes world digests as `\0worlds` followed, per provider in code-unit
+ * name order, by `\0<name>\0<tag><byteLength>\0<bytes>` where the tag is
+ * `s` (UTF-8 string), `n` (little-endian float64) or `b` (raw bytes). The
+ * explicit lengths keep adjacent providers from aliasing each other.
+ */
+function encodeWorldDigests(worlds: WorldDigest[]): Uint8Array {
+  if (worlds.length === 0) return new Uint8Array(0);
+
+  const encoder = new TextEncoder();
+  const sorted = [...worlds].sort((a, b) => compareCodeUnits(a.name, b.name));
+  const parts: Uint8Array[] = [encoder.encode('\0worlds')];
+
+  for (const { name, digest } of sorted) {
+    let tag: string;
+    let payload: Uint8Array;
+    if (typeof digest === 'string') {
+      tag = 's';
+      payload = encoder.encode(digest);
+    } else if (typeof digest === 'number') {
+      if (!Number.isFinite(digest)) {
+        throw new Error(`RND_0413: world provider "${name}" returned a non-finite hash value ${digest}.`);
+      }
+      tag = 'n';
+      payload = new Uint8Array(8);
+      new DataView(payload.buffer).setFloat64(0, digest, true);
+    } else {
+      tag = 'b';
+      payload = digest;
+    }
+    parts.push(encoder.encode(`\0${name}\0${tag}${payload.length}\0`), payload);
+  }
+
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
 }
 
 function quantizeChecked(value: number | undefined, entityId: string, label: string): number {

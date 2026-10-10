@@ -6,15 +6,16 @@
  */
 
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import { SimulationClock, type SimulationClockOptions } from './clock.js';
 import { PRNG } from './prng.js';
 import { StructuralCommandQueue } from './commands.js';
 import { DualBufferTransformPipeline } from './transform-buffer.js';
-import { PhysicsEngine, type CollisionEvent, type SensorEvent } from './physics.js';
+import { PhysicsEngine, type CollisionEvent, type RapierModule, type SensorEvent } from './physics.js';
 import { StateHasher } from './hashing.js';
 import { ResourceOwnershipTracker } from './ownership.js';
 import { DiagnosticLogger } from './diagnostics.js';
+import { WorldRegistry } from './worlds.js';
 import { InputManager } from '../input/input-manager.js';
 import { ActionRegistry } from '../input/actions.js';
 import {
@@ -61,6 +62,12 @@ export interface RenderoniConfig {
   subsystems?: Array<(engine: RenderoniEngine) => void>;
   /** Opt-in play / win / lose / restart match loop. */
   loop?: boolean | GameLoopOptions;
+  /**
+   * Set to `false` for games that never use Rapier: the WASM runtime is not
+   * loaded, `step()` skips the physics step and contact/sensor processing, and
+   * Rapier-backed APIs fail with RND_0412. Defaults to `true`.
+   */
+  physics?: boolean;
 }
 
 export class EventEmitter {
@@ -164,6 +171,8 @@ export class SystemManager {
 export class RenderoniEngine {
   readonly mode: EngineMode;
   readonly seed: number | string;
+  /** False when created with `physics: false`; Rapier is then never loaded. */
+  readonly physicsEnabled: boolean;
 
   // L0 Deterministic Kernel Components
   readonly clock: SimulationClock;
@@ -181,6 +190,8 @@ export class RenderoniEngine {
   readonly input: InputManager;
   readonly actions: ActionRegistry;
   readonly loop: GameLoop;
+  /** Game-owned simulations exposed to MCP describe/observe/check and the state hash. */
+  readonly worlds: WorldRegistry;
 
   // Native 3D Presentation Objects
   readonly native: {
@@ -207,6 +218,7 @@ export class RenderoniEngine {
     this.initialConfig = config;
     this.mode = config.mode ?? 'headless';
     this.seed = config.seed ?? 42;
+    this.physicsEnabled = config.physics !== false;
     this.physics = new PhysicsEngine();
 
     this.clock = new SimulationClock(config.clock);
@@ -222,6 +234,7 @@ export class RenderoniEngine {
     this.input = new InputManager();
     this.actions = new ActionRegistry();
     this.loop = new GameLoop(config.loop);
+    this.worlds = new WorldRegistry(this.diagnostics, () => this.clock.tick);
 
     if (this.loop.enabled) {
       this.actions.register({ name: 'loop.start', handle: () => this.loop.start() });
@@ -249,13 +262,14 @@ export class RenderoniEngine {
       renderer.shadowMap.enabled = true;
     }
 
-    const physicsRef = this.physics;
+    const engine = this;
     this.native = {
       scene,
       camera,
       renderer,
       get world() {
-        return physicsRef.world;
+        if (!engine.physicsEnabled) throw engine.physicsDisabledError('engine.native.world');
+        return engine.physics.world;
       },
     };
   }
@@ -293,10 +307,12 @@ export class RenderoniEngine {
 
   private async runInit(resolvedConfig: RenderoniConfig): Promise<void> {
     await Promise.all([
-      this.physics.init({
-        gravity: resolvedConfig.gravity,
-        integrationParameters: { dt: this.clock.fixedDt },
-      }),
+      this.physicsEnabled
+        ? this.physics.init({
+            gravity: resolvedConfig.gravity,
+            integrationParameters: { dt: this.clock.fixedDt },
+          })
+        : undefined,
       this.hasher.init(),
     ]);
 
@@ -305,6 +321,23 @@ export class RenderoniEngine {
         sub(this);
       }
     }
+  }
+
+  /**
+   * Error for a Rapier-backed API used on an engine created with
+   * `physics: false`, reported as an RND_0412 diagnostic.
+   */
+  private physicsDisabledError(operation: string): Error {
+    const message =
+      `RND_0412: ${operation} is unavailable because this engine was created with physics: false. ` +
+      'Rapier was never loaded, so bodies, colliders and physics presets cannot be created.';
+    this.diagnostics.emit('RND_0412', message, {
+      severity: 'error',
+      tick: this.clock.tick,
+      remediation:
+        'Omit `physics` (or pass `physics: true`) to use Rapier, or build the entity without a body (plain EntityConfig, mesh/model with physics: "none").',
+    });
+    return new Error(message);
   }
 
   /** True once dispose() has run; disposed engines reject further simulation. */
@@ -370,10 +403,19 @@ export class RenderoniEngine {
       throw this.duplicateEntityIdError(requestedId);
     }
 
+    // Physics engines keep failing fast when add() runs before init().
+    if (this.physicsEnabled) void this.native.world;
+    const engine = this;
     const ctx: EntityContext = {
       id: requestedId ?? generateId(),
       native: {
-        world: this.native.world,
+        get world() {
+          return engine.native.world;
+        },
+        get rapier(): RapierModule {
+          if (!engine.physicsEnabled) throw engine.physicsDisabledError('ctx.native.rapier');
+          return engine.physics.rapier;
+        },
         threeScene: this.native.scene,
       },
       events: {
@@ -892,9 +934,9 @@ export class RenderoniEngine {
         ent.update?.(this.clock.fixedDt);
       }
 
-      // 5. Step Rapier Physics World
+      // 5. Step Rapier Physics World (skipped entirely without physics)
       const currentTick = this.clock.tick;
-      this.physics.step(
+      if (this.physicsEnabled) this.physics.step(
         this.transformPipeline,
         (contact: CollisionEvent) => {
           this.events.emit(
@@ -922,7 +964,7 @@ export class RenderoniEngine {
 
       // 7. Re-sync authoritative Rapier state so impulses, velocity writes and
       //    teleports applied by post-physics systems are canonical for this tick.
-      this.physics.syncCanonicalState(this.transformPipeline);
+      if (this.physicsEnabled) this.physics.syncCanonicalState(this.transformPipeline);
 
       // 8. Periodically audit skipped bodies so a native move that Rapier
       //    cannot report can never become silent stale canonical state.
@@ -968,6 +1010,9 @@ export class RenderoniEngine {
    * Bodies skipped by the canonical sync are audited first, so a native move
    * Rapier cannot report is repaired and diagnosed instead of being hashed as
    * stale state.
+   *
+   * Registered world providers that implement `hash()` are folded in by name
+   * order; without them the digest is byte-identical to a provider-free engine.
    */
   getStateHash(): string {
     if (!this.hasher.isReady) {
@@ -990,7 +1035,8 @@ export class RenderoniEngine {
     return this.hasher.computeHash(
       rawEntities,
       this.transformPipeline.currentBuffer,
-      this.physics.getActiveContacts()
+      this.physics.getActiveContacts(),
+      this.worlds.digests()
     );
   }
 
@@ -1108,6 +1154,7 @@ export class RenderoniEngine {
     guard(() => this.actions.clear());
     guard(() => this.commands.clear());
     guard(() => this.systems.clear());
+    guard(() => this.worlds.clear());
     guard(() => {
       const disposalErrors = this.reportResourceDisposalErrors(
         '<engine>',

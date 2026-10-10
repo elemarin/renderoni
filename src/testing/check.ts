@@ -57,23 +57,43 @@ export function evaluateCheck(game: RenderoniEngine, assertions: AssertionOp[]):
         break;
       }
       case 'greaterThan': {
-        const val = resolvePath(game, ast.path!);
+        const resolved = resolvePath(game, ast.path!);
+        if ('error' in resolved) {
+          failures.push(`greaterThan failed for ${ast.path}: ${resolved.error}`);
+          break;
+        }
+        const val = resolved.value;
         if (typeof val !== 'number' || val <= (ast.value as number)) {
-          failures.push(`greaterThan failed for ${ast.path}: expected > ${ast.value}, got ${val}`);
+          failures.push(`greaterThan failed for ${ast.path}: expected > ${ast.value}, got ${formatValue(val, resolved.world)}`);
         }
         break;
       }
       case 'lessThan': {
-        const val = resolvePath(game, ast.path!);
+        const resolved = resolvePath(game, ast.path!);
+        if ('error' in resolved) {
+          failures.push(`lessThan failed for ${ast.path}: ${resolved.error}`);
+          break;
+        }
+        const val = resolved.value;
         if (typeof val !== 'number' || val >= (ast.value as number)) {
-          failures.push(`lessThan failed for ${ast.path}: expected < ${ast.value}, got ${val}`);
+          failures.push(`lessThan failed for ${ast.path}: expected < ${ast.value}, got ${formatValue(val, resolved.world)}`);
         }
         break;
       }
       case 'equals': {
-        const val = resolvePath(game, ast.path!);
-        if (val !== ast.value) {
-          failures.push(`equals failed for ${ast.path}: expected ${ast.value}, got ${val}`);
+        const resolved = resolvePath(game, ast.path!);
+        if ('error' in resolved) {
+          failures.push(`equals failed for ${ast.path}: ${resolved.error}`);
+          break;
+        }
+        const val = resolved.value;
+        // World values may be arrays or records; compare those structurally.
+        // Entity paths keep strict identity.
+        const matches = resolved.world ? jsonEquals(val, ast.value) : val === ast.value;
+        if (!matches) {
+          failures.push(
+            `equals failed for ${ast.path}: expected ${formatValue(ast.value, resolved.world)}, got ${formatValue(val, resolved.world)}`
+          );
         }
         break;
       }
@@ -134,8 +154,36 @@ export function evaluateCheck(game: RenderoniEngine, assertions: AssertionOp[]):
   };
 }
 
-function resolvePath(game: RenderoniEngine, path: string): unknown {
+type ResolvedPath = { value: unknown; world?: boolean } | { error: string };
+
+/**
+ * Resolves `entities.<id>.position[.x|y|z]`, `entities.<id>.state.<key>` and
+ * `world.<name>.<path...>`. A missing world provider, one without `resolve()`
+ * or one whose `resolve()` throws is reported as an error rather than a value.
+ */
+function resolvePath(game: RenderoniEngine, path: string): ResolvedPath {
   const parts = path.split('.');
+  if (parts[0] === 'world') {
+    const name = parts[1];
+    const provider = name === undefined ? undefined : game.worlds.get(name);
+    if (!provider) {
+      return { error: `no world provider named "${name ?? ''}" is registered` };
+    }
+    if (typeof provider.resolve !== 'function') {
+      return { error: `world provider "${name}" does not implement resolve()` };
+    }
+    try {
+      return { value: provider.resolve(parts.slice(2)), world: true };
+    } catch (error) {
+      return {
+        error: `world provider "${name}" failed to resolve: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+  return { value: resolveEntityPath(game, parts) };
+}
+
+function resolveEntityPath(game: RenderoniEngine, parts: string[]): unknown {
   if (parts[0] === 'entities') {
     if (!game.entities.has(parts[1])) return undefined;
     const ent = game.entities.get(parts[1]);
@@ -151,4 +199,31 @@ function resolvePath(game: RenderoniEngine, path: string): unknown {
     }
   }
   return undefined;
+}
+
+/** Renders world values as JSON; entity values keep their original String() form. */
+function formatValue(value: unknown, world?: boolean): string {
+  if (world && value !== null && typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function jsonEquals(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const other = b as unknown[];
+    return a.length === other.length && a.every((item, index) => jsonEquals(item, other[index]));
+  }
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = Object.keys(left);
+  if (keys.length !== Object.keys(right).length) return false;
+  return keys.every((key) => Object.hasOwn(right, key) && jsonEquals(left[key], right[key]));
 }

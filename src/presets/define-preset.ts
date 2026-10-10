@@ -7,14 +7,23 @@
 
 import { type TSchema, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import type { RapierModule } from '../core/physics.js';
 import type { DisposableResource, ResourceOwnership } from '../core/ownership.js';
 import type { PRNG } from '../core/prng.js';
 
 export interface EntityContext {
   id: string;
   native: {
+    /** The Rapier world. Throws RND_0412 when the engine runs with `physics: false`. */
     world: RAPIER.World;
+    /**
+     * The loaded Rapier module (loaded lazily at engine init). Presets build
+     * their descriptors from it instead of importing Rapier statically, so
+     * physics-free bundles never include the WASM. Throws RND_0412 when the
+     * engine runs with `physics: false`.
+     */
+    rapier: RapierModule;
     threeScene?: THREE.Scene;
   };
   events: {

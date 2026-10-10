@@ -6,7 +6,7 @@
 
 import { Type, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
 import { definePreset, type EntityContext } from './define-preset.js';
 
 export const SensorShapeSchema = Type.Union([
@@ -32,6 +32,8 @@ export const sensor = definePreset({
   version: 1,
   schema: SensorOptionsSchema,
   create(ctx: EntityContext, options: SensorOptions) {
+    // Throws RND_0412 up front when the engine runs without physics.
+    const R = ctx.native.rapier;
     const shape = options.shape ?? 'box';
     const pos = options.position ?? [0, 0, 0];
 
@@ -40,27 +42,27 @@ export const sensor = definePreset({
 
     if (shape === 'sphere') {
       const radius = options.radius ?? (options.size?.[0] ? options.size[0] / 2 : 1.0);
-      colliderDesc = RAPIER.ColliderDesc.ball(radius);
+      colliderDesc = R.ColliderDesc.ball(radius);
       if (options.debugMesh) geometry = new THREE.SphereGeometry(radius, 8, 8);
     } else if (shape === 'cylinder') {
       const radius = options.radius ?? 1.0;
       const height = options.size?.[1] ?? 2.0;
-      colliderDesc = RAPIER.ColliderDesc.cylinder(height / 2, radius);
+      colliderDesc = R.ColliderDesc.cylinder(height / 2, radius);
       if (options.debugMesh) geometry = new THREE.CylinderGeometry(radius, radius, height, 8);
     } else {
       const sx = options.size?.[0] ?? 1.0;
       const sy = options.size?.[1] ?? 1.0;
       const sz = options.size?.[2] ?? 1.0;
-      colliderDesc = RAPIER.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2);
+      colliderDesc = R.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2);
       if (options.debugMesh) geometry = new THREE.BoxGeometry(sx, sy, sz);
     }
 
     colliderDesc.setSensor(true);
-    colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-    colliderDesc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
+    colliderDesc.setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    colliderDesc.setActiveCollisionTypes(R.ActiveCollisionTypes.ALL);
 
     // Kinematic sensor body ensures collision pairs with dynamic, kinematic, and KCC players
-    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(pos[0], pos[1], pos[2]);
+    const bodyDesc = R.RigidBodyDesc.kinematicPositionBased().setTranslation(pos[0], pos[1], pos[2]);
     const body = ctx.native.world.createRigidBody(bodyDesc);
     const collider = ctx.native.world.createCollider(colliderDesc, body);
 

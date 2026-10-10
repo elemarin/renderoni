@@ -10,6 +10,7 @@ Renderoni is structured in 4 strict hierarchical layers:
 - **L0: Deterministic Kernel (`src/core/`)**: Integer tick clock (`clock.ts`), seeded PRNG streams (`prng.ts`), dual-buffer transform pipeline (`transform-buffer.ts`), XXH3 state hashing (`hashing.ts`), resource ownership matrix (`ownership.ts`), and diagnostics (`diagnostics.ts`).
   - **Rule 1**: NEVER call `Math.random()`, `Date.now()`, `performance.now()`, or `requestAnimationFrame()` inside simulation logic or entity updates. Always use `engine.prng` and `engine.clock.tick`.
   - **Rule 2**: NEVER bypass the dual-buffer transform pipeline. Write physics transforms into canonical buffer slots, never directly into render scene graphs.
+  - **Rule 3**: NEVER import `@dimforge/rapier3d-compat` as a value outside `src/core/physics.ts` (`import type` is fine). Presets get the module from `ctx.native.rapier`, so `physics: false` bundles never include the Rapier WASM.
 - **L1: Batteries & Subsystems (`src/presets/`, `src/animation/`, `src/audio/`, `src/vfx/`, `src/ui/`, `src/scene/`)**: High-level declarative presets (`body`, `sensor`, `light`, `kccPlayer`, `dynamicPlayer`, `proceduralModel`) and compact scene inventories for prompt → img2threejs factories.
 - **L2: Agent Tooling & MCP (`src/mcp/`, `src/testing/`)**: Stdio Model Context Protocol server, custom Vitest matchers, and headless CLI verification.
 - **L3: Web Application & Demos (`src/demo/`, `index.html`)**: Interactive playground and multi-archetype web showcases.
@@ -54,6 +55,7 @@ When connected over MCP (`bin/renderoni.js mcp`), use:
 - **`act`**: Dispatch typed gameplay actions (`{ name: string, payload?: any }`).
 - **`step`**: Advance simulation by $N$ fixed ticks.
 - **`check`**: Run AST assertions.
+- **World providers**: games with their own simulation register `engine.worlds.register({ name, describe?, observe?, resolve?, hash? })`; providers appear under `worlds` in `describe`, as `## <name>` sections in Tier 0 `observe`, as `world.<name>.<path>` in `check`, and in the state hash (provider-free hashes are unchanged).
 
 ---
 

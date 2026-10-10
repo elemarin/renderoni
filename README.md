@@ -55,6 +55,8 @@ resize();
 game.start();
 ```
 
+Games that never use Rapier (their own simulation, no bodies or colliders) can opt out: `createRenderoni({ physics: false })` never loads the Rapier WASM, since Rapier is imported lazily at engine init, so bundlers split it into a separate chunk that is never fetched. `step()` skips the physics step, and Rapier-backed APIs (`native.world`, the `body`/`sensor`/`kccPlayer` presets, `mesh`/`model` with physics) fail with `RND_0412`.
+
 ---
 
 ## ⚡ CLI & Asset Generation
@@ -205,6 +207,39 @@ npx renderoni mcp
 - **`act`**: Dispatch typed gameplay actions (`{ name: string, payload?: any }`).
 - **`step`**: Advance simulation by $N$ fixed ticks.
 - **`check`**: Run AST assertions headlessly.
+
+### World providers: games that run their own simulation
+
+A game whose state lives in its own simulation (run as an `engine.systems` system) rather than in renderoni entities can still be driven by agents. Register a world provider and it shows up in every MCP tool:
+
+```ts
+import { createRenderoni, type WorldProvider } from 'renderoni';
+
+const towns = [{ id: 'ashford', pop: 12 }];
+const game = await createRenderoni({ mode: 'headless', seed: 7 });
+game.systems.add({ update: () => { towns[0].pop++; } });
+
+const sim: WorldProvider = {
+  name: 'sim', // 1-64 chars of A-Z a-z 0-9 _ -
+  describe: () => ({ towns }),
+  observe: (budgetBytes) => towns.map((t) => `${t.id}: pop ${t.pop}`),
+  resolve: ([kind, id, field]) =>
+    kind === 'towns' ? (towns.find((t) => t.id === id) as Record<string, unknown> | undefined)?.[field] : undefined,
+  hash: () => towns.map((t) => `${t.id}:${t.pop}`).join('|'),
+};
+const unregister = game.worlds.register(sim);
+
+game.step(10);
+game.check([{ op: 'greaterThan', path: 'world.sim.towns.ashford.pop', value: 20 }]);
+unregister();
+```
+
+- **`describe`** adds `worlds: { <name>: describe() }` (only when a provider is registered).
+- **`observe`** (Tier 0) appends a `## <name>` section per provider after the entity lines. Entities reserve up to half of the 500-byte budget, providers split the rest evenly and are called with their share, and bytes a provider leaves unused go back to the entities. Tier 1 deltas are entity-only.
+- **`check`** resolves `world.<name>.<path...>` through `resolve(path)`; a missing provider or a provider without `resolve()` is reported as a failure.
+- **`step`** / `getStateHash()` fold every `hash()` (string, finite number or `Uint8Array`) into the digest in name order. Games without providers hash exactly as before.
+
+Invalid names and hooks fail with `RND_0410`, duplicate names with `RND_0411`, invalid hash values with `RND_0413`.
 
 ---
 

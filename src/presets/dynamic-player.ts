@@ -6,7 +6,6 @@
 
 import { Type, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { definePreset, type EntityContext } from './define-preset.js';
 
 export const DynamicPlayerOptionsSchema = Type.Object({
@@ -29,6 +28,8 @@ export const dynamicPlayer = definePreset({
   version: 1,
   schema: DynamicPlayerOptionsSchema,
   create(ctx: EntityContext, options: DynamicPlayerOptions) {
+    // Throws RND_0412 up front when the engine runs without physics.
+    const R = ctx.native.rapier;
     const pos = options.position ?? [0, 1, 0];
     const radius = options.radius ?? 0.5;
     const mass = options.mass ?? 1.0;
@@ -41,15 +42,15 @@ export const dynamicPlayer = definePreset({
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(pos[0], pos[1], pos[2]);
 
-    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+    const bodyDesc = R.RigidBodyDesc.dynamic()
       .setTranslation(pos[0], pos[1], pos[2])
       .setAdditionalMass(mass)
       .setLinearDamping(options.linearDamping ?? 0.5)
       .setAngularDamping(options.angularDamping ?? 0.5);
 
     const body = ctx.native.world.createRigidBody(bodyDesc);
-    const colliderDesc = RAPIER.ColliderDesc.ball(radius);
-    colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
+    const colliderDesc = R.ColliderDesc.ball(radius);
+    colliderDesc.setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
     const collider = ctx.native.world.createCollider(colliderDesc, body);
 
     let moveInput = { x: 0, z: 0 };

@@ -7,7 +7,6 @@
 
 import { Type, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
 import { definePreset, type EntityContext } from './define-preset.js';
 
 export const KCCPlayerOptionsSchema = Type.Object({
@@ -38,6 +37,8 @@ export const kccPlayer = definePreset({
   version: 1,
   schema: KCCPlayerOptionsSchema,
   create(ctx: EntityContext, options: KCCPlayerOptions) {
+    // Throws RND_0412 up front when the engine runs without physics.
+    const R = ctx.native.rapier;
     const pos = options.position ?? [0, 1, 0];
     const radius = options.radius ?? 0.4;
     const halfHeight = options.height ? options.height / 2 : 0.8;
@@ -54,12 +55,12 @@ export const kccPlayer = definePreset({
     mesh.position.set(pos[0], pos[1], pos[2]);
 
     // 2. Create Kinematic Position-Based Rigid Body & Capsule Collider
-    const bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(pos[0], pos[1], pos[2]);
+    const bodyDesc = R.RigidBodyDesc.kinematicPositionBased().setTranslation(pos[0], pos[1], pos[2]);
     const body = ctx.native.world.createRigidBody(bodyDesc);
 
-    const colliderDesc = RAPIER.ColliderDesc.capsule(halfHeight, radius);
-    colliderDesc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-    colliderDesc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
+    const colliderDesc = R.ColliderDesc.capsule(halfHeight, radius);
+    colliderDesc.setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    colliderDesc.setActiveCollisionTypes(R.ActiveCollisionTypes.ALL);
     const collider = ctx.native.world.createCollider(colliderDesc, body);
 
     // 3. Create Rapier Kinematic Character Controller
@@ -144,7 +145,7 @@ export const kccPlayer = definePreset({
       }
 
       // Compute desired movement vector
-      const desiredTranslation = new RAPIER.Vector3(
+      const desiredTranslation = new R.Vector3(
         inputVector.x * moveSpeedRuntime * dt,
         verticalVelocity * dt,
         inputVector.z * moveSpeedRuntime * dt
@@ -154,7 +155,7 @@ export const kccPlayer = definePreset({
       characterController.computeColliderMovement(
         collider,
         desiredTranslation,
-        RAPIER.QueryFilterFlags.EXCLUDE_SENSORS
+        R.QueryFilterFlags.EXCLUDE_SENSORS
       );
       const correctedMovement = characterController.computedMovement();
       isGrounded = characterController.computedGrounded();

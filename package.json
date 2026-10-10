@@ -92,6 +92,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsup && npm run copy:editor-assets",
+    "prepare": "npm run build 1>&2",
     "copy:editor-assets": "node -e \"require('fs').cpSync('src/editor/public','dist/editor/public',{recursive:true})\"",
     "build:web": "vite build",
     "preview": "vite preview",

@@ -4,7 +4,8 @@
 
 import { Type, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import type { RapierModule } from '../core/physics.js';
 import { definePreset, type EntityContext } from './define-preset.js';
 
 export const ProceduralColliderSchema = Type.Object({
@@ -44,7 +45,7 @@ export type ProceduralModelOptions = Omit<Static<typeof ProceduralModelOptionsSc
   create: () => THREE.Object3D;
 };
 
-function colliderDesc(options: ProceduralModelOptions): RAPIER.ColliderDesc {
+function colliderDesc(R: RapierModule, options: ProceduralModelOptions): RAPIER.ColliderDesc {
   const hint = options.collider ?? { shape: 'box' as const, size: [1, 1, 1] };
   const scale = options.scale ?? 1;
   const size = hint.size ?? [];
@@ -52,26 +53,26 @@ function colliderDesc(options: ProceduralModelOptions): RAPIER.ColliderDesc {
   let desc: RAPIER.ColliderDesc;
   if (hint.shape === 'sphere') {
     const radius = (hint.radius ?? size[0] ?? 0.5) * scale;
-    desc = RAPIER.ColliderDesc.ball(radius);
+    desc = R.ColliderDesc.ball(radius);
   } else if (hint.shape === 'cylinder') {
     const radius = (hint.radius ?? size[0] ?? 0.5) * scale;
     const height = (size[1] ?? 1) * scale;
-    desc = RAPIER.ColliderDesc.cylinder(height / 2, radius);
+    desc = R.ColliderDesc.cylinder(height / 2, radius);
   } else if (hint.shape === 'capsule') {
     const radius = (hint.radius ?? size[0] ?? 0.4) * scale;
     const height = (size[1] ?? 1.6) * scale;
-    desc = RAPIER.ColliderDesc.capsule(Math.max(height / 2 - radius, 0.05), radius);
+    desc = R.ColliderDesc.capsule(Math.max(height / 2 - radius, 0.05), radius);
   } else {
     const sx = (size[0] ?? 1) * scale;
     const sy = (size[1] ?? 1) * scale;
     const sz = (size[2] ?? 1) * scale;
-    desc = RAPIER.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2);
+    desc = R.ColliderDesc.cuboid(sx / 2, sy / 2, sz / 2);
   }
 
   if (hint.sensor) {
     desc.setSensor(true);
-    desc.setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS);
-    desc.setActiveCollisionTypes(RAPIER.ActiveCollisionTypes.ALL);
+    desc.setActiveEvents(R.ActiveEvents.COLLISION_EVENTS);
+    desc.setActiveCollisionTypes(R.ActiveCollisionTypes.ALL);
   }
   if (options.friction !== undefined) desc.setFriction(options.friction);
   if (options.restitution !== undefined) desc.setRestitution(options.restitution);
@@ -84,6 +85,8 @@ export const proceduralModel = definePreset({
   version: 1,
   schema: ProceduralModelOptionsSchema,
   create(ctx: EntityContext, options: ProceduralModelOptions) {
+    // Throws RND_0412 up front when the engine runs without physics.
+    const R = ctx.native.rapier;
     const pos = options.position ?? [0, 0, 0];
     const rot = options.rotation ?? [0, 0, 0, 1];
     const object = options.create();
@@ -94,17 +97,17 @@ export const proceduralModel = definePreset({
     const bodyType = options.type ?? 'fixed';
     let bodyDesc: RAPIER.RigidBodyDesc;
     if (bodyType === 'dynamic') {
-      bodyDesc = RAPIER.RigidBodyDesc.dynamic();
+      bodyDesc = R.RigidBodyDesc.dynamic();
     } else if (bodyType === 'kinematicPositionBased') {
-      bodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased();
+      bodyDesc = R.RigidBodyDesc.kinematicPositionBased();
     } else {
-      bodyDesc = RAPIER.RigidBodyDesc.fixed();
+      bodyDesc = R.RigidBodyDesc.fixed();
     }
     bodyDesc.setTranslation(pos[0], pos[1], pos[2]);
     bodyDesc.setRotation({ x: rot[0], y: rot[1], z: rot[2], w: rot[3] });
 
     const body = ctx.native.world.createRigidBody(bodyDesc);
-    const collider = ctx.native.world.createCollider(colliderDesc(options), body);
+    const collider = ctx.native.world.createCollider(colliderDesc(R, options), body);
 
     const tags = ['procedural', bodyType, ...(options.tags ?? [])];
     if (options.collider?.sensor) tags.push('sensor');

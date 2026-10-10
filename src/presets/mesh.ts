@@ -4,7 +4,8 @@
 
 import { Type, type Static } from '@sinclair/typebox';
 import * as THREE from 'three';
-import RAPIER from '@dimforge/rapier3d-compat';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import type { RapierModule } from '../core/physics.js';
 import { definePreset, type EntityContext } from './define-preset.js';
 
 export const MeshOptionsSchema = Type.Object({
@@ -48,12 +49,16 @@ function makeGeometry(options: MeshOptions): THREE.BufferGeometry {
   return new THREE.BoxGeometry(size[0] ?? 1, size[1] ?? 1, size[2] ?? 1);
 }
 
-function makeCollider(options: MeshOptions, object: THREE.Object3D): RAPIER.ColliderDesc | null {
+function makeCollider(
+  R: RapierModule,
+  options: MeshOptions,
+  object: THREE.Object3D
+): RAPIER.ColliderDesc | null {
   if ((options.physics ?? 'none') === 'none') return null;
   const box = new THREE.Box3().setFromObject(object);
   const size = new THREE.Vector3();
   box.getSize(size);
-  return RAPIER.ColliderDesc.cuboid(Math.max(size.x / 2, 0.05), Math.max(size.y / 2, 0.05), Math.max(size.z / 2, 0.05));
+  return R.ColliderDesc.cuboid(Math.max(size.x / 2, 0.05), Math.max(size.y / 2, 0.05), Math.max(size.z / 2, 0.05));
 }
 
 export const mesh = definePreset({
@@ -86,11 +91,12 @@ export const mesh = definePreset({
     let body: RAPIER.RigidBody | undefined;
     let collider: RAPIER.Collider | undefined;
     if (physics !== 'none') {
+      const R = ctx.native.rapier;
       const desc =
-        physics === 'dynamic' ? RAPIER.RigidBodyDesc.dynamic() : RAPIER.RigidBodyDesc.fixed();
+        physics === 'dynamic' ? R.RigidBodyDesc.dynamic() : R.RigidBodyDesc.fixed();
       desc.setTranslation(pos[0], pos[1], pos[2]);
       body = ctx.native.world.createRigidBody(desc);
-      const col = makeCollider(options, object);
+      const col = makeCollider(R, options, object);
       if (col) collider = ctx.native.world.createCollider(col, body);
     }
 

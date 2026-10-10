@@ -8,6 +8,7 @@
 import * as readline from 'node:readline';
 import { Value } from '@sinclair/typebox/value';
 import type { RenderoniEngine } from '../core/engine.js';
+import type { JsonValue } from '../core/worlds.js';
 import { ObservationEngine } from '../core/observations.js';
 import { evaluateCheck, isAssertionOp, type AssertionOp } from '../testing/check.js';
 import { RENDERONI_VERSION } from '../version.js';
@@ -29,7 +30,7 @@ export const MCP_SERVER_INFO = {
 } as const;
 
 export const MCP_INSTRUCTIONS =
-  `Inspect and drive a headless Renderoni simulation over stdio. describe reports configuration, entities, and registered actions; observe supports tiers 0 and 1; act dispatches registered gameplay actions; step advances 1–${MAX_MCP_STEP_TICKS} whole ticks; check evaluates supported assertions. The world starts empty until entities are spawned by game code.`;
+  `Inspect and drive a headless Renderoni simulation over stdio. describe reports configuration, entities, registered actions and game-registered worlds; observe supports tiers 0 and 1; act dispatches registered gameplay actions; step advances 1–${MAX_MCP_STEP_TICKS} whole ticks; check evaluates supported assertions, including world.<name>.<path> values. The world starts empty until entities are spawned by game code.`;
 
 export interface MCPToolDefinition {
   name: string;
@@ -257,9 +258,15 @@ function toolError(message: string): { content: Array<{ type: 'text'; text: stri
 export const MCP_TOOLS: Record<string, MCPToolDefinition> = {
   describe: {
     name: 'describe',
-    description: 'Inspect engine configuration, active entities, and registered actions',
+    description: 'Inspect engine configuration, active entities, registered actions and world providers',
     parameters: {},
     execute: (game: RenderoniEngine) => {
+      // Present only when the game registered providers, so provider-free
+      // games describe exactly as before.
+      const worlds: Record<string, JsonValue> = {};
+      for (const provider of game.worlds.list()) {
+        if (typeof provider.describe === 'function') worlds[provider.name] = provider.describe();
+      }
       return {
         tick: game.tick,
         mode: game.mode,
@@ -274,6 +281,7 @@ export const MCP_TOOLS: Record<string, MCPToolDefinition> = {
           state: e.state,
           position: e.position,
         })),
+        ...(game.worlds.size > 0 ? { worlds } : {}),
       };
     },
   },

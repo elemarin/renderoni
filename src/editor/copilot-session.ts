@@ -28,7 +28,11 @@ export async function getClient(): Promise<any> {
     clientPromise = (async () => {
       let mod: any;
       try {
-        mod = await import('@github/copilot-sdk');
+        // A non-literal specifier keeps tsc and the tsup DTS build from
+        // resolving the optional dependency, so the package builds (e.g. in
+        // `prepare` on a git install) when it is not installed.
+        const specifier = '@github/copilot-sdk';
+        mod = await import(/* @vite-ignore */ specifier);
       } catch (err: any) {
         if (err?.code === 'ERR_MODULE_NOT_FOUND' || err?.message?.includes('Cannot find package')) {
           throw new Error(
