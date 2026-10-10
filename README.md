@@ -190,6 +190,43 @@ test('player collects coin deterministically', async () => {
 - **Audio (`renderoni/audio`)**: Dual-mode Web Audio in interactive mode with one-shot user gesture autoplay resume (`pointerdown`/`keydown`), HRTF 3D spatial panning, master volume scaling, and zero-DOM deterministic event logging in headless mode.
 - **VFX (`renderoni/vfx`)**: Preallocated Structure-of-Arrays (SoA) particle pools with zero heap allocation churn during gameplay, billboard `THREE.InstancedMesh` rendering, and deterministic PRNG-driven screen shake.
 
+## 🏔️ Streamed Terrain (`renderoni/terrain`)
+
+For worlds too large to mesh or sample up front. You supply an analytic height function (and optionally a material and per-vertex attributes); the module handles caching, streaming, LOD and picking.
+
+- **`TiledHeightfield`**: lazily filled, LRU-evicted tiles over your height function. `heightAt` is an allocation-free bilinear lookup, `slopeAt(x, z, coarse?)` works on the cached surface (or directly on the analytic one, touching no tile), `prewarm` builds the tiles around a point. Tiles are a pure function of the sampler, so an evicted tile rebuilds bit-identically. Subclass and override `analytic` if the function needs your own fields.
+- **`TerrainMesh`**: chunked three.js terrain with distance LOD rings, crack-hiding skirts, a per-update build budget and unloading. Works with any material; a `TerrainShading` callback writes extra vertex attributes (colour, texture-layer weights). `pick` hits loaded chunks and falls back to analytic ray marching. Presentation only.
+- **`TileCache`**, **`Buckets`**: the tile cache and a uniform-grid spatial hash for bounding boxes (roads, settlements), usable on their own.
+
+```ts
+import * as THREE from 'three';
+import { TiledHeightfield, TerrainMesh } from 'renderoni/terrain';
+
+const ground = new TiledHeightfield({
+  size: 12_000,
+  sample: (x, z) => Math.sin(x * 0.004) * 30 + Math.cos(z * 0.003) * 20,
+});
+ground.prewarm(0, 0, 600);
+
+const terrain = new TerrainMesh(ground, {
+  shading: {
+    attributes: [{ name: 'color', itemSize: 3, skirtScale: 0.8 }],
+    vertex(v, out, i) {
+      const rock = Math.min(1, v.slope * 1.5);
+      out[0][i * 3] = 0.45 + rock * 0.1;
+      out[0][i * 3 + 1] = 0.5 - rock * 0.1;
+      out[0][i * 3 + 2] = 0.3;
+    },
+  },
+});
+
+const scene = new THREE.Scene();
+scene.add(terrain.group);
+terrain.update({ x: 0, z: 0 }); // every frame, with the camera target
+const hit = terrain.pick(new THREE.Ray(new THREE.Vector3(0, 200, 0), new THREE.Vector3(0, -1, 0)));
+void hit;
+```
+
 ---
 
 ## 🤖 MCP Agent Tools
@@ -231,6 +268,7 @@ import { body, kccPlayer, sensor, light, definePreset } from 'renderoni/presets'
 import { SceneManager, mountSceneInventory, parseSceneInventory } from 'renderoni/scene';
 import { audio, AudioManager } from 'renderoni/audio';
 import { vfx, ParticleEmitter, ScreenShake } from 'renderoni/vfx';
+import { TiledHeightfield, TerrainMesh, TileCache, Buckets } from 'renderoni/terrain';
 import { ui } from 'renderoni/ui';
 import { animation } from 'renderoni/animation';
 import { startEditorServer, generateAsset, scaffoldAsset } from 'renderoni/editor';

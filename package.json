@@ -41,6 +41,10 @@
       "types": "./dist/scene/index.d.ts",
       "import": "./dist/scene/index.js"
     },
+    "./terrain": {
+      "types": "./dist/terrain/index.d.ts",
+      "import": "./dist/terrain/index.js"
+    },
     "./mcp": {
       "types": "./dist/mcp/index.d.ts",
       "import": "./dist/mcp/index.js"

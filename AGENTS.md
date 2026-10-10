@@ -11,6 +11,7 @@ Renderoni is structured in 4 strict hierarchical layers:
   - **Rule 1**: NEVER call `Math.random()`, `Date.now()`, `performance.now()`, or `requestAnimationFrame()` inside simulation logic or entity updates. Always use `engine.prng` and `engine.clock.tick`.
   - **Rule 2**: NEVER bypass the dual-buffer transform pipeline. Write physics transforms into canonical buffer slots, never directly into render scene graphs.
 - **L1: Batteries & Subsystems (`src/presets/`, `src/animation/`, `src/audio/`, `src/vfx/`, `src/ui/`, `src/scene/`)**: High-level declarative presets (`body`, `sensor`, `light`, `kccPlayer`, `dynamicPlayer`, `proceduralModel`) and compact scene inventories for prompt → img2threejs factories.
+  - **Terrain (`src/terrain/`, `renderoni/terrain`)**: `TiledHeightfield` (lazily tiled, LRU-evicted cache over a caller's analytic height function; tiles must stay a pure function of it so evictions rebuild identically) and `TerrainMesh` (streamed chunk LOD mesh with skirts, build budget and picking; presentation only; simulation must never depend on it). Keep `heightAt` allocation-free.
 - **L2: Agent Tooling & MCP (`src/mcp/`, `src/testing/`)**: Stdio Model Context Protocol server, custom Vitest matchers, and headless CLI verification.
 - **L3: Web Application & Demos (`src/demo/`, `index.html`)**: Interactive playground and multi-archetype web showcases.
 
@@ -27,6 +28,7 @@ import { mountSceneInventory, parseSceneInventory } from 'renderoni/scene';
 import { audio } from 'renderoni/audio';
 import { animation } from 'renderoni/animation';
 import { vfx } from 'renderoni/vfx';
+import { TiledHeightfield, TerrainMesh } from 'renderoni/terrain';
 import { ui } from 'renderoni/ui';
 import { createMCPServer } from 'renderoni/mcp';
 import 'renderoni/testing/matchers';
