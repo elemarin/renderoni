@@ -15,6 +15,7 @@ export default defineConfig({
     'testing/matchers': 'src/testing/matchers.ts',
     'input/index': 'src/input/index.ts',
     'editor/index': 'src/editor/index.ts',
+    'nav/index': 'src/nav/index.ts',
   },
   format: ['esm'],
   dts: true,

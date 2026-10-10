@@ -60,6 +60,10 @@
     "./editor": {
       "types": "./dist/editor/index.d.ts",
       "import": "./dist/editor/index.js"
+    },
+    "./nav": {
+      "types": "./dist/nav/index.d.ts",
+      "import": "./dist/nav/index.js"
     }
   },
   "files": [

@@ -192,6 +192,40 @@ test('player collects coin deterministically', async () => {
 
 ---
 
+## 🧭 Navigation (`renderoni/nav`)
+
+Grid pathfinding for large, streamed worlds. The game supplies only its cost rules; the grid samples them lazily in tiles (LRU-evicted), layers rectangular blockers on top, and runs A* inside a bounded window with persistent scratch.
+
+```ts
+import { NavGrid, ExpeditionRouter, SpatialHash } from 'renderoni/nav';
+
+const nav = new NavGrid({
+  size: 3000, // metres, centred on the origin
+  cellCost: (x, z) => (Math.abs(x) < 20 && z < 1000 ? 0 : 1), // 0 = blocked, >1 slower, <1 faster
+});
+nav.addBlocker('hut', 40, 40, 12, 8, 0);
+
+nav.budget = 14; // searches allowed this step
+const path = nav.findPath(-100, 0, 100, 0); // Vector2 waypoints (y = world z)
+const arrived = path !== null && nav.lastPathComplete; // partial paths are never arrival
+
+// Long trips: corridors built from complete local paths, advanced a little each step.
+const router = new ExpeditionRouter(nav);
+const ticket = router.request({ x: -1400, z: -1400 }, { x: 1400, z: -1400 });
+router.update(1); // pass the sim tick; check ticket.state === 'ready'
+
+const hash = new SpatialHash<{ position: { x: number; z: number } }>(16);
+hash.rebuild([{ position: { x: 0, z: 0 } }]);
+const near = hash.within(0, 0, 5);
+console.log(arrived, ticket.state, near.length);
+```
+
+- `walkable(x, z, coarse?)`, `walkableFast` (no tile builds), `terrainPassable`, `segmentWalkable`, `lineClear`, `nearestWalkable`.
+- `revision` bumps on every blocker change; `refused` reports a search denied for lack of `budget`.
+- Results are a pure function of costs, blockers and the query.
+
+---
+
 ## 🤖 MCP Agent Tools
 
 When connected to AI coding assistants (Antigravity, Claude Code, Cursor), use Renderoni's built-in MCP server:
@@ -235,6 +269,7 @@ import { ui } from 'renderoni/ui';
 import { animation } from 'renderoni/animation';
 import { startEditorServer, generateAsset, scaffoldAsset } from 'renderoni/editor';
 import { createMCPServer } from 'renderoni/mcp';
+import { NavGrid, ExpeditionRouter, SpatialHash } from 'renderoni/nav';
 import 'renderoni/testing/matchers';
 ```
 
